@@ -1,0 +1,209 @@
+---
+title: "MoTrPAC Genotype Quality Metrics"
+output: html_document
+date: "2022-10-04"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(data.table)
+library(UpSetR)
+```
+
+```{r}
+ggplot.theme <- theme_minimal(base_size=18) +
+  theme(
+    panel.border=element_blank(),
+    panel.grid=element_blank(),
+    axis.line.x.bottom=element_line("black", 0.25),
+    axis.line.y.left=element_line("black", 0.25)
+  )
+```
+
+# Load Data
+
+```{r}
+DATA_DIR <- "/projects/motrpac/PRECOVID/DATA/GENOTYPE/FILTERED/"
+
+depth.samples <- fread(paste0(DATA_DIR, "merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.mean_depth_individual.idepth"))
+depth.sites <- fread(paste0(DATA_DIR, "merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.mean_depth_site.ldepth.mean"))
+
+heterozygosity <- fread(paste0(DATA_DIR, "merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.heterozygosity.het"))
+
+allele.freq <- fread(paste0(DATA_DIR, "merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.allele_frequencies.frq"))
+
+hwe <- fread(paste0(DATA_DIR, "merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.hwe_statistics.hwe"))
+
+site.qual <- fread(paste0(DATA_DIR, "merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.site_quality.lqual"))
+
+missing.samples <- fread(paste0(DATA_DIR, "merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.missing.imiss"))
+missing.sites <- fread(paste0(DATA_DIR, "merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.missing.lmiss"))
+```
+
+# Mean Depth per Individual
+
+The mean depth (number of reads overlapping the variant) for each sample. This
+ranges from 25.9774 to 41.0883 across the data. Depth is only calculated for samples
+that have the alternate variant.
+
+```{r}
+range(depth.samples$MEAN_DEPTH)
+
+depth.samples %>%
+  as.data.frame() %>%
+  ggplot(aes(x=MEAN_DEPTH)) +
+  geom_histogram(binwidth=1, fill="grey60", alpha=0.5) +
+  xlab("Mean Depth per Individual") + ylab("Frequency") +
+  ggplot.theme
+```
+
+# Mean Depth per Site
+
+Depth is only calculated for samples that have the alternate variant. That is,
+samples that did not report the variant (and automatically considered reference
+homozygotes) do not contribute to the measurement of depth.
+
+The mean depth per site ranged from 1.875 to 4086.660 with a median of 31.896 
+reads per alternate variant.
+
+```{r}
+summary(depth.sites$MEAN_DEPTH)
+
+depth.sites %>%
+  as.data.frame() %>%
+  ggplot(aes(x=MEAN_DEPTH)) +
+  geom_histogram(fill="grey60", alpha=0.5, bins=30) +
+  xlab("Mean Depth per Site") + ylab("Frequency") +
+  scale_x_log10() +
+  ggplot.theme
+```
+
+# Hardy-Weinberg Equilibrium
+
+Most variants are expected to be in Hardy-Weinberg Equilibrium (HWE). That is,
+the number of observed homozygotes and heterozygotes should match those seen
+under HWE.
+
+
+```{r}
+ hwe %>%
+  as.data.frame() %>%
+  dplyr::mutate(P.Interval=cut(P, breaks=seq(0, 1, length.out=101))) %>%
+  dplyr::count(P.Interval) %>%
+  dplyr::mutate(P.Interval=(as.numeric(P.Interval) - 0.5) / 100) %>%
+  ggplot() +
+  geom_bar(aes(x=P.Interval, y=n), stat="identity", fill="grey60", alpha=0.5) +
+  xlab("HWE p-value") + ylab("Frequency") +
+  ggplot.theme
+
+ggsave("results/motrpac_hwe_p_values.svg", width=12, height=8)
+```
+
+# Heterozygosity
+
+Heterozygosity is measured using the inbreeding coefficient $F$. It is defined
+as 1 minus the ratio of observed heterozygotes to expected heterozygotes under
+HWE. Therefore, low values of $F$ represent high heterozygosity and low
+inbreeding.
+
+This value varies from -0.09212 to 0.16777.
+
+```{r}
+range(heterozygosity$F)
+
+heterozygosity %>%
+  as.data.frame() %>%
+  ggplot(aes(x=F)) +
+  geom_histogram(fill="grey60", alpha=0.5, bins=30) +
+  xlab("Inbreeding Coefficient") + ylab("Frequency") +
+  ggplot.theme
+```
+
+# Allele Frequency Spectrum
+
+The SNPs have been filtered to MAF > 0.025. The allele frequency spectrum should
+show a larger number of rare variants compared to common variants.
+
+```{r}
+allele.freq %>%
+  as.data.frame() %>%
+  ggplot(aes(x=MAF)) +
+  geom_histogram(fill="grey60", alpha=0.5, bins=50) +
+  xlab("Minor Allele Frequency") + ylab("Frequency") +
+  ggplot.theme
+
+ggsave("results/motrpac_allele_frequency_spectrum.svg", width=12, height=8)
+```
+
+# Site Quality
+
+The site quality is reported for each site. The quality is a PHRED score, which
+is $q = -10\log_{10}(p)$. Thus, a value of $q=10$ is an error rate of 90%, a
+value of $q=100$ is an error rate of 99%, and so on.
+
+A generally useful cutoff is $q > 20$, based on the inflection point of error
+associated with the PHRED score. This is discussed
+[here](https://gatk.broadinstitute.org/hc/en-us/articles/360035531872-Phred-scaled-quality-scores).
+
+In this case, all variants pass the Q20 cutoff. The variant caller likely has
+a more stringent criteria.
+
+```{r}
+site.qual %>%
+  as.data.frame() %>%
+  ggplot(aes(x=QUAL)) +
+  geom_histogram(fill="grey60", alpha=0.5, bins=100) +
+  xlab("Site PHRED Score") + ylab("Frequency") +
+  scale_x_log10() +
+  ggplot.theme
+
+site.qual %>%
+  as.data.frame() %>%
+  dplyr::mutate(Pass.Q20 = QUAL > 20) %>%
+  dplyr::count(Pass.Q20) %>%
+  dplyr::mutate(Total = sum(n)) %>%
+  dplyr::mutate(Proportion = n / Total)
+```
+
+# Variant Filtering
+
+```{r}
+MERGED_DIR <- "/projects/motrpac/PRECOVID/DATA/GENOTYPE/MERGED/"
+FILTERED_DIR <- "/projects/motrpac/PRECOVID/DATA/GENOTYPE/FILTERED/"
+PLINK_DIR <- "/projects/motrpac/PRECOVID/DATA/GENOTYPE/PLINK/"
+
+plot.data <- data.frame(
+  Filters=c(
+    "Detected Variants",
+    "Missingness < 2%",
+    "MAF > 2.5%",
+    "HWE p-value ≥ 1E-6",
+    "SNPs",
+    "Autosomes"
+  ),
+  Variants=as.numeric(c(
+    system(paste0("bcftools index -n ", MERGED_DIR, "/merged.annotated.vcf.gz"), intern=T),
+    system(paste0("bcftools index -n ", FILTERED_DIR, "/merged.annotated.missingness_0_02.vcf.gz"), intern=T),
+    system(paste0("bcftools index -n ", FILTERED_DIR, "/merged.annotated.missingness_0_02.maf_0_025.vcf.gz"), intern=T),
+    system(paste0("bcftools index -n ", FILTERED_DIR, "/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.vcf.gz"), intern=T),
+    system(paste0("bcftools index -n ", FILTERED_DIR, "/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.vcf.gz"), intern=T),
+    system(paste0("grep 'variants loaded from' ", PLINK_DIR, "/motrpac.precovid.n_238.maf_0_025.snps.log", " | cut -d ' ' -f 1"), intern=T)
+  ))
+)
+```
+
+```{r, fig.width=8, fig.height=6}
+plot.data %>%
+  dplyr::mutate(Filters=factor(Filters, levels=rev(Filters))) %>%
+  ggplot() +
+  geom_bar(aes(x=Filters, y=Variants), stat="identity", fill="grey60", alpha=0.5) +
+  geom_text(aes(x=Filters, y=Variants, label=prettyNum(Variants, big.mark=",")), hjust=1.2, size=5) +
+  coord_flip() +
+  ggplot.theme +
+  theme(axis.title.y=element_blank())
+
+ggsave("results/motrpac_variant_filtering.svg", width=12, height=8)
+```
+

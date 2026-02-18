@@ -1,0 +1,238 @@
+---
+title: "MoTrPAC Genotype PCA"
+output: html_document
+date: "2022-10-04"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(data.table)
+library(gdsfmt)
+library(SNPRelate)
+library(here)
+```
+
+```{r}
+ggplot.theme <- theme_minimal(base_size=18) +
+  theme(
+    panel.border=element_blank(),
+    panel.grid=element_blank(),
+    axis.line.x.bottom=element_line("black", 0.25),
+    axis.line.y.left=element_line("black", 0.25)
+  )
+```
+
+# Load Data
+
+Sample information for the 1000 genomes project was acquired from
+[here](https://www.internationalgenome.org/data-portal/sample).
+
+```{r}
+populations <- read.table("1kg_pca/1kg_samples.tsv", sep="\t", header=T, quote="\"")
+population.colors <- read.csv("1kg_pca/1kg_population_colors.csv", stringsAsFactors=F)
+```
+
+
+# Reformat File
+
+Load the VCF file and reformat it as a GDS file. This is used by the `SNPRelate`
+package to work efficiently with a VCF file in `R`.
+
+```{r}
+DATA_DIR <- paste0(here(), "/data/tmp/")
+
+#vcf.fn <- paste0(DATA_DIR, "1kg.motrpac.merged.maf_0_05.ld_pruned.vcf.gz")
+gds.fn <- paste0(DATA_DIR, "1kg.motrpac.merged.maf_0_05.ld_pruned.gds")
+#snpgdsVCF2GDS(vcf.fn, gds.fn, method="biallelic.only")
+```
+
+There are ~200K SNPs in the LD-pruned VCF file.
+
+```{r}
+snpgdsSummary(gds.fn)
+```
+
+```{r}
+gds <- snpgdsOpen(gds.fn)
+```
+
+# LD Pruning
+
+The [package tutorial](https://www.bioconductor.org/packages/devel/bioc/vignettes/SNPRelate/inst/doc/SNPRelate.html)
+recommends LD pruning prior to analysis. Although I have already done this, I
+will use the package to see if further pruning can be achieved.
+
+```{r}
+set.seed(0)
+
+snpset <- snpgdsLDpruning(gds, ld.threshold=0.2)
+```
+
+These are the SNP indices that need to be retained after pruning. Only around
+~94K SNPs are included after the pruning step.
+
+```{r}
+snpset.id <- unlist(unname(snpset))
+```
+
+## PCA
+
+Perform PCA on the pruned genotypes.
+
+```{r,eval = FALSE}
+pca <- snpgdsPCA(gds, snp.id=snpset.id, num.thread=2)
+saveRDS(pca, paste0(DATA_DIR, "1kg.motrpac.merged.maf_0_05.ld_pruned.pca.RDS"))
+```
+
+Save the PCA results to file for future reference.
+
+```{r}
+pca = readRDS(paste0(DATA_DIR, "1kg.motrpac.merged.maf_0_05.ld_pruned.pca.RDS"))
+```
+
+```{r}
+head(round(pca$varprop, 4))
+```
+
+Match Sample IDs with known populations from the 1000 genomes project.
+
+```{r}
+pca.colors <- population.colors$Color
+names(pca.colors) <- population.colors$Population
+
+pca.1kg <- data.frame(
+  Sample.ID = pca$sample.id,
+  PC1 = pca$eigenvect[,1],
+  PC2 = pca$eigenvect[,2],
+  stringsAsFactors = FALSE
+) %>%
+  merge(., populations, by.x="Sample.ID", by.y="Sample.name") %>%
+  dplyr::select(Sample.ID, PC1, PC2, Population=Population.code) %>%
+  merge(., population.colors, by="Population") %>%
+  dplyr::mutate(Consortium = "1000 Genomes") %>%
+  dplyr::mutate(Population = factor(Population, levels=population.colors$Population))
+
+pca.motrpac <- data.frame(
+  Sample.ID = pca$sample.id,
+  PC1 = pca$eigenvect[,1],
+  PC2 = pca$eigenvect[,2],
+  stringsAsFactors = FALSE
+) %>%
+  dplyr::filter(!(Sample.ID %in% populations$Sample.name)) %>%
+  dplyr::mutate(Consortium = "MoTrPAC")
+```
+
+Plot initial PCA results.
+
+```{r, fig.height=6, fig.width=6}
+pdf(file = file.path(here(), "data", "tmp", "figures", "motrpac_1kg_pca.pdf"),
+    width = 7*1.4,height=4.05*3.3)
+thousand_genomes_pca = ggplot() +
+  geom_point(data=pca.1kg, aes(x=PC1, y=PC2, shape=Consortium, color=Population), size=I(3), alpha=0.5) +
+  geom_point(data=pca.motrpac, aes(x=PC1, y=PC2, shape=Consortium), size=I(3)) +
+  geom_rug(data=pca.motrpac, aes(x=PC1, y=PC2), sides="br", alpha=0.25, length=unit(2, "mm")) +
+  scale_shape_manual(values=c("1000 Genomes" = 20, "MoTrPAC" = 2)) +
+  scale_color_manual(values=pca.colors) +
+  xlab("gPC1 (4.33%)") + 
+  ylab("gPC2 (2.83%)") +
+  ggplot.theme +
+  theme(
+    legend.position = "bottom",
+    legend.direction = "horizontal",
+    legend.box = "vertical"
+  )
+
+print(thousand_genomes_pca)
+dev.off()
+
+```
+
+Assess how many samples are "non-European". As a simple proxy, I will draw
+a cutoff around the tightest cluster within the "European" cluster.
+
+```{r, eval = F, fig.height=6, fig.width=6}
+eur.counts <- pca.motrpac %>%
+  dplyr::mutate(European=PC2 < -0.016) %>%
+  dplyr::count(European)
+
+n.eur.count <- paste0("Non-European: ", eur.counts$n[eur.counts$European == FALSE], " ↑")
+eur.count <- paste0("European: ", eur.counts$n[eur.counts$European == TRUE], " ↓")
+
+ggplot() +
+  geom_point(data=pca.1kg, aes(x=PC1, y=PC2, shape=Consortium, color=Population), size=I(3), alpha=0.5) +
+  geom_point(data=pca.motrpac, aes(x=PC1, y=PC2, shape=Consortium), size=I(3)) +
+  geom_rug(data=pca.motrpac, aes(x=PC1, y=PC2), sides="br", alpha=0.25, length=unit(2, "mm")) +
+  geom_hline(aes(yintercept=-0.016), lty=2, size=0.25) +
+  geom_text(aes(x=-0.03, y=-0.016 + 0.001, label=n.eur.count), size=5) +
+  geom_text(aes(x=-0.03, y=-0.016 - 0.001, label=eur.count), size=5) +
+  scale_shape_manual(values=c("1000 Genomes" = 20, "MoTrPAC" = 2)) +
+  scale_color_manual(values=pca.colors) +
+  xlab("gPC1 (4.33%)") + ylab("gPC2 (2.83%)") +
+  ggplot.theme
+
+ggsave("results/1kg_pca.svg", width=12, height=12)
+```
+
+## Parallel Coordinates Plot
+
+We can track the coordinates of each sample.
+
+```{r, fig.height=4, fig.width=6}
+pca.10.pcs <- pca$eigenvect[,1:10]
+colnames(pca.10.pcs) <- as.character(1:10)
+
+pca.10.pcs.1kg <- cbind(pca$sample.id, as.data.frame(pca.10.pcs)) %>%
+  as.data.frame(stringsAsFactors=F) %>%
+  dplyr::select(Sample.ID=1, everything()) %>%
+  merge(., populations, by.x="Sample.ID", by.y="Sample.name") %>%
+  merge(population.colors, ., by.x="Population", by.y="Population.code") %>%
+  dplyr::mutate(Consortium = "1000 Genomes") %>%
+  dplyr::mutate(Population = factor(Population, levels=population.colors$Population)) %>%
+  dplyr::select(Sample.ID, Population, one_of(as.character(1:10))) %>%
+  tidyr::gather("PC", "Coordinate", -Sample.ID, -Population) %>%
+  dplyr::mutate(PC=factor(PC, levels=as.character(1:10)))
+
+pca.10.pcs.motrpac <- cbind(pca$sample.id, as.data.frame(pca.10.pcs)) %>%
+  as.data.frame(stringsAsFactors=F) %>%
+  dplyr::select(Sample.ID=1, everything()) %>%
+  dplyr::filter(!(Sample.ID %in% populations$Sample.name)) %>%
+  tidyr::gather("PC", "Coordinate", -Sample.ID) %>%
+  dplyr::mutate(PC=factor(PC, levels=as.character(1:10)))
+
+ggplot() +
+  geom_line(data=pca.10.pcs.1kg, aes(x=PC, y=Coordinate, group=Sample.ID, color=Population), alpha=0.5, size=0.25) +
+  geom_line(data=pca.10.pcs.motrpac, aes(x=PC, y=Coordinate, group=Sample.ID), alpha=0.5, size=0.25) +
+  scale_color_manual(values=pca.colors) +
+  ggplot.theme
+```
+
+## PC 5 Correlation
+
+PC 5 fully separates MoTrPAC from the 1000 genomes project. What variants are
+associated with PC 5?
+
+```{r, eval = F}
+chr <- read.gdsn(index.gdsn(gds, "snp.chromosome"))
+pos <- read.gdsn(index.gdsn(gds, "snp.position"))
+corr <- snpgdsPCACorr(pca, gds, eig.which=5)
+```
+
+```{r, eval = F, fig.height=3, fig.width=8}
+data.frame(
+  Abs.Corr=abs(corr$snpcorr[1,]),
+  Chr=factor(chr, as.character(1:22)),
+  Chr.Type=ifelse(as.numeric(chr) %% 2 == 0, "Even", "Odd"),
+  Position=pos
+) %>%
+  ggplot(aes(x=Position, y=Abs.Corr)) +
+  geom_point(aes(color=Chr.Type), size=0.25, alpha=0.5) +
+  facet_grid(. ~ Chr, scales="free_x", space="free_x") +
+  scale_color_manual(values=c("Even"="royalblue1", "Odd"="royalblue4")) +
+  xlab("Position") + ylab("|Correlation|") +
+  guides(color="none") +
+  ggplot.theme +
+  theme(panel.spacing=unit(0, "mm"), axis.text.x=element_blank())
+```
+

@@ -1,0 +1,451 @@
+---
+title: "single_feature_plots_manuscript"
+author: "Dan Katz"
+date: "2025-07-07"
+output: html_document
+---
+
+```{r setup}
+session_packages = c('pheatmap', 'limma', 'UpSetR', 'ComplexHeatmap', 'gprofiler2',
+                     'readxl','qvalue', 'reshape2', 'ggh4x','ggVennDiagram','ggpattern',
+                     'MASS', 'splitstackshape', 'MotrpacBicQC', 'tidyverse', 
+                     'powerjoin','MotrpacHumanPreSuspensionAnalysis','patchwork','ggbeeswarm','circlize',
+                     'grid','gridExtra')
+
+
+for(i in session_packages) {
+  tryCatch(
+    {
+      library(i, character.only = T)
+    }, error = function(e) {
+      print(paste("cannot load package:", i,", please install", i))
+    }
+  )
+}
+sessionInfo()
+
+```
+
+```{r}
+scale_factor<-1
+sc<-scale_factor * 0.7
+```
+#MYC & NR4A1 (Figure 2)
+```{r}
+myc_3 <-plot_single_feature(feature="MYC",
+                            color_time_labels = F,
+                            include_legend = T)
+
+ggsave(
+  myc_3, filename = paste0(here(),"/data/tmp/single_plot_MYC_all_tissues.pdf"),
+  height = 2.2 * sc, width = 1.7*3, dpi = 600, units = "in"
+)
+
+
+nr4a1 <-MotrpacHumanPreSuspensionAnalysis::plot_single_feature(feature="ENSG00000123358.20",
+                                                               color_time_labels = F,
+                                                               include_legend = T)
+
+ggsave(
+  nr4a1, filename = paste0(here(),"/data/tmp/single_plot_NR4A1_all_tissues.pdf"),
+  height = 2.2 * sc, width = 1.7*3, dpi = 600, units = "in"
+)
+
+```
+
+#PPARGC1A, PER2, Alloisoleucine, HSPA4 (Figure S2)
+```{r}
+Alloisoleucine<-plot_single_feature(feature="Alloisoleucine",
+                                    selected_tissues = "adipose", 
+                                    selected_omes = "all",
+                                    color_time_labels = F,
+                                    include_legend = F)
+
+PER2<-plot_single_feature(feature="PER2",
+                          selected_tissues = "muscle", 
+                          selected_omes = "transcript-rna-seq",
+                          color_time_labels = F,
+                          include_legend = T)
+
+Ppargc1a <-plot_single_feature(feature="PPARGC1A",
+                               selected_tissues = "muscle", 
+                               selected_omes = "transcript-rna-seq",
+                               color_time_labels = F,
+                               include_legend = F)
+
+P34932_S76S <-plot_single_feature(feature="P34932_S76s",
+                                  selected_tissues = "muscle", 
+                                  selected_omes = "all",
+                                  color_time_labels = F,
+                                  include_legend = F)
+
+hit_type_examples<-Ppargc1a+PER2+Alloisoleucine+P34932_S76S+plot_layout(ncol = 2, guides = "collect") &
+  theme(legend.position='right',      
+        legend.spacing.x = unit(0.01 * sc, "in"),
+        legend.spacing.y = unit(0.1 * sc, "in"),
+        legend.box.spacing = unit(0.01 * sc, "in"),
+        legend.key.size = unit(0.1 * sc, "in")
+  )
+
+ggsave(
+  hit_type_examples, filename = paste0(here(),"/data/tmp/landscape_figs2b_hit_type_examples.pdf"),
+  height = 4 * sc, width = 4, dpi = 600, units = "in"
+)
+```
+
+#Figure S2E: SIPA1L3 and NFKBIZ
+```{r}
+SIPA1L3 <-plot_single_feature(feature="ENSG00000105738.11",
+                              color_time_labels = F,
+                              include_legend = T)
+
+ggsave(
+  SIPA1L3, filename = paste0(here(),"/data/tmp/single_plot_SIPA1L3_all_tissues.pdf"),
+  height = 2.2 * sc, width = 1.7*3, dpi = 600, units = "in"
+)
+
+NFKBIZ <-plot_single_feature(feature="NFKBIZ",
+                             color_time_labels = F,
+                             include_legend = T)
+
+ggsave(
+  NFKBIZ, filename = paste0(here(),"/data/tmp/single_plot_NFKBIZ_all_tissues.pdf"),
+  height = 2.2 * sc, width = 1.7*3, dpi = 600, units = "in"
+)
+
+```
+
+# Figure 4 (PLIER)
+```{r}
+# Figure 4J
+plotobject1 <- MotrpacHumanPreSuspensionAnalysis::plot_single_feature(feature = "ENSG00000161835.11",
+                                                                      selected_tissues = "adipose",
+                                                                      selected_omes = "transcript-rna-seq",
+                                                                      output_file = "Figure4F_adipose_TAMALIN_rnapeak_plot_102925.png")
+# Figure 4K
+plotobject2 <- MotrpacHumanPreSuspensionAnalysis::plot_single_feature(feature = "ENSG00000161835.11",
+                                                                      selected_tissues = "blood",
+                                                                      selected_omes = "transcript-rna-seq",
+                                                                      output_file = "Figure4G_blood_TAMALIN_rnapeak_plot_102925.png")
+
+plotobject3 <- MotrpacHumanPreSuspensionAnalysis::plot_single_feature(feature = "ENSG00000161835.11",
+                                                                      selected_tissues = "muscle",
+                                                                      selected_omes = "transcript-rna-seq",
+                                                                      output_file = "Figure4H_muscle_TAMALIN_rnapeak_plot_102925.png")
+
+```
+
+
+#Figure 5F: EE-RE diverging single features
+```{r}
+#=============================================
+`ENSG00000257298.1`<-plot_single_feature(feature="ENSG00000257298.1",
+                                         selected_tissues = "muscle", 
+                                         selected_omes = "transcript-rna-seq",
+                                         color_time_labels = F,
+                                         include_legend = F) + ggtitle("lncRNA")
+
+BCKDHB<-plot_single_feature(feature="BCKDHB",
+                            selected_tissues = "muscle", 
+                            selected_omes = "transcript-rna-seq",
+                            color_time_labels = F,
+                            include_legend = F) 
+
+CAR6_0<-plot_single_feature(feature="CAR 6:0",
+                            selected_tissues = "blood", 
+                            selected_omes = "all",
+                            color_time_labels = F,
+                            include_legend = F)
+
+FHOD1<-plot_single_feature(feature="Q9Y613_S1078s",
+                           selected_tissues = "muscle", 
+                           selected_omes = "prot-ph",
+                           color_time_labels = F,
+                           include_legend = T)
+
+diverging_combo<-CAR6_0+BCKDHB+`ENSG00000257298.1`+FHOD1+plot_layout(ncol = 2, guides='collect') &
+  theme(legend.position='bottom',      
+        legend.spacing.x = unit(0.01 * sc, "in"),
+        legend.spacing.y = unit(0.1 * sc, "in"),
+        legend.box.spacing = unit(0.01 * sc, "in"),
+        legend.key.size = unit(0.1 * sc, "in")
+  )
+
+ggsave(
+  diverging_combo, filename = paste0(here(),"/data/tmp/landscape_Fig5_single_plot_diverging_features.pdf"),
+  height = 2*2.2 * sc, width = 2*2.45 * sc, dpi = 600, units = "in"
+)
+```
+#FigureS5
+```{r}
+CBFA2T3 <-plot_single_feature(feature="CBFA2T3",
+                              selected_tissues = "muscle", 
+                              selected_omes = "transcript-rna-seq",
+                              color_time_labels = F,
+                              include_legend = F) 
+
+DHTKD1<-plot_single_feature(feature="DHTKD1",
+                            selected_tissues = "muscle", 
+                            selected_omes = "transcript-rna-seq",
+                            color_time_labels = F,
+                            include_legend = F) 
+MYOG<-plot_single_feature(feature="MYOG",
+                          selected_tissues = "muscle", 
+                          selected_omes = "transcript-rna-seq",
+                          color_time_labels = F,
+                          include_legend = F) 
+
+NOL3<-plot_single_feature(feature="O60936_T114t",
+                          selected_tissues = "muscle", 
+                          selected_omes = "prot-ph",
+                          color_time_labels = F,
+                          include_legend = T)
+
+MYOT<-plot_single_feature(feature="Q9UBF9_T145t",
+                          selected_tissues = "muscle", 
+                          selected_omes = "prot-ph",
+                          color_time_labels = F,
+                          include_legend = T)
+
+LRRC14B<-plot_single_feature(feature="LRRC14B",
+                             selected_tissues = "muscle", 
+                             selected_omes = "transcript-rna-seq",
+                             color_time_labels = F,
+                             include_legend = T)
+
+diverging_combo_supp<-CBFA2T3+DHTKD1+MYOG+NOL3+MYOT+LRRC14B+plot_layout(ncol = 2, guides='collect') &
+  theme(legend.position='bottom',      legend.spacing.x = unit(0.01 * sc, "in"),
+        legend.spacing.y = unit(0.1 * sc, "in"),
+        legend.box.spacing = unit(0.01 * sc, "in"),
+        legend.key.size = unit(0.1 * sc, "in"),)
+
+ggsave(
+  diverging_combo_supp, filename = paste0(here(),"/data/tmp/landscape_figS5_single_plot_diverging_suppC.pdf"),
+  height = 3*2.2 * sc + (0.1*sc/3), width = 2*2.45 * sc, dpi = 600, units = "in"
+)
+
+FBXO32<-plot_single_feature(feature="FBXO32",
+                            selected_tissues = "muscle", 
+                            selected_omes = "transcript-rna-seq",
+                            color_time_labels = F,
+                            include_legend = T)
+
+ZBTB4<-plot_single_feature(feature="ZBTB4",
+                           selected_tissues = "muscle", 
+                           selected_omes = "transcript-rna-seq",
+                           color_time_labels = F,
+                           include_legend = T)
+
+diverging_combo_suppD<-FBXO32+ZBTB4+plot_layout(ncol = 2, guides='collect') &
+  theme(legend.position='bottom',      legend.spacing.x = unit(0.01 * sc, "in"),
+        legend.spacing.y = unit(0.1 * sc, "in"),
+        legend.box.spacing = unit(0.01 * sc, "in"),
+        legend.key.size = unit(0.1 * sc, "in"),)
+
+ggsave(
+  diverging_combo_suppD, filename = paste0(here(),"/data/tmp/landscape_figS5_single_plot_diverging_FBXO32-ZBTB4_suppD.pdf"),
+  height = 2.2 * sc + (0.11*sc*2), width = 2*2.45 * sc, dpi = 600, units = "in"
+) #balance height with the above, the height * sc doesn't quite match up sometimes because the shared 3 height ones have 1 legend. 
+
+```
+
+
+#Figure 7 (SCION)
+```{r}
+tfeb_3 <-plot_single_feature(feature="ENSG00000112561.19",
+                             selected_tissues = "all", 
+                             selected_omes = "transcript-rna-seq",
+                             color_time_labels = F,
+                             include_legend = T)
+
+hsp90aa1 <-plot_single_feature(feature="ENSG00000080824.19",
+                               selected_omes = "transcript-rna-seq",
+                               color_time_labels = F,
+                               include_legend = T)
+
+tfeb_hsp90aa1<-tfeb_3-hsp90aa1+plot_layout(ncol = 1, guides='collect') &
+  theme(legend.position='right',      legend.spacing.x = unit(0.01 * sc, "in"),
+        legend.spacing.y = unit(0.1 * sc, "in"),
+        legend.box.spacing = unit(0.01 * sc, "in"),
+        legend.key.size = unit(0.1 * sc, "in"),)
+
+ggsave(
+  tfeb_hsp90aa1, filename = paste0(here(),"/data/tmp/single_plot_tfeb+hsp90aa1_all_tissues.pdf"),
+  height = 2*2.2 * sc, width = 1.7*3, dpi = 600, units = "in"
+)
+
+
+lactate_3 <-plot_single_feature(feature="Lactic acid",
+                                color_time_labels = F,
+                                include_legend = T)
+
+ggsave(
+  lactate_3, filename = paste0(here(),"/data/tmp/single_plot_lactate_all_tissues.pdf"),
+  height = 2.2 * sc, width = 1.7*3, dpi = 600, units = "in"
+)
+
+```
+
+
+#Fig 8: CCN1, CXCL3
+```{r}
+ccn1_olink<-plot_single_feature(feature="CCN1",
+                                selected_tissues = "blood", 
+                                selected_omes = "prot-ol",
+                                color_time_labels = F,
+                                include_legend = F)
+
+ccn1_mus_prot<-plot_single_feature(feature="CCN1",
+                                   selected_tissues = "muscle", 
+                                   selected_omes = "prot-pr",
+                                   color_time_labels = F,
+                                   include_legend = T,
+                                   legend_position = "bottom")
+
+ccn1_mus_seq<-plot_single_feature(feature="CCN1",
+                                  selected_tissues = "muscle", 
+                                  selected_omes = "transcript-rna-seq",
+                                  color_time_labels = F,
+                                  include_legend = F)
+
+ccn1_adi_seq<-plot_single_feature(feature="CCN1",
+                                  selected_tissues = "adipose", 
+                                  selected_omes = "transcript-rna-seq",
+                                  color_time_labels = F,
+                                  include_legend = F)
+
+g<-ccn1_mus_seq+ccn1_adi_seq+ccn1_olink+ccn1_mus_prot+plot_layout(guides='collect') &
+  theme(legend.position='bottom',      legend.spacing.x = unit(0.01 * sc, "in"),
+        legend.spacing.y = unit(0.1 * sc, "in"),
+        legend.box.spacing = unit(0.01 * sc, "in"),
+        legend.key.size = unit(0.1 * sc, "in"),)
+ggsave(
+  g, filename = paste0(here(),"/data/tmp/single_plot_test_scale_ccn1_combo.pdf"),
+  height = 3.08, width = 4, dpi = 600, units = "in"
+)
+
+
+fract_mus_seq<-plot_single_feature(feature="CX3CL1",
+                                   selected_tissues = "muscle", 
+                                   selected_omes = "transcript-rna-seq",
+                                   color_time_labels = F,
+                                   include_legend = F)
+
+fract_adi_seq<-plot_single_feature(feature="CX3CL1",
+                                   selected_tissues = "adipose", 
+                                   selected_omes = "transcript-rna-seq",
+                                   color_time_labels = F,
+                                   include_legend = F)
+
+fract_olink<-plot_single_feature(feature="CX3CL1",
+                                 selected_tissues = "all", 
+                                 selected_omes = "prot-ol",
+                                 color_time_labels = F,
+                                 include_legend = T)
+
+
+fract_combo<-fract_mus_seq+fract_adi_seq+fract_olink+plot_layout(ncol = 3, guides='collect') &
+  theme(legend.position='bottom',      legend.spacing.x = unit(0.01 * sc, "in"),
+        legend.spacing.y = unit(0.1 * sc, "in"),
+        legend.box.spacing = unit(0.01 * sc, "in"),
+        legend.key.size = unit(0.1 * sc, "in"),)
+ggsave(
+  fract_combo, filename = paste0(here(),"/data/tmp/single_plot_test_scale_fract_combo.pdf"),
+  height = 3.08/2*(545/508), width = 4*3/2*(443/460), dpi = 600, units = "in"
+)
+```
+
+#Figure S8
+```{r}
+PXN_PH_170 <-MotrpacHumanPreSuspension::plot_single_feature(feature="P49023_S170s",
+                                                            p_level = 0.1,
+                                                            selected_tissues = "all", 
+                                                            selected_omes = "prot-ph",
+                                                            color_time_labels = F,
+                                                            include_legend = T)
+
+PXN_PH_106 <-MotrpacHumanPreSuspension::plot_single_feature(feature="P49023_S106s",
+                                                            p_level = 0.1,
+                                                            participant_paths = F,
+                                                            selected_tissues = "all", 
+                                                            selected_omes = "prot-ph",
+                                                            color_time_labels = F,
+                                                            include_legend = T)
+
+PXN_PH<-PXN_PH_170+PXN_PH_106+plot_layout(ncol = 1,guides='collect') &
+  theme(legend.position='bottom',      legend.spacing.x = unit(0.01 * sc, "in"),
+        legend.spacing.y = unit(0.1 * sc, "in"),
+        legend.box.spacing = unit(0.01 * sc, "in"),
+        legend.key.size = unit(0.1 * sc, "in"),)
+
+ggsave(
+  PXN_PH, filename = paste0(here(),"/data/tmp/single_plot_PXN_PH_all_tissues.pdf"),
+  height = 2*2.2 * sc, width = 1.7*2*sc, dpi = 600, units = "in"
+)
+```
+
+#other plots (Muscle paper)
+```{r}
+GZMB <-MotrpacHumanPreSuspension::plot_single_feature(feature="GZMB",
+                                                      selected_tissues = "blood", 
+                                                      selected_omes = "transcript-rna-seq",
+                                                      color_time_labels = F,
+                                                      include_legend = T)
+
+KLRD1 <-MotrpacHumanPreSuspension::plot_single_feature(feature="KLRD1",
+                                                       selected_tissues = "blood", 
+                                                       selected_omes = "transcript-rna-seq",
+                                                       color_time_labels = F,
+                                                       include_legend = T)
+
+
+KLRD1_GZMB<-GZMB+KLRD1+plot_layout(ncol = 1,guides='collect') &
+  theme(legend.position='bottom',      legend.spacing.x = unit(0.01 * sc, "in"),
+        legend.spacing.y = unit(0.1 * sc, "in"),
+        legend.box.spacing = unit(0.01 * sc, "in"),
+        legend.key.size = unit(0.1 * sc, "in"),)
+
+ggsave(
+  KLRD1_GZMB, filename = paste0(here(),"/data/tmp/single_plot_GZMB_KLRD1_blood.png"),
+  height = 2*2.2 * sc, width = 1.8*2*sc, dpi = 600, units = "in"
+)
+```
+
+```{r}
+CRHBP <-MotrpacHumanPreSuspension::plot_single_feature(feature="CRHBP",
+                                                       selected_tissues = "blood", 
+                                                       selected_omes = "prot-ol",
+                                                       color_time_labels = F,
+                                                       include_legend = T)
+
+GAL <-MotrpacHumanPreSuspension::plot_single_feature(feature="GAL",
+                                                     selected_tissues = "blood", 
+                                                     selected_omes = "prot-ol",
+                                                     color_time_labels = F,
+                                                     include_legend = T)
+
+FGF21 <-MotrpacHumanPreSuspension::plot_single_feature(feature="FGF21",
+                                                       selected_tissues = "blood", 
+                                                       selected_omes = "prot-ol",
+                                                       color_time_labels = F,
+                                                       include_legend = T)
+
+ADM <-MotrpacHumanPreSuspension::plot_single_feature(feature="ADM",
+                                                     selected_tissues = "blood", 
+                                                     selected_omes = "prot-ol",
+                                                     color_time_labels = F,
+                                                     include_legend = T)
+
+
+blood_olink_fig<-CRHBP+GAL+FGF21+ADM+plot_layout(ncol = 1,guides='collect') &
+  theme(legend.position='bottom',      legend.spacing.x = unit(0.01 * sc, "in"),
+        legend.spacing.y = unit(0.1 * sc, "in"),
+        legend.box.spacing = unit(0.01 * sc, "in"),
+        legend.key.size = unit(0.1 * sc, "in"),)
+
+ggsave(
+  blood_olink_fig, filename = paste0(here(),"/data/tmp/single_plot_blood_olink_fig_blood.png"),
+  height = 4*2.2 * sc, width = 1.8*2*sc, dpi = 600, units = "in"
+)
+```
+

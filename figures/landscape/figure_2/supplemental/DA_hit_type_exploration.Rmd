@@ -1,0 +1,297 @@
+---
+title: "DA_hit_type_exploration"
+author: "Dan Katz, Malene Lindholm, Christopher Jin"
+date: "2025-06-03"
+output: html_document
+---
+
+```{r setup}
+session_packages = c('pheatmap', 'limma', 'UpSetR', 'ComplexHeatmap', 'gprofiler2',
+                     'plier', 'cluster', 'readxl','qvalue', 'reshape2', 'ggh4x','ggVennDiagram','ggpattern',
+                     'MASS', 'splitstackshape', 'MotrpacBicQC', 'tidyverse', 
+                     'powerjoin','MotrpacHumanPreSuspensionAnalysis','conflicted','patchwork','ggbeeswarm',
+                     'circlize', 'grid','gridExtra')
+
+
+for(i in session_packages) {
+  tryCatch(
+    {
+      library(i, character.only = T)
+    }, error = function(e) {
+      print(paste("cannot load package:", i,", please install", i))
+    }
+  )
+}
+
+conflict_prefer('select','dplyr')
+conflict_prefer('filter','dplyr')
+
+sessionInfo()
+
+```
+
+```{r}
+all_omes_except_methyl = ome_available_list()
+all_omes_except_methyl = all_omes_except_methyl[all_omes_except_methyl != "epigen-methylcap-seq"]
+
+
+full_da_results_all_tissues = MotrpacHumanPreSuspensionAnalysis::load_differential_analysis(
+  selected_omes = all_omes_except_methyl,
+  selected_tissues = "all",
+  epigen = TRUE,
+  single_matrix = TRUE
+) %>%
+  mutate(assay = case_when(
+    grepl("metab", assay) ~ "Metabolomics", #stick all the metab together
+    grepl("prot-ol|prot-pr", assay) ~ "Proteomics",  #stick ol into MS/general Prot
+    TRUE ~ assay)
+  )  %>%
+  mutate(assay = recode(assay, 
+                        "transcript-rna-seq" = "Transcriptomics",
+                        "prot-ph" = "Phosphoproteomics",
+                        "epigen-atac-seq" = "ATAC"))
+
+```
+
+
+```{r}
+wide_by_contrasts = full_da_results_all_tissues %>%   
+  dplyr::filter(!contrast_type %in% c("Endur_vs_Resist", "baseline")) %>%
+  #so we want to be able to flip some results up and down dependning on if 
+  #the logFC is up or down
+  dplyr::mutate(direction = sign(logFC)) %>%
+  dplyr::select(tissue, assay, randomGroupCode, Timepoint, contrast_type, adj_p_value, feature_id, direction) %>%
+  pivot_wider(., names_from = c("contrast_type"), #aaaa i could also just split by group here? will do both
+              values_from = adj_p_value) %>%
+  group_by(tissue, assay, Timepoint, feature_id) %>%
+  #so because its grouped by feature_id/timepoint, we can just use first for
+  #finding control_only
+  mutate(control_only = ifelse(is.na(control_only), 
+                               dplyr::first(na.omit(control_only)), 
+                               control_only)) %>% 
+  #^ just filling in control values to compare with either group
+  ungroup() %>%
+  #because we have control_only already, we get rid of this part below, the values
+  #are already filled into the other group codes
+  dplyr::filter(!randomGroupCode == "Control") %>%
+  mutate(Timepoint = factor(Timepoint,
+                            levels = c("during_20_min", "during_40_min", "post_10_min", "post_15_30_45_min", "post_3.5_4_hr", "post_24_hr")))
+#remove timepoint for blood samples
+#now we actually categorize things similar to before. 
+
+```
+
+General categorization thought process here:
+Control effect - we want to profile features that are stable in a given exercise
+group, but the comparison is significant because of some movement in the controls.
+so an experiment without controls would not be able to detect these.
+
+Exercise effect - our general positive control section, the types of effects that
+most people would categorize for exercise effect. We see some stimulus in the exercise group,
+and the overall comparison to the controls is significant. We don't really care
+what direction the control group is going in this section. 
+
+Circadian/Non Exercise effect - these are NOT significant differences between
+exercise and control groups. These are features that could be considered
+statistically significant in a different study, but because we have controls,
+we know that those would be an experimental "false positive". 
+
+Note:: we don't do much looking into directions, magnitudes here. Theoretically, 
+this could cause an issue, in cases where certain groups have patterns that 
+just dont reach statistical significance, but we are more or less just making
+some elaborate upset plots. 
+```{r}
+wide_by_contrasts_merge = wide_by_contrasts %>%
+  mutate(
+    exercise_with_controls_cat = ifelse(exercise_with_controls <= 0.05, "Sig", "Non-sig"),
+    exercise_no_controls_cat = ifelse(exercise_no_controls <= 0.05, "Sig", "Non-sig"),
+    control_only_cat = ifelse(control_only <= 0.05, "Sig", "Non-sig")
+  ) %>%
+  mutate(
+    category = case_when(
+      (exercise_no_controls_cat == "Non-sig" & exercise_with_controls_cat == "Sig") ~ "Ctrl-driven exercise effects",
+      (exercise_no_controls_cat == "Sig" & exercise_with_controls_cat == "Sig") ~ "Exercise effects",
+      (control_only_cat == "Sig" & exercise_no_controls_cat == "Sig" & exercise_with_controls_cat == "Non-sig") ~ "Non-exercise induced changes",
+      TRUE ~ "Other"
+    )
+  ) %>%
+  dplyr::filter(category != "Other")
+
+```
+
+
+```{r}
+# Combine all color mappings into one vector
+combined_colors <- c(
+  "Non-exercise induced changes" = "#7570b3",
+  "Exercise effects" = "brown4",        
+  "Ctrl-driven exercise effects" = "brown1",
+  HUMAN_OME_COLORS,  
+  HUMAN_TISSUE_COLORS,  
+  HUMAN_EXERCISE_GROUP_COLORS 
+)
+
+#This part is needed because the current data objects
+#only list the "fuller" names e.g. ADUResist instead of EE/RE. 
+tissue_colors <- setNames(
+  HUMAN_TISSUE_COLORS[levels(wide_by_contrasts_merge$tissue)],
+  levels(wide_by_contrasts_merge$tissue)
+)
+group_colors <- setNames(
+  HUMAN_EXERCISE_GROUP_COLORS[c("ADUEndur","ADUResist")],
+  levels(wide_by_contrasts_merge$randomGroupCode)
+)
+assay_colors <- setNames(
+  HUMAN_OME_COLORS[levels(wide_by_contrasts_merge$assay)],
+  levels(wide_by_contrasts_merge$assay)
+)
+#-----------------------------------
+
+#Make variables into factors first
+wide_by_contrasts_merge$assay <- as.factor(wide_by_contrasts_merge$assay)
+wide_by_contrasts_merge$tissue <- as.factor(wide_by_contrasts_merge$tissue)
+wide_by_contrasts_merge$randomGroupCode <- as.factor(wide_by_contrasts_merge$randomGroupCode)
+
+
+```
+
+
+```{r}
+#replace names to make things ready for figures
+filtered_data <- wide_by_contrasts_merge %>%
+  mutate(randomGroupCode = recode(randomGroupCode, 
+                                  "ADUEndur" = "EE", 
+                                  "ADUResist" = "RE"),
+         Timepoint = case_when(
+           Timepoint == "during_20_min" ~ "D20M",
+           Timepoint == "during_40_min" ~ "D40M",
+           Timepoint == "post_10_min" ~ "P10M",
+           Timepoint == "post_15_30_45_min" ~ "P15-45M",
+           Timepoint == "post_3.5_4_hr" ~ "P3.5/4H",
+           Timepoint == "post_24_hr" ~ "P24H",
+           TRUE ~ Timepoint
+         ),
+         Timepoint = factor(Timepoint, 
+                            levels = c("D20M", "D40M", "P10M", "P15-45M", "P3.5/4H", "P24H"))) %>%
+  group_by(assay, tissue, randomGroupCode, Timepoint, category, direction) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  mutate(y_value = ifelse(direction == 1, count, -count))
+#so now we're just flipping across the axis in cases where its
+#up vs downregulated to add extra info
+
+# Calculate the maximum count for each assay using filtered data
+# to inform figure dimensions for each row 
+max_counts_by_assay = filtered_data %>%
+  summarise(max_count = max(abs(y_value)), .by = "assay")
+
+#--------------------------------------------------------------------------
+#so here we try and find the combinations of omic platforms that were NOT run 
+#Important--make sure that an assay is NOT run instead of not having any sig results
+#because if we start with 'filtered data' that already trims sections without 
+#any interesting results. 
+existing_combinations = full_da_results_all_tissues %>%
+  distinct(tissue, assay, randomGroupCode, Timepoint) %>%
+  mutate(Timepoint = case_when(
+    Timepoint == "during_20_min" ~ "D20M",
+    Timepoint == "during_40_min" ~ "D40M",
+    Timepoint == "post_10_min" ~ "P10M",
+    Timepoint == "post_15_30_45_min" ~ "P15-45M",
+    Timepoint == "post_3.5_4_hr" ~ "P3.5/4H",
+    Timepoint == "post_24_hr" ~ "P24H",
+    TRUE ~ Timepoint
+  ),
+  randomGroupCode = recode(randomGroupCode, 
+                           "ADUEndur" = "EE", 
+                           "ADUResist" = "RE"))
+#probably should fix this syntax stuff so i dont have to recode timepoint/group again
+
+# Create complete grid only for valid combinations
+# Blood gets all timepoints, muscle and adipose exclude the three specified
+all_combinations <- rbind(
+  expand.grid(
+    Timepoint = unique(filtered_data$Timepoint[filtered_data$tissue == "blood"]),
+    assay = unique(filtered_data$assay),
+    tissue = "blood",
+    randomGroupCode = unique(filtered_data$randomGroupCode)
+  ),
+  expand.grid(
+    Timepoint =  unique(filtered_data$Timepoint[filtered_data$tissue %in% c("muscle", "adipose")]),
+    assay = unique(filtered_data$assay),
+    tissue = c("muscle", "adipose"),
+    randomGroupCode = unique(filtered_data$randomGroupCode)
+  )
+)
+
+# Identify which combinations are missing from filtered data
+# the reason I try to make this grid is to set up which squares need grey backgrounds
+missing_combinations <- dplyr::anti_join(all_combinations, existing_combinations,
+                                         by = c("Timepoint", "assay", "tissue", "randomGroupCode")) %>%
+  left_join(max_counts_by_assay, by = "assay")  %>% # Add the max count for each assay to the missing combinations
+  mutate(category = "Not assayed") %>%
+  #filter these out because there's no bars here in the first place
+  filter(!(tissue %in% c("adipose", "muscle") & Timepoint %in% c("D20M", "D40M", "P10M"))) %>%
+  mutate(y_value = max_count) %>% #so we are now also adding up vs down reg so i make 2
+  tidyr::uncount(2, .id = "sign") %>%     # duplicate each row twice
+  mutate(y_value = ifelse(sign == 1, y_value, -y_value))
+#--------------------------------------------------------------------------------
+```
+
+```{r}
+p = ggplot(filtered_data, aes(x = Timepoint)) +
+  # Grey bars for missing assay combinations (background)
+  #now with up/down stuff for counting up and down 
+  geom_col(
+    data = missing_combinations,
+    aes(y = y_value),
+    fill = "grey80", width = 0.8, alpha = 0.7
+  ) +
+  geom_hline(yintercept = 0, colour = "black", linewidth = 0.4) +
+  # Stacked exercise-induced bars (signed)
+  geom_col(
+    data = subset(filtered_data, category != "Non-exercise induced changes"),
+    aes(y = y_value, fill = category),
+    width = 0.3, position = "stack"
+  ) +
+  
+  # Nudged non-exercise-induced bars (signed)
+  geom_col(
+    data = subset(filtered_data, category == "Non-exercise induced changes"),
+    aes(y = y_value, fill = category),
+    width = 0.3, position = position_nudge(x = 0.3)
+  ) +
+  scale_fill_manual(values = c(combined_colors, "Not assayed" = "grey80")) +
+  coord_cartesian(clip = "off") +
+  facet_grid2(
+    assay ~ tissue + randomGroupCode,
+    scales = "free",
+    space = "free_x",
+    strip = strip_nested(
+      background_y = elem_list_rect(fill = assay_colors),
+      background_x = elem_list_rect(fill = c(tissue_colors, group_colors, group_colors, group_colors)),
+      text_x = list(element_text(colour = "black"), element_text(colour = "black")),
+      by_layer_x = FALSE
+    )
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, size = 10),
+    axis.title.y = element_blank(),
+    axis.title.x = element_blank(),
+    legend.text = element_text(size = 12),
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    legend.justification = "top",
+    legend.background = element_rect(fill = "white", colour = "black", linewidth = 0.5),
+    legend.margin = margin(3, 3, 3, 3)
+  )
+
+pdf(file = file.path(here(), "figures", "landscape", "figure_S2a_signed.pdf"),
+    height = 8, width= 9)
+print(p)
+dev.off()
+```
+
+
+
+
+

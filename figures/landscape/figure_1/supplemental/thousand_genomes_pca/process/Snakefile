@@ -1,0 +1,596 @@
+#!/bin/python3
+
+'''
+Process MoTrPAC sample VCF files from cloud storage to merged,
+filtered genotypes.
+'''
+
+#----------------------------------------------------------
+# Setup
+#----------------------------------------------------------
+
+import os
+import re
+
+
+# Location of sample data in Google Cloud Bucket
+BUCKET_DIR = 'gs://motrpac-portal-transfer-nygc/wgs/human/batch1_20220324/processed'
+
+# Location of sample data in Google Cloud Bucket
+VCF_FILE = 'gs://precovid-wgs/vcf/merged_precovid_samples.recalibrated.haplotypeCalls.vcf.gz'
+VCF_FILE_STATS = 'gs://precovid-wgs/vcf/merged_precovid_samples.recalibrated.haplotypeCalls_stats.txt'
+
+# Location of hg38 UCSC genome sequence
+HG38_FASTA = '/oak/stanford/groups/smontgom/shared/genomes/hg38/Homo_sapiens/UCSC/hg38/Sequence/WholeGenomeFasta/genome.fa'
+
+# Location of dbSNP VCF file
+DBSNP_VCF = 'https://ftp.ncbi.nih.gov/snp/organisms/human_9606_b151_GRCh38p7/VCF/00-All.vcf.gz'
+
+# Output Directory
+OUTPUT_DIR = '/projects/motrpac/PRECOVID/DATA/GENOTYPE/'
+
+# Change directory to output directory
+os.chdir(OUTPUT_DIR)
+
+# Load sample VCF file names and extract sample ID
+with open('SAMPLES/sample_vcf_paths.txt', 'r') as file_in:
+    individuals = file_in.read().split('\n')
+INDIVIDUALS = [re.search(r'[0-9]+', re.search(r'Sample_[0-9]+/$', x).group()).group() for x in individuals if x]
+
+# Chromosomes of interest
+CHROMOSOMES = [str(x) for x in range(1, 23)] + ['X', 'Y', 'M']
+CHROMOSOMES = [f'chr{x}' for x in CHROMOSOMES]
+
+# PLINK parallelization
+N_PLINK_JOBS = 6
+PLINK_JOBS = [str(x) for x in range(1, N_PLINK_JOBS + 1)]
+
+rule all:
+    input:
+        'FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.allele_frequencies.frq',
+        'FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.mean_depth_individual.idepth',
+        'FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.mean_depth_site.ldepth.mean',
+        'FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.site_quality.lqual',
+        'FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.missing.imiss',
+        'FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.missing.lmiss',
+        'FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.heterozygosity.het',
+        'FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.hwe_statistics.hwe',
+        'PLINK/motrpac.precovid.n_238.maf_0_025.kinship.rel'
+
+#----------------------------------------------------------
+# Download Sample Data
+#----------------------------------------------------------
+
+# Download VCF merged by the BIC
+rule download_merged_vcf:
+    output:
+        'MERGED/merged_precovid_samples.recalibrated.haplotypeCalls.vcf.gz',
+        'MERGED/merged_precovid_samples.recalibrated.haplotypeCalls.vcf.gz.tbi',
+        'MERGED/merged_precovid_samples.recalibrated.haplotypeCalls_stats.txt'
+    params:
+        vcf_file=VCF_FILE,
+        vcf_file_stats=VCF_FILE_STATS
+    retries: 3
+    shell:
+        '''
+        gsutil cp {params.vcf_file}* MERGED/
+        gsutil cp {params.vcf_file_stats} MERGED/
+        '''
+
+# Create position file based on merged variant set
+rule variant_position_file:
+    input:
+        vcf='MERGED/merged_precovid_samples.recalibrated.haplotypeCalls.vcf.gz',
+        vcf_index='MERGED/merged_precovid_samples.recalibrated.haplotypeCalls.vcf.gz.tbi'
+    output:
+        vcf='MERGED/merged_precovid_samples.variants.tsv.gz',
+        vcf_index='MERGED/merged_precovid_samples.variants.tsv.gz.tbi'
+    shell:
+        '''
+        bcftools query --format '%CHROM\\t%POS\\t%REF,%ALT\\n' {input.vcf} | bgzip --stdout > {output.vcf}
+        tabix --sequence 1 --begin 2 --end 2 {output.vcf}
+        '''
+
+# Call shared variants using all BAM files
+rule call_shared_variants:
+    input:
+        vcf='MERGED/merged_precovid_samples.variants.tsv.gz',
+        vcf_index='MERGED/merged_precovid_samples.variants.tsv.gz.tbi'
+    output:
+        temp('SAMPLES/{individual,\d+}.unsorted.vcf.gz')
+    params:
+        bucket_dir=BUCKET_DIR,
+        genome=HG38_FASTA
+    retries: 3
+    script:
+        'call_shared_variants.sh'
+
+# Sort shared variant sample files
+rule sort_shared_variant_samples:
+    input:
+        'SAMPLES/{individual}.unsorted.vcf.gz'
+    output:
+        'SAMPLES/{individual,\d+}.vcf.gz'
+    script:
+        'sort_shared_variant_samples.sh'
+
+# Index shared variant sample files
+rule index_shared_variant_samples:
+    input:
+        'SAMPLES/{individual}.vcf.gz'
+    output:
+        'SAMPLES/{individual,\d+}.vcf.gz.tbi'
+    shell:
+        'bcftools index'
+        '   --tbi'
+        '   --output {output}'
+        '   {input}'
+
+# Split merged VCF file by chromosome
+rule split_merged_vcf_by_chr:
+    input:
+        vcf='MERGED/merged_precovid_samples.recalibrated.haplotypeCalls.vcf.gz',
+        vcf_index='MERGED/merged_precovid_samples.recalibrated.haplotypeCalls.vcf.gz.tbi'
+    output:
+        temp('MERGED/merged_precovid_samples.recalibrated.haplotypeCalls.{chrom}.vcf.gz')
+    shell:
+        'bcftools view'
+        '   --regions {wildcards.chrom}'
+        '   --output-type z'
+        '   --output {output}'
+        '   {input}'
+
+# Index the chromosome-specific files for the merged VCF
+rule index_split_merged_vcf:
+    input:
+        'MERGED/merged_precovid_samples.recalibrated.haplotypeCalls.{chrom}.vcf.gz'
+    output:
+        temp('MERGED/merged_precovid_samples.recalibrated.haplotypeCalls.{chrom}.vcf.gz.tbi')
+    shell:
+        'bcftools index'
+        '   --tbi'
+        '   --output {output}'
+        '   {input}'
+
+# Annotate merged VCF with homozygote reference calls
+rule annotate_with_homozygote_reference_calls:
+    input:
+        vcf='MERGED/merged_precovid_samples.recalibrated.haplotypeCalls.{chrom}.vcf.gz',
+        vcf_index='MERGED/merged_precovid_samples.recalibrated.haplotypeCalls.{chrom}.vcf.gz.tbi'
+    output:
+        temp('MERGED/merged.{chrom}.vcf.gz')
+    params:
+        sample_dir='SAMPLES/',
+        refreplacer=workflow.source_path('refreplacer/refreplacer')
+    shell:
+        'chmod u+x {params.refreplacer};'
+        '{params.refreplacer}'
+        '   {input.vcf}'
+        '   {params.sample_dir}'
+        '   1' # Number of threads
+        '   {wildcards.chrom}'
+        '   {output}'
+
+# Merge chromosome-specific files after they are annotated
+rule merge_split_files_after_annotation:
+    input:
+        expand('MERGED/merged.{chrom}.vcf.gz', chrom=CHROMOSOMES)
+    output:
+        temp('MERGED/merged.with_info.vcf.gz')
+    threads: 6
+    shell:
+        'bcftools concat'
+        '   --threads {threads}'
+        '   --output-type z'
+        '   --output {output}'
+        '   {input}'
+
+# Remove information fields, which are now invalid
+rule remove_info_fields:
+    input:
+        'MERGED/merged.with_info.vcf.gz'
+    output:
+        'MERGED/merged.vcf.gz'
+    threads: 6
+    shell:
+        'bcftools annotate'
+        '   --remove INFO'
+        '   --threads {threads}'
+        '   --output-type z'
+        '   --output {output}'
+        '   {input}'
+
+# Index the merged VCF file
+rule index_merged_vcf:
+    input:
+        'MERGED/merged.vcf.gz'
+    output:
+        'MERGED/merged.vcf.gz.tbi'
+    threads: 6
+    shell:
+        'bcftools index'
+        '   --tbi'
+        '   --threads {threads}'
+        '   --output {output}'
+        '   {input}'
+
+# ----------------------------------------------------------
+# Download dbSNP
+# ----------------------------------------------------------
+
+# Download the current dbSNP VCF file
+rule download_dbsnp_vcf:
+    output:
+        'MERGED/00-All.vcf.gz'
+    params:
+        dbsnp_vcf=DBSNP_VCF
+    shell:
+        'wget'
+        '   --output-document {output}'
+        '   {params.dbsnp_vcf}'
+
+# Convert chromosome names to UCSC style
+rule convert_chromosome_names:
+    input:
+        'MERGED/00-All.vcf.gz'
+    output:
+        'MERGED/dbSNP_build_151_all.vcf.gz'
+    threads: 6
+    script:
+        'convert_chromosome_names.sh'
+
+# Index the dbSNP VCF file
+rule index_dbsnp_vcf:
+    input:
+        'MERGED/dbSNP_build_151_all.vcf.gz'
+    output:
+        'MERGED/dbSNP_build_151_all.vcf.gz.tbi'
+    threads: 6
+    shell:
+        'bcftools index'
+        '   --tbi'
+        '   --threads {threads}'
+        '   --output {output}'
+        '   {input}'
+
+#----------------------------------------------------------
+# Annotated with dbSNP
+#----------------------------------------------------------
+
+# Annotate VCF file with known variants
+rule annotate_known_variants:
+    input:
+        vcf='MERGED/merged.vcf.gz',
+        vcf_index='MERGED/merged.vcf.gz.tbi',
+        dbsnp='MERGED/dbSNP_build_151_all.vcf.gz',
+        dbsnp_index='MERGED/dbSNP_build_151_all.vcf.gz.tbi'
+    output:
+        temp('MERGED/merged.annotated_with_rsIDs.vcf.gz')
+    threads: 6
+    shell:
+        'bcftools annotate'
+        '   --annotations {input.dbsnp}'
+        '   --columns ID'
+        '   --output-type z'
+        '   --output {output}'
+        '   --threads {threads}'
+        '   {input.vcf}'
+
+# Assign unknown variants with unique ID
+rule annotate_unknown_variants:
+    input:
+        'MERGED/merged.annotated_with_rsIDs.vcf.gz'
+    output:
+        'MERGED/merged.annotated.vcf.gz'
+    threads: 6
+    shell:
+        'bcftools annotate'
+        '   --set-id +\'%CHROM\_%POS\_%REF\_%FIRST_ALT\''
+        '   --output-type z'
+        '   --output {output}'
+        '   --threads {threads}'
+        '   {input}'
+
+# Index annotated VCF file
+rule index_annotated_vcf_file:
+    input:
+        'MERGED/merged.annotated.vcf.gz'
+    output:
+        'MERGED/merged.annotated.vcf.gz.tbi'
+    threads: 6
+    shell:
+        'bcftools index'
+        '   --tbi'
+        '   --threads {threads}'
+        '   --output {output}'
+        '   {input}'
+
+#----------------------------------------------------------
+# Filter to Missingnes < 2%
+#----------------------------------------------------------
+
+rule missingness_filter:
+    input:
+        vcf='MERGED/merged.annotated.vcf.gz',
+        vcf_index='MERGED/merged.annotated.vcf.gz.tbi'
+    output:
+        'FILTERED/merged.annotated.missingness_0_02.vcf.gz'
+    threads: 6
+    shell:
+        'bcftools filter'
+        '   --include "F_MISSING<0.02"'
+        '   --threads {threads}'
+        '   --output-type z'
+        '   --output {output}'
+        '   {input.vcf}'
+
+# Index the newly-filtered VCF file
+rule index_missingness_filtered_variants:
+    input:
+        'FILTERED/merged.annotated.missingness_0_02.vcf.gz'
+    output:
+        'FILTERED/merged.annotated.missingness_0_02.vcf.gz.tbi'
+    threads: 6
+    shell:
+        'bcftools index'
+        '   --tbi'
+        '   --threads {threads}'
+        '   --output {output}'
+        '   {input}'
+
+#----------------------------------------------------------
+# Filter to MAF >= 2.5%
+#----------------------------------------------------------
+
+# Apply a MAF filter
+rule maf_filter:
+    input:
+        vcf='FILTERED/merged.annotated.missingness_0_02.vcf.gz',
+        vcf_index='FILTERED/merged.annotated.missingness_0_02.vcf.gz.tbi'
+    output:
+        'FILTERED/merged.annotated.missingness_0_02.maf_0_025.vcf.gz'
+    threads: 6
+    shell:
+        'bcftools view'
+        '   --min-af 0.025:minor'
+        '   --threads {threads}'
+        '   --output-type z'
+        '   --output {output}'
+        '   {input.vcf}'
+
+# Index the newly-filtered VCF file
+rule index_maf_filtered_variants:
+    input:
+        'FILTERED/merged.annotated.missingness_0_02.maf_0_025.vcf.gz'
+    output:
+        'FILTERED/merged.annotated.missingness_0_02.maf_0_025.vcf.gz.tbi'
+    threads: 6
+    shell:
+        'bcftools index'
+        '   --tbi'
+        '   --threads {threads}'
+        '   --output {output}'
+        '   {input}'
+
+#----------------------------------------------------------
+# Apply HWE Filter of p-value >= 1e-6
+#----------------------------------------------------------
+
+# Apply HWE filter to remove variants with p-value < 1e-6
+rule hwe_filter:
+    input:
+        vcf='FILTERED/merged.annotated.missingness_0_02.maf_0_025.vcf.gz',
+        vcf_index='FILTERED/merged.annotated.missingness_0_02.maf_0_025.vcf.gz.tbi'
+    output:
+        'FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.vcf.gz'
+    threads: 6
+    shell:
+        'vcftools'
+        '   --gzvcf {input.vcf}'
+        '   --hwe 1e-6'
+        '   --recode'
+        '   --recode-INFO-all'
+        '   --stdout |'
+        '   bcftools view'
+        '   --threads {threads}'
+        '   --output-type z'
+        '   --output {output}'
+        '   -'
+
+# Index the newly-filtered VCF file
+rule index_hwe_filtered_variants:
+    input:
+        'FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.vcf.gz'
+    output:
+        'FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.vcf.gz.tbi'
+    threads: 6
+    shell:
+        'bcftools index'
+        '   --tbi'
+        '   --threads {threads}'
+        '   --output {output}'
+        '   {input}'
+
+#----------------------------------------------------------
+# Filter to Only SNPs
+#----------------------------------------------------------
+
+# Retain only SNPs (remove indels)
+rule snp_filter:
+    input:
+        vcf='FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.vcf.gz',
+        vcf_index='FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.vcf.gz.tbi'
+    output:
+        'FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.vcf.gz'
+    threads: 6
+    shell:
+        'vcftools'
+        '   --gzvcf {input.vcf}'
+        '   --remove-indels'
+        '   --recode'
+        '   --recode-INFO-all'
+        '   --stdout |'
+        '   bcftools view'
+        '   --threads {threads}'
+        '   --output-type z'
+        '   --output {output}'
+        '   -'
+
+# Index the newly-filtered VCF file
+rule index_snp_filtered_variants:
+    input:
+        'FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.vcf.gz'
+    output:
+        'FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.vcf.gz.tbi'
+    threads: 6
+    shell:
+        'bcftools index'
+        '   --tbi'
+        '   --threads {threads}'
+        '   --output {output}'
+        '   {input}'
+
+#----------------------------------------------------------
+# Calculate Quality Metrics
+#----------------------------------------------------------
+
+rule metrics_allele_frequency:
+    input:
+        vcf='FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.vcf.gz',
+        vcf_index='FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.vcf.gz.tbi'
+    output:
+        'FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.allele_frequencies.frq'
+    script:
+        'metrics_allele_frequency.sh'
+
+rule metrics_mean_depth_per_individual:
+    input:
+        vcf='FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.vcf.gz',
+        vcf_index='FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.vcf.gz.tbi'
+    output:
+        'FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.mean_depth_individual.idepth'
+    shell:
+        'vcftools'
+        '   --gzvcf {input.vcf}'
+        '   --depth'
+        '   --out FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.mean_depth_individual'
+
+rule metric_mean_depth_per_site:
+    input:
+        vcf='FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.vcf.gz',
+        vcf_index='FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.vcf.gz.tbi'
+    output:
+        'FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.mean_depth_site.ldepth.mean'
+    shell:
+        'vcftools'
+        '   --gzvcf {input.vcf}'
+        '   --site-mean-depth'
+        '   --out FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.mean_depth_site'
+
+rule metric_site_quality:
+    input:
+        vcf='FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.vcf.gz',
+        vcf_index='FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.vcf.gz.tbi'
+    output:
+        'FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.site_quality.lqual'
+    shell:
+        'vcftools'
+        '   --gzvcf {input.vcf}'
+        '   --site-quality'
+        '   --out FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.site_quality'
+
+rule metric_individual_missingness:
+    input:
+        vcf='FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.vcf.gz',
+        vcf_index='FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.vcf.gz.tbi'
+    output:
+        'FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.missing.imiss'
+    shell:
+        'vcftools'
+        '   --gzvcf {input.vcf}'
+        '   --missing-indv'
+        '   --out FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.missing'
+
+rule metric_site_missingness:
+    input:
+        vcf='FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.vcf.gz',
+        vcf_index='FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.vcf.gz.tbi'
+    output:
+        'FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.missing.lmiss'
+    shell:
+        'vcftools'
+        '   --gzvcf {input.vcf}'
+        '   --missing-site'
+        '   --out FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.missing'
+
+rule metric_heterozygosity:
+    input:
+        vcf='FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.vcf.gz',
+        vcf_index='FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.vcf.gz.tbi'
+    output:
+        'FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.heterozygosity.het'
+    shell:
+        'vcftools'
+        '   --gzvcf {input.vcf}'
+        '   --het'
+        '   --out FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.heterozygosity'
+
+rule metric_hwe:
+    input:
+        vcf='FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.vcf.gz',
+        vcf_index='FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.vcf.gz.tbi'
+    output:
+        'FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.hwe_statistics.hwe'
+    shell:
+        'vcftools'
+        '   --gzvcf {input.vcf}'
+        '   --hardy'
+        '   --out FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.hwe_statistics'
+
+#----------------------------------------------------------
+# Save in PLINK Format
+#----------------------------------------------------------
+
+rule save_in_plink_format:
+    input:
+        vcf='FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.vcf.gz',
+        vcf_index='FILTERED/merged.annotated.missingness_0_02.maf_0_025.hwe_1e-6.snps.vcf.gz.tbi'
+    output:
+        'PLINK/motrpac.precovid.n_238.maf_0_025.snps.pgen',
+        'PLINK/motrpac.precovid.n_238.maf_0_025.snps.pvar',
+        'PLINK/motrpac.precovid.n_238.maf_0_025.snps.psam'
+    shell:
+        'plink2'
+        '   --vcf {input.vcf}'
+        '   --make-pgen'
+        '   --autosome'
+        '   --out PLINK/motrpac.precovid.n_238.maf_0_025.snps'
+
+#----------------------------------------------------------
+# Calculate Kinship Matrix
+#----------------------------------------------------------
+
+rule calculate_kinship_matrices:
+    input:
+        pgen='PLINK/motrpac.precovid.n_238.maf_0_025.snps.pgen',
+        pvar='PLINK/motrpac.precovid.n_238.maf_0_025.snps.pvar',
+        psam='PLINK/motrpac.precovid.n_238.maf_0_025.snps.psam'
+    output:
+        temp('PLINK/motrpac.precovid.n_238.maf_0_025.kinship.rel.{plink_job}')
+    params:
+        n_jobs=N_PLINK_JOBS,
+        prefix='PLINK/motrpac.precovid.n_238.maf_0_025.snps'
+    shell:
+        'plink2'
+        '   --pfile {params.prefix}'
+        '   --parallel {wildcards.plink_job} {params.n_jobs}'
+        '   --make-rel'
+        '   --out PLINK/motrpac.precovid.n_238.maf_0_025.kinship'
+
+rule combine_kinship_matrices:
+    input:
+        expand('PLINK/motrpac.precovid.n_238.maf_0_025.kinship.rel.{plink_job}', plink_job=PLINK_JOBS)
+    output:
+        'PLINK/motrpac.precovid.n_238.maf_0_025.kinship.rel'
+    shell:
+        'cat {input} > {output}'

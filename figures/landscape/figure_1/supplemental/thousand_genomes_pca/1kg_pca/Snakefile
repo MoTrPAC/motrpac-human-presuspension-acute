@@ -1,0 +1,156 @@
+#!/bin/python3
+
+'''
+Intersect and merge MoTrPAC VCF and 1000 Genomes VCFs for input into local ancestry inference tools
+'''
+
+#----------------------------------------------------------
+# Setup
+#----------------------------------------------------------
+
+import os
+
+
+# 1000 Genomes VCFs
+DIR_1KG = '/oak/stanford/groups/smontgom/shared/1KG/hg38/'
+
+# MoTrPAC VCF
+MOTRPAC_VCF = '/projects/motrpac/PRECOVID/DATA/GENOTYPE/MERGED/merged.annotated.vcf.gz'
+
+# Output Directory
+OUTPUT_DIR = '/projects/motrpac/PRECOVID/DATA/GENOTYPE/1KG_MERGE/'
+
+# Chromosomes to use
+CHROMOSOMES = [str(x) for x in range(1, 22)]
+
+# Change directory to output directory
+os.chdir(OUTPUT_DIR)
+
+# Expected output
+rule all:
+    input:
+        '1kg.motrpac.merged.maf_0_05.ld_pruned.vcf.gz'
+
+#----------------------------------------------------------
+# Split MoTrPAC VCF
+#----------------------------------------------------------
+
+# Split the MoTrPAC VCF file by chromosomes
+rule split_motrpac_vcf_by_chr:
+	input:
+		MOTRPAC_VCF
+	output:
+		temp('motrpac_split/merged.annotated.maf_0_05.chr{chrom}.vcf.gz')
+	shell:
+		'bcftools view'
+		'	--regions chr{wildcards.chrom}'
+		'	--min-af 0.05:minor'
+		'	--output-type z'
+		'	--output {output}'
+		'	{input}'
+
+#----------------------------------------------------------
+# Prepare 1KG VCF Files
+#----------------------------------------------------------
+
+# Use a MAF filter of 0.05
+rule maf_filter_1kg:
+	input:
+		DIR_1KG + 'ALL.chr{chrom}_GRCh38.genotypes.20170504.vcf.gz'
+	output:
+		temp('1kg_split/ALL.chr{chrom}_GRCh38.genotypes.20170504.maf_0_05.vcf.gz')
+	shell:
+		'bcftools view'
+		'	--min-af 0.05:minor'
+		'	--output-type z'
+		'	--output {output}'
+		'	{input}'
+
+# Make a chromosome map from Ensembl to UCSC style
+rule make_chr_map:
+	output:
+		temp('1kg_split/chr_ensembl_to_ucsc.txt')
+	shell:
+		'for c in {{1..22}}; do echo "${{c}} chr${{c}}" >> {output}; done'
+
+# Update nomenclature in 1KG VCF files
+rule update_chr_1kg:
+	input:
+		vcf='1kg_split/ALL.chr{chrom}_GRCh38.genotypes.20170504.maf_0_05.vcf.gz',
+		chr_map='1kg_split/chr_ensembl_to_ucsc.txt'
+	output:
+		temp('1kg_split/ALL.chr{chrom}_GRCh38.genotypes.20170504.maf_0_05.ucsc_chr.vcf.gz')
+	shell:
+		'bcftools annotate'
+		'	--rename-chrs {input.chr_map}'
+		'	--output-type z'
+		'	--output {output}'
+		'	{input.vcf}'
+
+#----------------------------------------------------------
+# Merge Datasets
+#----------------------------------------------------------
+
+# Identify variants present in both datasets
+rule intersect_motrpac_1kg_vcf:
+	input:
+		vcf_1kg='1kg_split/ALL.chr{chrom}_GRCh38.genotypes.20170504.maf_0_05.ucsc_chr.vcf.gz',
+		vcf_motrpac='motrpac_split/merged.annotated.maf_0_05.chr{chrom}.vcf.gz'
+	output:
+		temp('combined/chr{chrom}/0002.vcf.gz'),
+		temp('combined/chr{chrom}/0003.vcf.gz')
+	shell:
+		'''
+		tabix -p vcf {input.vcf_1kg}
+		tabix -p vcf {input.vcf_motrpac}
+
+		bcftools isec --collapse none --output-type z --prefix combined/chr{wildcards.chrom} {input.vcf_1kg} {input.vcf_motrpac}
+		'''
+
+# Merge overlapping variants
+rule merge_1kg_with_motrpac:
+	input:
+		vcf_1kg='combined/chr{chrom}/0002.vcf.gz',
+		vcf_motrpac='combined/chr{chrom}/0003.vcf.gz'
+	output:
+		temp('merged/1kg.motrpac.merged.chr{chrom}.vcf.gz')
+	shell:
+		'bcftools merge'
+		'	--merge none'
+		'	--output-type z'
+		'	--output {output}'
+		'	{input.vcf_1kg} {input.vcf_motrpac}'
+
+#----------------------------------------------------------
+# LD Prune
+#----------------------------------------------------------
+
+# Prune variants to LD < 0.1 in a 1000kb window
+rule ld_prune_vcf:
+	input:
+		'merged/1kg.motrpac.merged.chr{chrom}.vcf.gz'
+	output:
+		temp('merged/1kg.motrpac.merged.ld_pruned.chr{chrom}.vcf.gz')
+	shell:
+		'bcftools +prune'
+		'	--window 1000kb'
+		'	--max r2=0.1'
+		'	--output-type z'
+		'	--output {output}'
+		'	{input}'
+
+#----------------------------------------------------------
+# Final VCF File
+#----------------------------------------------------------
+
+# Merge chromosomes into one VCF
+rule chromosome_merge:
+	input:
+		expand('merged/1kg.motrpac.merged.ld_pruned.chr{chrom}.vcf.gz', chrom=CHROMOSOMES)
+	output:
+		'1kg.motrpac.merged.maf_0_05.ld_pruned.vcf.gz'
+	shell:
+		'bcftools concat'
+		'	--output-type z'
+		'	--output {output}'
+		'	{input}'

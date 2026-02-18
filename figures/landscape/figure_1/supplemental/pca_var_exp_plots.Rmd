@@ -1,0 +1,296 @@
+---
+title: "pca_variance_exp_plots"
+output: html_document
+date: "2025-07-07"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(MotrpacHumanPreSuspensionAnalysis)
+library(MotrpacHumanPreSuspensionData)
+library(dplyr)
+library(tidyr)
+library(here)
+library(tibble)
+library(purrr)
+library(variancePartition)
+library(BiocParallel)
+library(Rtsne)
+
+figure_out_path = file.path(here(), "data", "tmp", "figures")
+```
+
+# Note: 
+
+This figure(s) requires access to `MotrpacHumanPreSuspensionData` to fully recreate. 
+
+# Figure Info
+This code is used to generate: 
+Figure S1C,D
+Table S3. 
+Supplemental figures for some other purpose. 
+
+```{r}
+non_methyl = ome_available_list()
+non_methyl = non_methyl[non_methyl != "epigen-methylcap-seq"]
+
+qc_norm_list = load_qc(selected_omes = non_methyl,
+                       epigen = TRUE,
+                       repo_local_dir = file.path(here(), "data", "tmp"))
+```
+
+First - PCAs, CCAs, TSNE
+
+So for these figures, we are trying to collapse the sets of metabolomics platforms
+and just make one figure/panel block for metabolomics platforms intead of having
+one PCA/CCA/TSNE per metab. 
+```{r make metab_qc_norm}
+for(tissue in names(qc_norm_list)){
+  #so we re-load qc_norm metab platforms to use `combine_qc_matrixes`
+  #and then we're going to plug in this combined one in place of all the single matrixes
+  metab_platforms_only = load_qc(selected_tissues = tissue,
+                                 selected_omes = metab_only_list())
+  
+  combined_metab_matrixes = combine_qc_matrixes(metab_platforms_only)
+  #we select any of the metadata, because the resulting combined matrix should have
+  #only shared participants, so the metadata i need should be in every sample_meta
+  metab_single_metadata = metab_platforms_only[[tissue]][[1]][["sample_metadata"]]
+  #now we convert back from the format of `combine_qc_matrix` to map back to vialLabels
+  #in reality ea column of the metab consists of mixes of metab, but for the figures
+  #we're making here, it shouldn't need any of the other metadata.
+  name_mapping = metab_single_metadata %>%
+    mutate(pid_timepoint = interaction(pid, Timepoint, sep = "..")) %>%
+    filter(pid_timepoint %in% colnames(combined_metab_matrixes)) %>%
+    dplyr::select(pid_timepoint, vialLabel) %>%
+    deframe()
+  colnames(combined_metab_matrixes) = name_mapping[colnames(combined_metab_matrixes)]
+  
+  combined_metab_replacement = list("qc_norm" = combined_metab_matrixes,
+                                    "sample_metadata" = metab_single_metadata)
+  
+  #and just get rid of the individual platforms
+  qc_norm_list[[tissue]][grep("metab", names(qc_norm_list[[tissue]]))] = NULL
+  qc_norm_list[[tissue]][["metab"]] = combined_metab_replacement
+}
+```
+
+```{r}
+cca_plot_list = list()
+for(tissue in names(qc_norm_list)){
+  for(assay in names(qc_norm_list[[tissue]])){
+    data_to_pca = qc_norm_list[[tissue]][[assay]][["qc_norm"]]
+    if(assay == "prot-ph" || assay == "prot-pr")  
+      data_to_pca = data_to_pca %>% tidyr::drop_na()
+    
+    if(nrow(data_to_pca) < 10) next
+    sample_metadata = qc_norm_list[[tissue]][[assay]][["sample_metadata"]]
+    rownames(sample_metadata) = sample_metadata$vialLabel
+    pdf(file = file.path(figure_out_path, "pcas", paste0(tissue,"_", assay, "_pca.pdf")))
+    p = plot_precovid_pca(data_to_pca,
+                          sample_metadata,
+                          custom_title = paste(tissue, assay))
+    print(p)
+    dev.off()
+    
+    #-----new: cca plot
+    pdf(file = file.path(figure_out_path, "ccas", paste0(tissue,"_", assay, "_cca.pdf")))
+    cca_plot = plot_precovid_cca(data_to_pca,
+                                 sample_metadata,
+                                 custom_title = paste(tissue, assay))
+    cca_plot_list[[tissue]][[assay]] = cca_plot
+    dev.off()
+    
+    #------new: tSNE plots
+    if(nrow(data_to_pca) < 100 | ncol(data_to_pca) < 50) next
+    tSNE_counts = Rtsne(t(data_to_pca), 
+                        check_duplicates = TRUE, 
+                        num_threads = 4)
+    unique_pids = unique(sample_metadata$pid)
+    pid_colors = hsv(seq(0, 1, length.out = length(unique_pids)), v = 1, s = 0.8)
+    pid_colors = pid_colors[as.numeric(factor(sample_metadata$pid))]
+    
+    pdf(file = file.path(figure_out_path, "tsnes", paste0(tissue,"_", assay, "_tsnes.pdf")))
+    plot(tSNE_counts$Y, 
+         col = pid_colors[match(colnames(data_to_pca), sample_metadata$vialLabel)], 
+         pch = 20, 
+         xlab = "Each color represents one participant", 
+         ylab = "", 
+         xaxt = "n", 
+         yaxt = "n", 
+         main = paste(assay, "tSNE", tissue))
+    dev.off()
+  }
+}
+```
+
+
+```{r}
+library(gridExtra)
+#Note: we also are modifying this to make each tissue a column for the grid 
+grobs_by_tissue = list()
+for(tissue in names(cca_plot_list)){
+  sublist = list()
+  for(assay in names(cca_plot_list[[tissue]])){
+    pheat = cca_plot_list[[tissue]][[assay]]
+    if (inherits(pheat, "pheatmap")) {
+      sublist[[assay]] = pheat$gtable
+    }
+  }
+  if(length(sublist) > 0){
+    grobs_by_tissue[[tissue]] = sublist
+  }
+}
+
+# Convert each tissue's set of grobs into a vertically stacked gTree
+tissue_panels = lapply(grobs_by_tissue, function(grob_list) {
+  do.call(arrangeGrob, c(grob_list, ncol = 1))
+})
+
+# Arrange the grobs in a grid. Make sure you either combine metab or 
+# do something else because the figure looks terrible with all the metabs separate
+# because there's basically infinite rows
+
+pdf(file = file.path(figure_out_path,"ccas", "all_tissue_ome_cca.pdf"),
+    width = 15, height = 15)
+do.call(grid.arrange, c(tissue_panels, ncol = length(tissue_panels)))
+dev.off()
+
+
+
+```
+
+next we want to work on variance explained plots
+
+note: actually fitting the models
+```{r, eval = TRUE}
+var_part_results = list()
+
+for(tissue in names(qc_norm_list)){
+  for(assay in names(qc_norm_list[[tissue]])){
+    message(paste(tissue, assay))
+    qc_norm = qc_norm_list[[tissue]][[assay]][["qc_norm"]] %>% drop_na()
+    if(nrow(qc_norm) < 10) next
+    sample_metadata = qc_norm_list[[tissue]][[assay]][["sample_metadata"]]
+    rownames(sample_metadata) = sample_metadata$vialLabel 
+    sample_metadata$group_timepoint = interaction(sample_metadata$randomGroupCode, sample_metadata$Timepoint)
+    sample_metadata = sample_metadata[match(colnames(qc_norm), rownames(sample_metadata)), ] 
+    #reorder so they're in the same order as colnames of raw_counts
+    
+    # param = SnowParam(8, "SOCK", progressbar = TRUE)
+    
+    cov_info = COVARIATES_FILE %>% 
+      dplyr::filter(tech_or_design == "Design",
+                    ome == assay,
+                    tissue %in% c(tissue, "all"),
+                    covariate != "visitcode") #this is for training only
+    
+    num_cov = cov_info %>% filter(data_type == "numerical") %>% pull(covariate)
+    #we manually add metab covariate inclusion, because normally DA is done
+    #per platform but here we're doing for all metabolites. So there's no
+    #metab in the covariates file formally. 
+    if(assay == "metab") num_cov = c("BMI", "calculatedAge")
+    num_part = paste(num_cov, collapse = " + ")
+    
+    factor_cov = cov_info %>% filter(data_type == "factor") %>% pull(covariate)
+    #so we are fitting things according to the group timepoint framework as
+    #a cell means model, just like the DA. 
+    factor_cov = factor_cov[!factor_cov %in%  c("randomGroupCode", "Timepoint")]
+    factor_cov = c(factor_cov, "group_timepoint")
+    
+    #we manually add metab covariate inclusion, because normally DA is done
+    #per platform but here we're doing for all metabolites. So there's no
+    #metab in the covariates file formally. 
+    if(assay == "metab") factor_cov = c("pid", "Sex", "group_timepoint")
+    
+    factor_part = factor_cov %>%
+      paste0("(1 | ", ., ")") %>%
+      paste(collapse = " + ")
+    
+    var_part_formula = paste("~", num_part, "+", factor_part)
+    var_part_model = fitExtractVarPartModel(exprObj = qc_norm,
+                                            formula = var_part_formula,
+                                            data = sample_metadata)
+    var_part_results[[tissue]][[assay]] = var_part_model
+  }
+}
+saveRDS(var_part_results, file = file.path(here(), "data", "tmp", "var_exp_results.RDS"))
+```
+
+```{r}
+var_part_results = readRDS(file.path(here(), "data", "tmp", "var_exp_results.RDS"))
+for(tissue in names(var_part_results)){
+  for(assay in names(var_part_results[[tissue]])){
+    pdf(file = file.path(figure_out_path,"var_explained", paste0(tissue,"_", assay, "_var_exp.pdf")))
+    
+    figure = plotVarPart(var_part_results[[tissue]][[assay]], 
+                         main = paste(tissue, assay, "variance explained"))
+    print(figure)
+    dev.off()
+  }
+}
+```
+
+```{r}
+#structure is [[tissue]][[ome]] for ea df (well it can be converted to df),
+#just rbind my way into an actual big df
+#also i just realized that i used assay for everything above but ome here. oops
+var_part_df = bind_rows(
+  lapply(names(var_part_results), function(tissue) {
+    lapply(names(var_part_results[[tissue]]), function(ome) {
+      df = as.data.frame(var_part_results[[tissue]][[ome]])
+      df %>%
+        tibble::rownames_to_column("feature") %>%
+        mutate(tissue = tissue, ome = ome)
+    }) %>% bind_rows()
+  })
+)
+#we also include this information in a supplementary table. 
+saveRDS(var_part_df, file.path(repo_local_dir, "figures", "table_S3.RDS"))
+
+
+plot_df = var_part_df %>%
+  pivot_longer(
+    cols = c("pid", "group_timepoint", "Sex", "BMI", "calculatedAge"),
+    names_to = "variable",
+    values_to = "value"
+  ) %>%
+  mutate(ome = case_when(
+    grepl("metab", ome) ~ "Metabolomics",
+    grepl("prot-ol|prot-pr", ome) ~ "Proteomics", #collapse into prot
+    ome == "prot-ph" ~ "Phosproteomics", #collapse into prot
+    ome == "epigen-atac-seq" ~ "ATAC",
+    ome == "transcript-rna-seq" ~ "RNA",
+    TRUE ~ ome
+  ),
+  variable = case_when(
+    variable == "pid" ~ "participant",
+    variable == "randomGroupCode" ~ "Group",
+    variable == "calculatedAge" ~ "Age",
+    TRUE ~ variable
+  )) %>%
+  mutate(variable = factor(variable,
+                           levels = c("participant", "group_timepoint", "Sex", "BMI", "Age")))
+
+pdf(file = file.path(figure_out_path, "var_explained", paste0("variance_exp_facetted.pdf")))
+p = plot_df %>%
+  ggplot(aes(x = variable, y = value, fill = variable)) +
+  geom_violin(scale = "width", trim = TRUE, color = NA) +
+  stat_summary(fun = mean, geom = "point", shape = 20, size = 1.5, color = "black") +
+  geom_boxplot(width = 0.1, outlier.shape = NA, color = "black", fill = NA) +
+  facet_grid(ome ~ tissue) +
+  labs(
+    x = "Covariate",
+    y = "Variance Explained",
+    title = "Distribution of Variance Explained per covariate"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 7),  
+    panel.spacing = unit(1, "lines"),
+    legend.position = "none"
+  )
+
+print(p)
+dev.off()
+
+```

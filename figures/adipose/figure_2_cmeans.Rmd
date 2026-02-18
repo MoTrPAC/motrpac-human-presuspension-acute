@@ -1,0 +1,44 @@
+---
+title: "cmeans_adipose"
+output: html_document
+date: "2025-02-12"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(MotrpacHumanPreSuspension)
+library(MotrpacHumanPreSuspensionData)
+
+config = jsonlite::fromJSON("~/config.json")
+repo_local_dir = config$precovid_repo_path
+
+devtools::load_all(config$r_package_path)
+```
+
+So here want to do c-means results by modality, plot them, and do enrichment on all
+```{r}
+for(modality in c("Resist", "Endur")){
+  outdir = file.path(repo_local_dir, "data/tmp/c_means_adipose", modality)
+  dir.create(outdir, recursive = TRUE, showWarnings = FALSE)
+  
+  DA_list = MotrpacHumanPreSuspensionData::load_differential_analysis(
+    selected_omes = c("transcript-rna-seq", "metab"),
+    selected_tissues = "adipose")
+  DA_list <- unlist(DA_list, recursive = FALSE)
+  modality_clusters = run_cmeans(DA_list = DA_list,
+                                 modality = modality)
+  
+  write.csv(modality_clusters[["adipose"]]$membership,
+            file = paste0(outdir, "/", modality, "_specific_clusts.csv"))
+  
+  plot_cmeans(modality_clusters[["adipose"]],
+              filename = paste0(outdir, "/", modality, "_specific_clusts.pdf"))
+  cameraPR = run_cluster_cameraPR(modality_clusters,
+                       selected_omes = c("transcript-rna-seq", "metab"),
+                       selected_tissues = "adipose") %>%
+    arrange(adj_p_value)
+  write.csv(cameraPR,
+            file = paste0(outdir, "/", modality, "_specific_enrichments.csv"))
+  
+}
+```

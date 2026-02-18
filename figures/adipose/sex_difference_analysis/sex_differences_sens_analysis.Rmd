@@ -1,0 +1,247 @@
+---
+title: "sex_baseline_sensitivity_analysis"
+output: html_document
+date: "2025-04-10"
+---
+
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(MotrpacHumanPreSuspension)
+library(MotrpacBicQC)
+library(ggplot2)
+library(stringr)
+library(variancePartition)
+library(edgeR)
+
+knitr::opts_chunk$set(
+  fig.width=8, 
+  fig.height=4,
+  out.width = '100%',
+  fig.dpi=300,
+  cache = FALSE
+)
+
+source("sex_diff_helpers.R")
+```
+
+# Motivation of this document
+
+The initial models for sex-differences at baseline were built directly off of the
+models from the larger exercise-acute bout trajectories. Those were informed by sensitivity
+analysis from `/DA/DA_Sensitivity_Analysis/cov_sensitivity_analysis.Rmd`
+
+However, as we focus on the baseline sex differences, which are essentially just
+comparisons of the pre-exercise timepoint for M vs F participants independent of 
+acute exercise, the number of samples that we're analyzing is quite a bit smaller 
+than the overall acute bout (esp for prot-pr/ph). So we repeat a similar analysis
+and report back in this document to see what type of analysis the models can support. 
+
+The code parameters are a little outdated in some areas, and the code is a little clunky, but the conclusions are still here. 
+
+```{r}
+#so I'm basically just expanding out the DA functions for given omes so I can test and save intermediates and visualize num parameters, fit, etc. 
+desired_ome = "transcript-rna-seq"; tissue = 'adipose'
+parsed_qc_norm = load_qc(selected_omes = desired_ome, 
+                         selected_tissues = tissue, 
+                         load_acute_only = T)
+qc_norm_mat = parsed_qc_norm[[tissue]][[desired_ome]][["qc_norm"]]
+#-> so here we want to make sure the genes we chose and the participants we chose are the same as the ones that pass through expression logcpm cutoffs
+metadata = parsed_qc_norm[[tissue]][[desired_ome]][['sample_metadata']] %>% 
+  filter(Timepoint == "pre_exercise") %>%
+  mutate(vialLabel = as.character(vialLabel))
+
+qc_norm_mat = qc_norm_mat %>% select(any_of(metadata$vialLabel))
+rownames(metadata) = metadata$vialLabel
+process_metadata = process_covariates(meta = metadata, selected_ome = desired_ome, tissue_input = tissue)
+meta_matrix = process_metadata$metadata
+
+metadata_feat = cbind(t(qc_norm_mat), meta_matrix)
+bic_table = data.frame()
+
+for(feat in colnames(metadata_feat)[1:nrow(qc_norm_mat)]){
+  #remember for adipose we don't do Batch regardless, due to the batching issues. 
+  full_formula = paste0(feat, "~ Sex + randomGroupCode +  calculatedAge + codedsiteid + pct_umi_dup + RIN") %>% as.formula()
+  without_site = paste0(feat, "~ Sex + randomGroupCode + calculatedAge + Batch + pct_umi_dup + RIN") %>% as.formula()
+  without_batch_or_site = paste0(feat, "~ Sex + randomGroupCode + calculatedAge + pct_umi_dup + RIN") %>% as.formula()
+  without_batch_group_site = paste0(feat, "~ Sex +  calculatedAge + pct_umi_dup + RIN") %>% as.formula()
+  only_sex = paste0(feat, "~ Sex") %>% as.formula()
+  
+  
+  full_fit = lm(formula = full_formula, data = metadata_feat)
+  without_site_fit = lm(formula = without_site, data = metadata_feat)
+  without_batch_or_site_fit = lm(formula = without_batch_or_site, data = metadata_feat)
+  without_batch_group_site_fit = lm(formula = without_batch_group_site, data = metadata_feat)
+  only_sex_fit = lm(formula = only_sex, data = metadata_feat)
+  
+  
+  bic_table = rbind(bic_table,
+                    c(BIC(full_fit), "original model", feat),
+                    c(BIC(without_site_fit), "without_site", feat),
+                    c(BIC(without_batch_or_site_fit), "without_batch_or_site", feat),
+                    c(BIC(without_batch_group_site_fit), "without_batch_group_site", feat),
+                    c(BIC(only_sex_fit), "only_sex", feat)
+  )
+}
+colnames(bic_table) = c("BIC", "Model", "Feature")
+
+bic_table = bic_table %>%
+  mutate(BIC = as.numeric(BIC)) %>%
+  group_by(Feature) %>%
+  mutate(mean_BIC = mean(BIC),
+         delta_BIC_from_mean = BIC - mean_BIC) %>%
+  ungroup() 
+
+model_summary = bic_table %>%
+  group_by(Model) %>%
+  summarise(mean_delta_BIC_from_mean = mean(delta_BIC_from_mean, na.rm = TRUE)) %>%
+  mutate(ome = desired_ome,
+         tissue = tissue) %>%
+  arrange(mean_delta_BIC_from_mean)
+print(model_summary)
+
+```
+
+We do the same analysis for proteomics
+```{r, warning = F, message=F}
+prot_omes = c('prot-pr', 'prot-ph')
+for(desired_ome in prot_omes){
+  for(tissue in c("adipose")){ #desired_tissues){
+    if(tissue == "blood") next #prot-pr has no blood tissue
+    ome_data = load_qc(selected_tissues = tissue,
+                       selected_omes = desired_ome,
+                       load_acute_only = FALSE)
+    
+    metadata = ome_data[[tissue]][[desired_ome]][['sample_metadata']] %>% 
+      dplyr::filter(Timepoint == "pre_exercise") #because we're just looking for baseline measurements
+    rownames(metadata) = metadata$vialLabel
+    data_matrix = ome_data[[tissue]][[desired_ome]][['qc_imputed']] %>%
+      dplyr::select(as.character(metadata$vialLabel))
+    rownames(data_matrix) = paste0("feat", gsub("[-/;:',^+() ]", "_",  rownames(data_matrix)))
+    process_metadata = process_covariates(meta = metadata,
+                                          selected_ome = desired_ome,
+                                          tissue_input = tissue)
+    
+    meta_matrix = process_metadata$metadata
+    metadata_feat = cbind(t(data_matrix), meta_matrix) 
+    bic_table = data.frame()
+    for(feat in colnames(metadata_feat)[1:nrow(qc_norm_mat)]){
+      if(is.na(feat)) next
+      
+      full_formula = paste0(feat, "~ Sex + randomGroupCode + calculatedAge + codedsiteid + tmt_plex") %>% as.formula()
+      without_site = paste0(feat, "~ Sex + randomGroupCode + calculatedAge + tmt_plex") %>% as.formula()
+      without_batch_or_site = paste0(feat, "~ Sex + randomGroupCode + calculatedAge") %>% as.formula()
+      without_batch_group_site = paste0(feat, "~ Sex + calculatedAge") %>% as.formula()
+      only_sex = paste0(feat, "~ Sex") %>% as.formula()
+      
+      full_fit = lm(formula = full_formula, data = metadata_feat)
+      without_site_fit = lm(formula = without_site, data = metadata_feat)
+      without_batch_or_site_fit = lm(formula = without_batch_or_site, data = metadata_feat)
+      without_batch_group_site_fit = lm(formula = without_batch_group_site, data = metadata_feat)
+      only_sex_fit = lm(formula = only_sex, data = metadata_feat)
+      
+      bic_table = rbind(bic_table,
+                        c(BIC(full_fit), "original model", feat),
+                        c(BIC(without_site_fit), "without_site", feat),
+                        c(BIC(without_batch_or_site_fit), "without_batch_or_site", feat),
+                        c(BIC(without_batch_group_site_fit), "without_batch_group_site", feat),
+                        c(BIC(only_sex_fit), "only_sex", feat)
+                        
+      )
+    }
+    colnames(bic_table) = c("BIC", "Model", "Feature")
+    
+    bic_table = bic_table %>%
+      mutate(BIC = as.numeric(BIC)) %>%
+      group_by(Feature) %>%
+      mutate(mean_BIC = mean(BIC),
+             delta_BIC_from_mean = BIC - mean_BIC) %>%
+      ungroup() 
+    
+    model_summary = bic_table %>%
+      group_by(Model) %>%
+      summarise(mean_delta_BIC_from_mean = mean(delta_BIC_from_mean, na.rm = TRUE)) %>%
+      mutate(ome = desired_ome,
+             tissue = tissue) %>%
+      arrange(mean_delta_BIC_from_mean)
+    print(model_summary)
+  }
+}
+```
+
+
+
+And for metabolomics
+```{r, warning = F, message=F}
+bic_table = data.frame()
+for(metab_platform in metab_only_list()){
+  desired_ome = metab_platform
+  for(tissue in c("adipose")){
+    ome_data = load_qc(selected_tissues = tissue,
+                       selected_omes = desired_ome,
+                       load_acute_only = FALSE)
+    if(length(ome_data) == 0) next 
+    
+    metadata = ome_data[[tissue]][[desired_ome]][['sample_metadata']] %>% 
+      dplyr::filter(Timepoint == "pre_exercise") #because we're just looking for baseline measurements
+    rownames(metadata) = metadata$vialLabel
+    data_matrix = ome_data[[tissue]][[desired_ome]][['qc_norm']] %>%
+      dplyr::select(as.character(metadata$vialLabel))
+    process_metadata = process_covariates(meta = metadata,
+                                          selected_ome = desired_ome,
+                                          tissue_input = tissue)
+    
+    meta_matrix = process_metadata$metadata
+    rownames(data_matrix) = paste0("feat", gsub("[-/;:',^+() ]", "_",  rownames(data_matrix)))
+    metadata_feat = cbind(t(data_matrix), meta_matrix) 
+    
+    for(feat in colnames(metadata_feat)[1:nrow(qc_norm_mat)]){
+      if(is.na(feat)) next
+      full_formula = paste0(feat, "~ Sex + randomGroupCode + calculatedAge + codedsiteid") %>% as.formula()
+      without_site = paste0(feat, "~ Sex + randomGroupCode + calculatedAge") %>% as.formula()
+      without_batch_group_site = paste0(feat, "~ Sex + calculatedAge") %>% as.formula()
+      only_sex = paste0(feat, "~ Sex") %>% as.formula()
+      
+      full_fit = lm(formula = full_formula, data = metadata_feat)
+      without_site_fit = lm(formula = without_site, data = metadata_feat)
+      without_batch_group_site_fit = lm(formula = without_batch_group_site, data = metadata_feat)
+      only_sex_fit = lm(formula = only_sex, data = metadata_feat)
+      
+      bic_table = rbind(bic_table,
+                        c(BIC(full_fit), "original model", feat),
+                        c(BIC(without_site_fit), "without_site", feat),
+                        c(BIC(without_batch_group_site_fit), "without_batch_group_site", feat),
+                        c(BIC(only_sex_fit), "only_sex", feat)
+                        
+      )
+    }
+  }
+}
+colnames(bic_table) = c("BIC", "Model", "Feature")
+
+bic_table = bic_table %>%
+  mutate(BIC = as.numeric(BIC)) %>%
+  group_by(Feature) %>%
+  mutate(mean_BIC = mean(BIC),
+         delta_BIC_from_mean = BIC - mean_BIC) %>%
+  ungroup() 
+
+model_summary = bic_table %>%
+  group_by(Model) %>%
+  summarise(mean_delta_BIC_from_mean = mean(delta_BIC_from_mean, na.rm = TRUE)) %>%
+  mutate(ome = "metab",
+         tissue = tissue) %>%
+  arrange(mean_delta_BIC_from_mean)
+print(model_summary)
+
+```
+
+So what is the verdict from these results?
+
+Generally, the suggestion from BIC is that the pre-exercise timepoint doesn't have 
+a very large number of samples to support the parameters in that are otherwise
+included in the acute bout of exercise.
+
+The BIC model diagnostics indicates that just including essentially only "Sex" and
+age seems to be the most appropriate for the

@@ -1,0 +1,301 @@
+---
+title: "omic_overlap_visualizations (Figure S1B)"
+author: "Daniel Katz"
+date: "2024-09-24"
+date of last update: "2025-10-30"
+output: html_document
+---
+
+# Note: 
+
+This figure(s) requires access to `MotrpacHumanPreSuspensionData` to fully recreate. 
+
+```{r setup}
+#This code uses a configuration file to ensure local file structure and local machine settings can be used properly.
+
+#' Steps for using the MoTrPAC config file:
+#' 1. Open the configuration template file in the root folder of this repo called `example_config.json` available in `precovid-analyses/`
+#' 2. Save a copy of this template to some other location in your computer. Many choose to place it in their home directory: Example: `~/motrpac_config.json`
+#' 3. Customize the fields for your machine and save changes. Remove any "comments" as JSON does not permit comments
+#' 4. This script expects the following elements in the config file:
+##' a. "gsutil_user" and "gsutil_path": this is the way your machine calls the gsutil, usually "/usr/bin/gsutil"
+##' b. "precovid_repo_path": this is the absolute file path for the `precovid-analyses` repo. Please do not include the final "/"
+#' 5. Add the path to this config file below 
+# config <- jsonlite::read_json(path = "//mnt/c/Users/dankatz/Documents/motrpac_config.json")
+config <- jsonlite::read_json(path = "~/config.json")
+
+source(file.path(config$precovid_repo_path,"/library/library-general.R"))
+
+
+session_packages = c('pheatmap', 'limma', 'UpSetR', 'ComplexHeatmap', 'gprofiler2',
+                     'plier', 'cluster', 'readxl','qvalue', 'reshape2',
+                     'MASS', 'splitstackshape', 'MotrpacBicQC', 'tidyverse', 'MotrpacHumanPreSuspension',
+                     'powerjoin','MotrpacHumanPreSuspension','variancePartition','conflicted','patchwork','ggbeeswarm','circlize',
+                     'grid','gridExtra')
+
+
+for(i in session_packages) {
+  tryCatch(
+    {
+      library(i, character.only = T)
+    }, error = function(e) {
+      print(paste("cannot load package:", i,", please install", i))
+    }
+  )
+}
+
+conflict_prefer('select','dplyr')
+conflict_prefer('filter','dplyr')
+
+sessionInfo()
+```
+
+```{r}
+qc_object<-MotrpacHumanPreSuspensionData::load_qc(epigen = T,
+                                                  repo_local_dir = paste0(config$precovid_repo_path,"data/tmp/"))
+
+pheno_object <- MotrpacHumanPreSuspensionData::load_pheno()
+# pheno_object <- load_pheno(repo_local_dir = config$precovid_repo_path)
+# qc_object <- load_qc(repo_local_dir = config$precovid_repo_path,
+#                   selected_omes = "all",
+#                   selected_tissues = "all",
+#                   epigen = T)
+
+#use a local object to save time
+# qc_object<-readRDS(file="//mnt/c/Users/dankatz/Documents/qc_object_1-7-25.rds")
+```
+
+```{r Prepare the data}
+all_vials<-data.frame()
+for (tiss in names(qc_object)){
+  
+  tissue_list<-(qc_object[[tiss]])
+  
+  for (assay1 in names(tissue_list)) {
+    
+    all_vials<-data.frame(vialLabel = names(tissue_list[[assay1]][["qc_norm"]])) %>% 
+      #mutate() %>% 
+      mutate(tissue = tiss, assay = assay1) %>% 
+      bind_rows(all_vials)
+    
+    
+  }
+}
+
+
+pheno_vials_long_all_times <- pheno_object$pheno_data %>% 
+  dplyr::select(pid,vialLabel,visitcode,tempSampProfile,
+                #calculatedAge,BMI,wtkg_pcaa,htcmavg_hwwt,
+                randomGroupCode, Sex,Timepoint) %>% 
+  mutate(tempSampProfile = factor(tempSampProfile,levels=c("All","Early","Middle","Late"))) %>% 
+  right_join(all_vials,by="vialLabel") %>% 
+  mutate(binary = 1) %>% 
+  filter(visitcode=="ADU_BAS")
+
+pheno_vials_long<-pheno_vials_long_all_times %>% 
+  # mutate(`Time Window` = case_when(Timepoint == "pre_exercise" ~ "Pre-exercise",
+  #                                  Timepoint == "during_20_min" ~ "During",
+  #                                  Timepoint == "during_40_min" ~ "During",
+  #                                  Timepoint == "post_10_min" ~ "Early",
+  #                                  Timepoint == "post_15_30_45_min" ~ "Early",
+  #                                  Timepoint == "post_3.5_4_hr" ~ "Mid",
+  #                                  Timepoint == "post_24_hr" ~ "Late")) %>% 
+  # 
+  # mutate(`Time Window` = factor(`Time Window`,levels = c("Pre-exercise",
+  #                                                        "During",
+  #                                                        "Early",
+  #                                                        "Mid",
+  #                                                        "Late"))) %>% 
+  # 
+  mutate(ome = case_when(str_detect(assay,"metab") ~ "Metabolomics",
+                         str_detect(assay,"prot-pr") ~ "Proteomics (MS)",
+                         str_detect(assay,"prot-ol") ~ "Proteomics (Olink)",
+                         str_detect(assay,"prot-ph") ~ "Phosphoproteomics",
+                         str_detect(assay, "rna") ~ "Transcriptomics",
+                         str_detect(assay,"methyl") ~ "Methylation",
+                         str_detect(assay, "atac") ~ "Chromatin Accessibility (ATAC)", .default = assay)) %>%
+  
+  mutate(ome = factor(ome, levels = c("Transcriptomics","Metabolomics","Proteomics (MS)","Proteomics (Olink)","Phosphoproteomics","Chromatin Accessibility (ATAC)", "Methylation"))) %>%
+  # 
+  # mutate(ome = factor(ome, levels = c("ATAC","Transcriptomics","Proteomics","Metabolomics"))) %>%
+  mutate(Group = factor(randomGroupCode,levels = c("ADUEndur","ADUResist","ADUControl"))) %>% 
+  mutate(tissue = factor(tissue,levels = c("muscle","adipose","blood"))) %>% 
+  mutate(Group = fct_recode(Group, EE = "ADUEndur", RE = "ADUResist",CON = "ADUControl")) %>% 
+  mutate(Sex = tolower(Sex)) %>% 
+  mutate(Timepoint = fct_recode(Timepoint,
+                                "Pre-Exercise" = "pre_exercise",
+                                "During 20 Min" = "during_20_min",
+                                "During 40 Min" = "during_40_min",
+                                "Post 10 Min" = "post_10_min",
+                                "Post 15/30/45 Min" = "post_15_30_45_min",
+                                "Post 3.5/4 Hour" = "post_3.5_4_hr",
+                                "Post 24 Hour" = "post_24_hr")) %>% 
+  select(-vialLabel,-visitcode,-assay) %>%
+  distinct() %>% 
+  arrange(Timepoint,ome) 
+
+
+pheno_vials <-pheno_vials_long %>% 
+  pivot_wider(values_from = binary,names_from = c(ome),values_fill = 0,names_sep = ";") %>%
+  arrange(tissue,randomGroupCode, Sex) #%>% 
+#  filter(tissue=="muscle", Timepoint=="Pre-Exercise",randomGroupCode=="ADUEndur")
+
+#Use this one if you want each circos to reflect the total number of people in a given group-tissue, 
+#use the one above if you want only those who have biosamples analyzed to be in the plot
+
+# pheno_vials <-pheno_vials_long %>% 
+#   pivot_wider(values_from = binary,names_from = c(ome,Timepoint),values_fill = 0,names_sep = ";") %>%
+#   pivot_longer(
+#     cols = contains(";"), # or specify the exact column names
+#     names_to = c("ome", "Timepoint"),
+#     names_sep = ";",
+#     values_to = "binary",
+#     values_drop_na = FALSE # optionally remove rows where the values are NA
+#   ) %>% 
+#   pivot_wider(values_from = binary,names_from = c(ome),values_fill = 0,names_sep = ";") %>%
+#   arrange(tissue,randomGroupCode, Sex) %>% 
+#   filter(tissue=="muscle", Timepoint=="Post 3.5/4 Hour",randomGroupCode=="ADUEndur")
+
+# Define specific colors for each ome when value is 1
+ome_colors <- MotrpacHumanPreSuspension::HUMAN_OME_COLORS
+```
+
+```{r single tissue, no sex tile option for multiple}
+
+# Reshape the data to long format for ggplot
+for(tissue_select in c("Blood","Muscle","Adipose")){
+  tissue_select_lower<-tolower(tissue_select)
+  
+  df_long_building <- pheno_vials %>%
+    filter(tissue==tissue_select_lower) %>% 
+    #select(-randomGroupCode,-Timepoint,-tissue,-Group) %>% 
+    mutate_at(.vars = vars(c("Sex",
+                             "Transcriptomics",
+                             "Metabolomics",
+                             "Proteomics (MS)",
+                             "Proteomics (Olink)",
+                             "Methylation",
+                             "Phosphoproteomics",
+                             "Chromatin Accessibility (ATAC)",
+                             "pid")),
+              .f = as.character) %>% 
+    arrange(Transcriptomics) %>% 
+    pivot_longer(cols = -c(pid,randomGroupCode,Timepoint,tissue,Group,tempSampProfile,Sex), 
+                 names_to = "Track", 
+                 values_to = "Value") %>%
+    mutate(Track = factor(Track,levels = c("Transcriptomics",
+                                           "Metabolomics",
+                                           "Proteomics (MS)",
+                                           "Proteomics (Olink)",
+                                           "Methylation",
+                                           "Phosphoproteomics",
+                                           "Chromatin Accessibility (ATAC)"))) %>% 
+    mutate(Ome = factor((if_else(Value==1,Track,"No Data")),
+                        levels = c("Transcriptomics",
+                                   "Metabolomics",
+                                   "Proteomics (MS)",
+                                   "Proteomics (Olink)",
+                                   "Methylation",
+                                   "Phosphoproteomics",
+                                   "Chromatin Accessibility (ATAC)",
+                                   "No Data"))) %>% 
+    arrange(desc(tempSampProfile) ) %>% 
+    mutate(pid = factor(pid,levels = unique(pid))) %>% 
+    mutate(Value = as.numeric(Value))
+  
+  test_all_null <- df_long_building %>% 
+    group_by(tissue,Track) %>%
+    summarise(sum = sum(Value))
+    
+df_long <- df_long_building %>% 
+  left_join(test_all_null) %>% 
+  filter(sum != 0)
+
+  
+  if (tissue_select_lower == "muscle"){
+    legend_pos <- "right"
+    df_long<-df_long %>% 
+      mutate(Timepoint = factor(Timepoint,labels = c("Pre-Exercise","Post 15 Min","Post 3.5 Hour","Post 24 Hour")))
+    
+  } else if (tissue_select_lower == "adipose") {
+    legend_pos <- "none"
+    df_long<-df_long %>% 
+      mutate(Timepoint = factor(Timepoint,labels = c("Pre-Exercise","Post 45 Min","Post 4 Hour","Post 24 Hour")))
+    
+  } else {
+    legend_pos <- "none"
+    df_long<-df_long %>% 
+      mutate(Timepoint = factor(Timepoint,labels = c("Pre-Exercise","During 20 Min","During 40 Min","Post 10 Min","Post 30 Min","Post 3.5 Hour","Post 24 Hour")))
+  }
+  
+  # Map `Value` and `Track` to fill colors
+  g<-ggplot(df_long, aes(x = Track, y = pid, fill = Ome)) +
+    geom_tile(color = "#00000000",linewidth=.05) +  # Add black borders around tiles
+    scale_fill_manual(values = c(
+      # Track colors for value 1
+      "Transcriptomics" = ome_colors[["Transcriptomics"]],
+      "Metabolomics" = ome_colors[["Metabolomics"]],
+      "Proteomics (MS)" = ome_colors[["Proteomics (MS)"]],
+      "Proteomics (Olink)" = ome_colors[["Proteomics (Olink)"]],
+      "Phosphoproteomics" = ome_colors[["Phosphoproteomics"]],
+      "Chromatin Accessibility (ATAC)" = ome_colors[["Chromatin Accessibility (ATAC)"]],
+      "Methylation" = ome_colors[["Methylation"]],
+      "No Data" = "lightgrey"
+    )) +
+    facet_grid(Group ~ Timepoint,scales = "free_y",shrink=TRUE,space = "free_y") +
+    theme_classic()+   # Remove axis ticks, labels, and grid lines
+    ggtitle(paste(tissue_select,"Sample Overlap"))+
+    ylab("Participant")+
+    theme( legend.background = element_blank(), # Remove the legend
+           legend.position = legend_pos,
+           axis.text = element_blank(),  # Remove axis text
+           axis.title.x = element_blank(),  # Remove axis titles
+           axis.ticks = element_blank())  # Remove axis ticks
+  
+  assign(paste0("g_",tissue_select),g)
+  print(g)
+}
+
+combo<-(g_Muscle+g_Blood+g_Adipose+plot_layout(guides = "collect",ncol = 1))
+
+#plots to print
+g_Adipose_single<-g_Adipose + theme(legend.position = "bottom")
+g_Blood_single<-g_Blood + theme(legend.position = "bottom")
+g_Muscle_single<-g_Muscle + theme(legend.position = "bottom")
+# Save each graph as a PDF
+prefix <- "omic_overlap_graph_"
+destination_folder<-paste0(config$precovid_repo_path, "/data/tmp/figures/")
+
+# ggsave(paste0(destination_folder, prefix, "Adipose_single.jpg"), plot = g_Adipose_single, device = "jpg",height=5,width=7,dpi = 600)
+# ggsave(paste0(destination_folder, prefix, "Blood_single.jpg"), plot = g_Blood_single, device = "jpg",height=5, width=8,dpi = 600)
+# ggsave(paste0(destination_folder, prefix, "Muscle_single.jpg"), plot = g_Muscle_single, device = "jpg", height = 5, width = 7,dpi = 600)
+ggsave(paste0(destination_folder, prefix, "combo.pdf"), plot = combo, device = "pdf",height = 14,width=12)
+# ggsave(paste0(destination_folder, prefix, "combo.jpg"), plot = combo, device = "jpg",height = 14,width=12,dpi=600)
+
+```
+
+
+```{r}
+# grobs_grob <- ggplotGrob(basic_tile)
+# 
+# # Example data
+# just_tissue_ome_nums <- data.frame(
+#   Timepoint = rep(c("T1", "T2", "T3"), 3),
+#   n = c(10, 15, 20, 25, 30, 10, 15, 20, 10),
+#   ome = rep(c("Ome1", "Ome2", "Ome3"), each = 3),
+#   tissue = rep(c("Tissue1", "Tissue2", "Tissue3"), each = 3),
+#   Group = rep(c("Group1", "Group2", "Group3"), 3)
+# )
+# 
+# # Create a blank plot template
+# blank_plot <- ggplot(just_tissue_ome_nums, aes(x = Timepoint, y = n, fill = ome)) +
+#   facet_grid(tissue ~ Group, switch = "y") 
+# 
+# # Create a list of grobs for each "bar"
+# grobs_list <- replicate(9, grobs_grob, simplify = FALSE)  # Just replicating for illustration
+# 
+# # Arrange grobs in the same grid layout as the bar plot
+# grid.arrange(grobs = grobs_list, nrow = 3, ncol = 3)
+
+```
+

@@ -1,0 +1,86 @@
+---
+title: "figure4c_refmet_visualizations"
+output: html_document
+date: "2025-09-16"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(MotrpacHumanPreSuspension)
+library(MotrpacHumanPreSuspensionData)
+library(dplyr)
+library(tidyr)
+library(patchwork)
+library(here)
+library(ComplexHeatmap)
+
+figures_dir = file.path(here(), "data", "tmp", "figures")
+```
+
+Sept 16, 2025. 
+
+One point of feedback that we've gotten for figures in Pre-CAWG is to potentially
+reduce the number of heatmaps that we're working with, because we have too many
+and the visualizations are getting a little bit stale. 
+
+Our goal is to attempt a few different visualizations for figure 4C to reduce
+
+
+```{r}
+selected_ome = "metab"
+interested_refmets = c("Acyl carnitines",
+                       "TCA acids",
+                       "TG")
+
+camera_filtered = CAMERA_RESULTS %>% 
+  filter(assay == selected_ome,
+         contrast_type == "exercise_with_controls") %>%
+  dplyr::mutate(contrast_left = stringr::str_split_fixed(contrast_short, " - ", 2)[,1],
+                randomGroupCode = case_when(
+                  contrast_type == "Endur_vs_Resist" ~ "ADUEndur - ADUResist",
+                  TRUE ~ paste0("ADU", stringr::str_split_fixed(contrast_left, "\\.", 2)[,1])
+                ),
+                Timepoint = as.factor(stringr::str_split_fixed(contrast_left, "\\.", 2)[,2])) %>%
+  dplyr::select(-contrast_left) %>%
+  mutate(Timepoint_labels = case_when(
+    Timepoint == "during_20_min" ~ "D20M",
+    Timepoint == "during_40_min" ~ "D40M",
+    Timepoint == "post_10_min" ~ "P10M",
+    Timepoint == "post_15_30_45_min" ~ "P15-45M",
+    Timepoint == "post_3.5_4_hr" ~ "P3.5/4H",
+    Timepoint == "post_24_hr" ~ "P24H",
+    TRUE ~ Timepoint
+  ),
+  Timepoint_labels = factor(Timepoint_labels, 
+                            levels = c("D20M","D40M", "P10M", "P15-45M", "P3.5/4H", "P24H"))) %>%
+  #optional - filter to just the timepoints that work for most tissues
+  # filter(Timepoint_labels %in% c("P15-45M", "P3.5/4H", "P24H")) %>%
+  filter(set_short %in% interested_refmets)
+
+camera_labels = camera_filtered %>%
+  group_by(tissue, randomGroupCode, set_short) %>%
+  filter(Timepoint_labels == "P24H") %>%
+  ungroup()
+
+pathway_plot = ggplot(camera_filtered, 
+                      aes(x = Timepoint_labels, y = z.std, 
+                          color = randomGroupCode, 
+                          group = interaction(randomGroupCode, set_short))) + 
+  facet_grid(tissue ~ ., scales = "free_y", space = "free_y") +
+  geom_line(linewidth = 0.5 * sc) +
+  geom_text_repel(data = camera_labels,
+                  aes(label = set_short, 
+                      color = randomGroupCode),
+                  hjust = 0, nudge_x = 0.2, size = 2.5,
+                  show.legend = FALSE) +
+  ggtitle(label = "pathway trajectory attempts") + 
+  scale_color_manual(values = MotrpacHumanPreSuspension::HUMAN_EXERCISE_GROUP_COLORS) +
+  theme(strip.text.y = element_text(angle = 0),
+        axis.title = element_blank()) 
+   #no timepoint/set title
+
+pathway_plot
+```
+```{r}
+```

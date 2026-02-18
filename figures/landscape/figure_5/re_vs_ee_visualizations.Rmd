@@ -1,0 +1,537 @@
+---
+title: "re_vs_ee_visualizations"
+output: html_document
+date: "2025-07-07"
+---
+
+```{r setup, include=FALSE}
+library(MotrpacHumanPreSuspensionAnalysis)
+library(dplyr)
+library(tidyr)
+
+# ----complexupset is giving problems with ggplot 4.0.0----
+if (!requireNamespace("ggplot2", quietly = TRUE) ||
+    packageVersion("ggplot2") != "3.5.2") {
+  stop("ggplot2 3.5.2 is required. Please install with:
+       remotes::install_version('ggplot2', version = '3.5.2')")
+}
+library(ggplot2)
+library(ggrepel)
+library(stringr)
+library(ComplexUpset)
+library(patchwork)
+library(purrr)
+library(here)
+library(ComplexHeatmap)
+library(limma)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# General Outline
+
+Ideas that we're trying to present in 
+```{r, width = 15, include = F}
+ee_vs_re = load_differential_analysis(selected_omes = "all",
+                                      selected_tissues = "all",
+                                      single_matrix = TRUE) 
+ee_re_sig = ee_vs_re %>%
+  filter(contrast_type == "Endur_vs_Resist") %>%
+  select(tissue, assay, feature_id, Timepoint, adj_p_value, logFC)
+
+ee_re_wide = ee_vs_re %>%
+  filter(contrast_type == "exercise_with_controls") %>%
+  select(tissue, assay, feature_id, Timepoint, randomGroupCode, logFC, adj_p_value) %>%
+  pivot_wider(names_from = c("randomGroupCode"),
+              values_from = c("logFC", "adj_p_value")) %>%
+  merge(., ee_re_sig, by = c("tissue", "assay", "feature_id", "Timepoint")) %>%
+  mutate(sig_contrast = ifelse(adj_p_value < 0.05, "Sig", "Non-Sig"),
+         sig_ee_single = ifelse(adj_p_value_ADUEndur < 0.05, "Sig", "Non-Sig"),
+         sig_re_single = ifelse(adj_p_value_ADUResist < 0.05, "Sig", "Non-Sig"))
+
+categorized = ee_re_wide %>%
+  mutate(
+    Significant_in = case_when(
+      sig_contrast == "Sig" & sig_ee_single == "Sig" & sig_re_single == "Non-Sig" ~ "Only EE",
+      sig_contrast == "Sig" & sig_ee_single == "Non-Sig" & sig_re_single == "Sig" ~ "Only RE",
+      sig_contrast == "Sig" & sig_ee_single == "Sig" & sig_re_single == "Sig" ~ "Both Groups",
+      sig_contrast == "Sig" & sig_ee_single == "Non-Sig" & sig_re_single == "Non-Sig" ~ "Neither",
+      TRUE ~ "Not RE vs EE Hit"
+    ),
+    border_color = case_when(
+      sig_contrast == "Sig" ~ "black",
+      Significant_in == "Only EE" ~ HUMAN_EXERCISE_GROUP_COLORS[["ADUEndur"]],
+      Significant_in == "Only RE" ~ HUMAN_EXERCISE_GROUP_COLORS[["ADUResist"]],
+      Significant_in == "Both Groups" ~ "brown",
+      Significant_in == "Neither" ~ "#86C5D8",
+      TRUE ~ "grey"
+    )
+  ) %>%
+  group_by(tissue, feature_id) %>%
+  #so for a given tissue, we just squash timepoints by picking the most significant one. 
+  slice_min(adj_p_value) %>%
+  ungroup()
+
+ggplot_re_ee = ggplot() +
+  #adding axis plots to clearly identify quadrants
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  geom_vline(xintercept = 0, color = "black") +
+  geom_hline(yintercept = 0, color = "black") +
+  geom_point(
+    data = categorized %>% filter(sig_contrast != "Sig"),
+    aes(x = logFC_ADUEndur, y = logFC_ADUResist),
+    color = "grey", size = 0.5, shape = 20
+  ) +
+  geom_point(
+    data = categorized %>% filter(sig_contrast == "Sig"),
+    aes(x = logFC_ADUEndur, y = logFC_ADUResist, fill = Significant_in),
+    color = "black", size = 1.5, shape = 21, stroke = 0.4
+  ) +
+  #we could add a different line in red that describes how the "opposite" 
+  #effect could look like. personally the red line looks a little bad
+  # geom_abline(slope = -1, intercept = 0, linetype = "dashed", color = "red") +
+  scale_fill_manual(
+    values = c(
+      "Only EE" = HUMAN_EXERCISE_GROUP_COLORS[["ADUEndur"]],
+      "Only RE" = HUMAN_EXERCISE_GROUP_COLORS[["ADUResist"]],
+      "Both Groups" = "brown",
+      "Neither" = "#86C5D8"
+    )
+  ) +
+  labs(
+    x = "logFC (EE vs Control)", 
+    y = "logFC (RE vs Control)",
+    title = NULL
+    # caption = "Small grey dots represent features not significant in EE vs RE comparison,
+    # colored dots represent RE vs EE significant hits"
+  ) +
+  facet_grid(~ tissue) +
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        strip.text = element_text(size = 12))
+print(ggplot_re_ee)
+```
+
+This chunk of code is a quick detour for text in the manuscript - corresponding
+to what is now figure 3E
+```{r}
+oppositional = ee_re_wide %>% 
+  filter(adj_p_value_ADUEndur < 0.05 & adj_p_value_ADUResist < 0.05) %>%
+  filter(sign(logFC_ADUEndur) != sign(logFC_ADUResist))
+```
+
+```{r}
+upset_list = lapply(unique(categorized$tissue), function(tissue) {
+  #getting this into a format ready for an upset plot
+  df_tiss = categorized %>%
+    filter(tissue == !!tissue) %>%
+    #we're also newly adding assay to try to make stacked barplots
+    select(feature_id, assay, sig_contrast, sig_ee_single, sig_re_single) %>%
+    distinct() %>%
+    mutate(across(c(sig_contrast, sig_ee_single, sig_re_single), ~ . == "Sig")) %>%
+    rename(
+      EE_vs_RE = sig_contrast,
+      EE_vs_Ctrl = sig_ee_single,
+      RE_vs_Ctrl = sig_re_single
+    ) %>%
+    #so we notably remove the triple negative--those not significant in any 
+    #modality specific, and also the re vs ee. 
+    filter(EE_vs_RE | EE_vs_Ctrl | RE_vs_Ctrl)
+  
+  #custom colors. Notably, if theres an intersection that one tissue has
+  #but not another, it doesn't run at all. so i have to add thing specially
+  #bc adipose is missing a "both" feature. 
+  custom_colors = list(
+    upset_query(
+      intersect = c('EE_vs_RE', 'EE_vs_Ctrl'),
+      color = HUMAN_EXERCISE_GROUP_COLORS[["ADUEndur"]],
+      fill = HUMAN_EXERCISE_GROUP_COLORS[["ADUEndur"]],
+      only_components = c('intersections_matrix', 'Intersection size')
+    ),
+    upset_query(
+      intersect = c('EE_vs_RE', 'RE_vs_Ctrl'),
+      color = HUMAN_EXERCISE_GROUP_COLORS[["ADUResist"]],
+      fill = HUMAN_EXERCISE_GROUP_COLORS[["ADUResist"]],
+      only_components = c('intersections_matrix', 'Intersection size')
+    ),
+    upset_query(
+      intersect = c('EE_vs_RE'),
+      color = '#86C5D8',
+      fill = '#86C5D8',
+      only_components = c('intersections_matrix', 'Intersection size')
+    )
+  )
+  
+  
+  if(tissue == "muscle" | tissue == "blood"){    
+    custom_colors[[4]] = upset_query(
+      intersect = c('EE_vs_RE', 'EE_vs_Ctrl', 'RE_vs_Ctrl'),
+      color = 'brown',
+      fill = 'brown',
+      only_components = c('intersections_matrix', 'Intersection size')
+    )
+  }
+  
+  ComplexUpset::upset(
+    df_tiss,
+    intersect = c("EE_vs_RE", "EE_vs_Ctrl", "RE_vs_Ctrl"),
+    #so here we don't want to just go in the same order every time
+    sort_intersections = FALSE,
+    sort_sets = FALSE,
+    intersections = list(
+      c("EE_vs_RE", "EE_vs_Ctrl", "RE_vs_Ctrl"),
+      c("RE_vs_Ctrl", "EE_vs_RE"),
+      c("EE_vs_Ctrl", "EE_vs_RE"),
+      "EE_vs_RE",
+      "RE_vs_Ctrl",
+      "EE_vs_Ctrl"
+    ),
+    name = tissue,
+    encode_sets = FALSE,
+    min_size = 3,
+    set_sizes = FALSE,
+    base_annotations = list(
+      'Intersection size' = intersection_size(
+        counts = TRUE) +
+        #remove assay legend bc itll get printed 3 times
+        guides(fill = "none")
+    ),
+    matrix = intersection_matrix(
+      geom = geom_point(shape = 'square', size = 3.5),
+      segment = geom_segment(linetype = 'dotted')
+    ),
+    queries = custom_colors
+  )
+})
+
+combined_upset_plot = patchwork::wrap_plots(upset_list, nrow = 1)
+print(combined_upset_plot)
+```
+
+
+```{r}
+final_plot = ggplot_re_ee / combined_upset_plot + plot_layout(heights = c(1.5, 1.2))
+
+pdf(file = file.path(here(), "data", "tmp", "figures", "figure3a_re_vs_ee.pdf"),
+    width = 12, height = 8)
+print(final_plot)
+dev.off()
+```
+
+
+Okay now lets do some ORA here
+```{r}
+all_ora_results = data.frame()
+for(tissue in tissue_available_list()){
+  unique_assays = categorized %>% filter(tissue == !!tissue) %>% pull(assay) %>% unique()
+  for(assay in unique_assays){
+    #we're not going to do refmet or ptm-sea type stuff here. 
+    if(assay == "metab" | assay == "prot-ph") next
+    
+    for(groups in c("Only EE", "Only RE")){
+      #filler contrast is to make sure the heatmap has the right colors
+      if(groups == "Only EE") filler_contrast = "EE"
+      if(groups == "Only RE") filler_contrast = "RE"
+      
+      #to make the background for the ORA. 
+      all_results = categorized %>% 
+        filter(tissue == !!tissue,
+               assay == !!assay) %>%
+        left_join(HUMAN_FEATURE_TO_GENE, by = c("feature_id", "assay")) %>%
+        filter(!is.na(gene_symbol))
+      
+      #significant in the certain group we want. 
+      sig_results = all_results %>% 
+        filter(Significant_in == groups,
+               adj_p_value < 0.1)
+      
+      message(paste(tissue, groups, assay, nrow(sig_results)))
+      #if its <50 samples, we dont even do ORA. 
+      if(nrow(sig_results) < 50) next
+      # write.csv(sig_results, 
+      #           file = file.path(here(), "data", "tmp", "figures", paste0(filler_contrast,tissue,"only_ORA_enrichments.csv")),
+      #           row.names = FALSE)
+      #bc its a factor otherwise
+      significant = as.character(unique(sig_results$gene_symbol))
+      all_feats = as.character(unique(all_results$gene_symbol))
+      
+      ora_results = run_ORA(input = significant,
+                            background = all_feats) 
+      ora_formatted = ora_results %>%
+        mutate(
+          tissue = !!tissue,
+          assay = assay,
+          contrast = filler_contrast,
+          contrast_type = "exercise_with_controls",
+          #basically just qnorm normal to find the zscore
+          z.std = qnorm(1 - p_value / 2)
+        )
+      all_ora_results = rbind(all_ora_results, ora_formatted)
+    }
+  }
+}
+
+all_ora_results = all_ora_results %>%
+  mutate(z.std = case_when(
+    z.std == "Inf" ~ 15,
+    TRUE ~ z.std
+  ),
+  contrast = as.factor(contrast)
+  )
+```
+
+So here we make the actual figure and set colors and stuff
+```{r}
+# write.csv(all_ora_results, 
+#           file = file.path(here(), "data", "tmp", "figures", "all_muscle_re_ee_only_ORA_results.csv"),
+#           row.names = FALSE)
+#okay just take n from ea group in a really brute force way
+all_ora_results_figure = all_ora_results %>%
+  filter(tissue == "muscle") %>%
+  group_by(contrast) %>%
+  arrange(adj_p_value, .by_group = TRUE) %>%
+  slice_head(n = 15) %>%
+  ungroup() %>%
+  filter(adj_p_value < 0.05) %>%
+  mutate(neg_log10_p = -log10(p_value))
+
+#by default these arrange themselves alphabetically so instead we just 
+#force them to get arranged by contrast like they were before. 
+ordered_sets = all_ora_results_figure %>%
+  pull(set_short) 
+
+contrast_colors = c(
+  "EE" = HUMAN_EXERCISE_GROUP_COLORS[["ADUEndur"]],
+  "RE" = HUMAN_EXERCISE_GROUP_COLORS[["ADUResist"]]
+)
+
+enrichmap(all_ora_results_figure,
+          n_top = 30L,
+          set_column = "set_short",
+          statistic_column = "neg_log10_p",
+          contrast_column = "contrast", 
+          padj_column = "adj_p_value",
+          colors = c("white", "#543483"),
+          filename = file.path(here(), "data", "tmp", "figures", "re_ee_only_enrichments.pdf"),
+          width = 12, 
+          height = 10,
+          heatmap_args = list(
+            column_title = "Muscle \n Transcriptomics",
+            row_order = ordered_sets,
+            "cluster_columns" = FALSE,
+            "cluster_rows"= FALSE,
+            na_col = "grey55",
+            top_annotation = HeatmapAnnotation(
+              Modality = c("EE", "RE"),
+              col = list(Modality = contrast_colors),
+              show_annotation_name = TRUE
+            ),
+            heatmap_legend_param = list(
+              title = latex2exp::TeX("$\\bf{$-log$_{10}($P-Value$)}$")
+            )
+          )
+)
+```
+
+
+The goal of this is:
+
+1. To visualize how things look compared to the previous plot of feature level results
+
+2. To find interesting pathways to present using a triangle type plot (see below)
+
+
+```{r}
+# triangle_size_scale = 1 #easier parameter to change for testing iterations
+
+camera_tp_group = CAMERA_RESULTS %>%
+  dplyr::mutate(contrast_left = stringr::str_split_fixed(contrast_short, " - ", 2)[,1],
+                randomGroupCode = case_when(
+                  contrast_type == "Endur_vs_Resist" ~ "ADUEndur - ADUResist",
+                  TRUE ~ paste0("ADU", stringr::str_split_fixed(contrast_left, "\\.", 2)[,1])
+                ),
+                Timepoint = as.factor(stringr::str_split_fixed(contrast_left, "\\.", 2)[,2])) %>%
+  dplyr::select(-contrast_left) 
+
+enrich_results = camera_tp_group %>%
+  filter(contrast_type == "Endur_vs_Resist") %>%
+  select(tissue, assay, set_id, set_short, adj_p_value, contrast_short, t, randomGroupCode, Timepoint)
+#-----------------------------------------------------------------------------------------------------
+#ok so i made this code to become wide -> merge -> pull in overall RE-EE sig for each group
+#for a different thing, but the wide -> long code can definitely be improved/trimmed. 
+#not really worth worrying about too much yet. 
+enrich_wide = camera_tp_group %>%
+  filter(contrast_type == "exercise_with_controls") %>%
+  select(tissue, assay, set_id, set_short,  Timepoint, randomGroupCode, t, adj_p_value) %>%
+  pivot_wider(names_from = c("randomGroupCode"),
+              values_from = c("t", "adj_p_value")) %>%
+  merge(., enrich_results, by = c("tissue", "assay", "set_id", "set_short", "Timepoint")) 
+
+# potential_pathways = 
+interesting_pathways = readxl::read_excel(path = file.path(here(), "figures", "landscape", "curated_pathways.xlsx"),
+                                          sheet = "5") %>% pull(set_id)
+
+enrich_wide$set_short = as.character(enrich_wide$set_short)
+selected_pathways_long = enrich_wide %>%
+  #filter to desired pathways
+  #currently we're only keep transcript bc trying to do multiple assays is too messy
+  filter(set_id %in% interesting_pathways, assay %in% c("transcript-rna-seq")) %>%
+  #i need to have a better way to organize set_short bc this is not it 
+  mutate(set_short = ifelse(
+    nchar(set_short) > 35,
+    paste0(substr(set_short, 1, 35), "..."),
+    set_short
+  ))%>%  
+  rename(t_overall = t, adj_p_value_overall = adj_p_value) %>%
+  pivot_longer(
+    cols = c(t_ADUResist, t_ADUEndur, adj_p_value_ADUResist, adj_p_value_ADUEndur),
+    names_to = c(".value", "condition"),
+    names_pattern = "(t|adj_p_value)_(ADUResist|ADUEndur)"
+  ) %>%
+  mutate(outline = ifelse(adj_p_value < 0.05, "signif", "nonsignif"), #significant within single group
+         shape = ifelse(t > 0, "Upregulated", "Downregulated"), #up or down within single group
+         tile_filt = ifelse(adj_p_value_overall < 0.05, "Adj P <= 0.05", "Adj P > 0.05"), #significant across groups
+         size = abs(t), #size based on absolute 
+         condition = recode(condition,
+                            "t_ADUResist" = "ADUResist",
+                            "t_ADUEndur" = "ADUEndur")) %>%
+  arrange(desc(size)) %>%
+  mutate(Timepoint_labels = case_when(
+    Timepoint == "post_10_min" ~ "P10M",
+    Timepoint == "post_15_30_45_min" ~ "P15-45M",
+    Timepoint == "post_3.5_4_hr" ~ "P3.5/4H",
+    Timepoint == "post_24_hr" ~ "P24H",
+    TRUE ~ Timepoint
+  ),
+  Timepoint_labels = factor(Timepoint_labels, 
+                            levels = c("P10M", "P15-45M", "P3.5/4H", "P24H"))) %>%
+  droplevels()
+
+# write.csv(selected_pathways_long, 
+#           file = file.path(here(), "data", "tmp", "figures", "Fig3C_triangle_selected_pathways.csv"),
+#           row.names = FALSE)
+
+```
+
+So now we make the actual plots themselves
+```{r}
+triangle_plots = ggplot(selected_pathways_long,
+                        aes(x = Timepoint_labels, y = set_short)) +
+  # Background tile for adjusted P significance
+  geom_tile(aes(alpha = tile_filt),
+            fill = "grey60",
+            colour = NA,
+            height = 0.95, width = 0.6) +
+  
+  # Separate points for endurance and resistance (nudged for clarity)
+  geom_point(
+    data = subset(selected_pathways_long, condition == "ADUEndur"),
+    aes(fill = condition, shape = shape, size = size),
+    stroke = 0.8,
+    position = position_nudge(y = 0.2)
+  ) +
+  geom_point(
+    data = subset(selected_pathways_long, condition == "ADUResist"),
+    aes(fill = condition, shape = shape, size = size),
+    stroke = 0.8,
+    position = position_nudge(y = -0.2)
+  ) +
+  
+  # Legend for significance tiles
+  scale_alpha_manual(
+    values = c("Adj P <= 0.05" = 0.3, "Adj P > 0.05" = 0),
+    name = "RE-EE"
+  ) +
+  
+  # Legend for fill (Group)
+  scale_fill_manual(
+    values = HUMAN_EXERCISE_GROUP_COLORS,
+    name = "Group",
+    guide = guide_legend(
+      nrow = 2, byrow = TRUE,
+      override.aes = list(shape = 22, size = 5, colour = "black")
+    )
+  ) +
+  
+  # Legend for up/down regulation
+  scale_shape_manual(
+    values = c("Upregulated" = 24, "Downregulated" = 25),
+    name = "Direction"
+  ) +
+  
+  theme_bw() +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(),
+    plot.background = element_blank(),
+    panel.background = element_blank(),
+    panel.border = element_rect(linewidth = 1),
+    
+    # Axis adjustments
+    axis.text.y.right = element_text(colour = "black", size = 8),
+    axis.text.y.left = element_blank(),
+    axis.ticks.y.left = element_blank(),
+    axis.title = element_blank(),
+    axis.text.x = element_text(colour = "black", angle = 45, hjust = 1, vjust = 1, size = 10),
+    
+    # Legend layout
+    legend.position = "bottom",
+    legend.box = "horizontal",
+    legend.justification = c(0, 0),
+    legend.box.just = "right",
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 12),
+    plot.margin = margin(t = 5, r = 50, b = 5, l = 8)
+  ) +
+  
+  # Unified legend configuration
+  guides(
+    fill = guide_legend(
+      order = 1,
+      nrow = 2, 
+      byrow = TRUE,
+      override.aes = list(
+        shape = 22,          # square shape with fill (not circle)
+        size = 5,            # larger for visibility
+        colour = "black"     # outline around fill
+      )
+    ),
+    shape = guide_legend(order = 2, nrow = 2, byrow = TRUE),
+    size  = guide_legend(
+      title = "z-std",
+      order = 3,,
+      nrow = 3,
+      override.aes = list(
+        shape = 24,       # triangles for size legend
+        fill  = "grey60",
+        color = "black"   # add border outline
+      )
+    ),
+    alpha = guide_legend(
+      order = 4,
+      nrow = 2,
+      override.aes = list(
+        fill  = "grey60",
+        color = "black",   # outline for RE-EE tiles
+        shape = 22,
+        size  = 4
+      )
+    )
+  ) +
+  scale_y_discrete(position = "right") +
+  facet_grid(~ tissue, scales = "free_x", space = "free_x") +
+  ggtitle("Group-level pathway enrichment")
+
+
+
+pdf(file = file.path(here(), "data", "tmp", "figures", "Fig3C_triangle_re_ee_plots.pdf"),
+    width = 10, height = 12)
+print(triangle_plots)
+dev.off()
+```
+
+
+
+
+
+
+

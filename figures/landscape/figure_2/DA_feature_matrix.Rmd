@@ -1,0 +1,164 @@
+---
+title: "da_features_heatmap"
+author: "Dan Katz, Christopher Jin"
+date: "2024-05-07"
+date of last update: "2025-10-07" - CJ
+output: html_document
+---
+
+
+This corresponds to figure 2A in the landscape. 
+
+```{r setup}
+session_packages = c('here',  'UpSetR', 'ComplexHeatmap',
+                     'plier', 'cluster', 'readxl', 'reshape2',
+                     'MASS', 'splitstackshape', 'MotrpacBicQC', 'tidyverse', 'MotrpacHumanPreSuspensionAnalysis',
+                     'conflicted','patchwork','ggbeeswarm','circlize',
+                     'grid','gridExtra')
+
+
+for(i in session_packages) {
+  tryCatch(
+    {
+      library(i, character.only = T)
+    }, error = function(e) {
+      print(paste("cannot load package:", i,", please install", i))
+    }
+  )
+}
+
+conflict_prefer('select','dplyr')
+conflict_prefer('filter','dplyr')
+
+sessionInfo()
+
+```
+
+```{r}
+all_da <- load_differential_analysis(selected_omes = "all",
+                                     selected_tissues = "all",
+                                     epigen = TRUE,
+                                     single_matrix = TRUE) 
+
+```
+
+```{r}
+all_da_sum = all_da %>% 
+  filter(contrast_type == "exercise_with_controls") %>%
+  mutate(Ome = assay) %>%
+  select(Ome, randomGroupCode, tissue, adj_p_value, feature_id) %>% 
+  group_by(randomGroupCode, tissue, feature_id, Ome) %>% 
+  slice_min(adj_p_value) %>%
+  ungroup()
+```
+
+
+For supplementary table: we also present information by timepoint. 
+This corresponds to info in Table S2
+
+```{r}
+all_da_by_grp_tp = all_da %>% 
+  filter(contrast_type == "exercise_with_controls") %>%
+  rename(Ome = assay) %>%
+  filter(adj_p_value < 0.05) %>%
+  summarize(
+    n = n(), 
+    .by = c("Timepoint", "randomGroupCode", "tissue", "Ome")
+  ) %>%
+  arrange(tissue, Ome, randomGroupCode, Timepoint)
+# write.csv(all_da_by_grp_tp,
+#           file = file.path(here(), "data", "tmp", "figures", "DA_feature_matrix_by_tp.csv"),
+#           row.names = FALSE)
+```
+
+
+```{r}
+all_da_slice<-all_da_sum %>% 
+  group_by(Ome,tissue,randomGroupCode) %>% 
+  dplyr::summarize(num_feat = n(),
+                   percent_sig_fdr = 100*sum(adj_p_value<0.05)/n(),
+                   num_sig_fdr005 = sum(adj_p_value<0.05)) %>% 
+  mutate(Group = if_else(randomGroupCode=="ADUEndur","EE","RE"),
+         Group = factor(Group, levels = c("EE", "RE"))) %>%
+  mutate(Ome = if_else((Ome=="prot-ol" | Ome == "prot-pr"),"prot-pr",Ome)) %>% 
+  mutate(Ome = case_when(str_detect(Ome,"metab") ~ "Metabolomics",
+                         str_detect(Ome,"prot-pr") ~ "Proteomics",
+                         str_detect(Ome,"prot-ph") ~ "Phosphoproteomics",
+                         str_detect(Ome, "rna") ~ "Transcriptomics",
+                         str_detect(Ome, "atac") ~ "Chromatin Accessibility (ATAC)", 
+                         str_detect(Ome, "methyl") ~ "Methylation",
+                         .default = Ome)) %>%
+  mutate(Ome = factor(Ome, levels = c("Chromatin Accessibility (ATAC)",
+                                      "Transcriptomics",
+                                      "Proteomics",
+                                      "Phosphoproteomics",
+                                      "Metabolomics", 
+                                      "Methylation"))) 
+```
+
+```{r}
+da_feat_perc<-all_da_slice %>% 
+  select(Ome,tissue,percent_sig_fdr,Group) %>% 
+  pivot_wider(values_from = percent_sig_fdr,names_from = c("Group","tissue"),) %>% 
+  arrange(Ome) %>% 
+  select(Ome,starts_with("EE"),starts_with("RE")) %>% 
+  column_to_rownames(var = 'Ome') %>% 
+  as.matrix()
+
+da_feat_num<-all_da_slice %>% 
+  select(Ome,tissue,num_sig_fdr005,Group) %>% 
+  pivot_wider(values_from = num_sig_fdr005,names_from = c("Group","tissue")) %>% 
+  arrange(Ome)  %>% 
+  select(Ome,starts_with("EE"),starts_with("RE")) %>% 
+  column_to_rownames(var = 'Ome') %>% 
+  as.matrix()
+```
+
+```{r}
+extra_Group_colors = c(EE="#d95f02",RE="#1b9e77",CON="#7570b3")
+
+ann_colors = list(
+  Tissue = MotrpacHumanPreSuspensionAnalysis::HUMAN_TISSUE_COLORS,
+  Group = extra_Group_colors,
+  Ome = MotrpacHumanPreSuspensionAnalysis::HUMAN_OME_COLORS
+)
+
+annotation_data <- rownames(da_feat_perc) %>% 
+  as.data.frame() %>% 
+  rename(Ome = ".") %>% 
+  mutate(Ome = factor(Ome, levels = c("Chromatin Accessibility (ATAC)","Transcriptomics","Proteomics","Phosphoproteomics","Metabolomics", "Methylation")))
+
+annotation_col <- colnames(da_feat_perc) %>% 
+  as.data.frame() %>% 
+  rename(tissue = ".") %>% 
+  separate(tissue, into = c("Group","tissue"),sep = "_") %>% 
+  rename(Tissue = tissue)
+
+rownames(annotation_col)<-paste(annotation_col$Group,annotation_col$Tissue,sep = "_")
+
+pdf(file = file.path(here(), "data", "tmp", "figures", "DA_feature_matrix.pdf"),
+     width= 7,height=5)
+
+ht = ComplexHeatmap::pheatmap(da_feat_perc,
+                         heatmap_legend_param = list(title = "% features DA"),
+                         border_color = 'gray3',
+                         scale='none',
+                         color = c("white","#9e9ac8"),
+                         cluster_cols = F,
+                         cluster_rows = F,
+                         annotation_row = annotation_data,
+                         annotation_colors = ann_colors,
+                         annotation_col = annotation_col,
+                         show_rownames = FALSE,
+                         show_colnames = FALSE,
+                         annotation_names_col = FALSE,
+                         display_numbers = as.matrix(da_feat_num),
+                         number_color='black',
+                         fontsize_number = 15,
+                         angle_col="90",
+                         gaps_col = 3,
+                         na_col='white')
+draw(ht, merge_legends = TRUE, heatmap_legend_side = "right", annotation_legend_side = "right")
+
+dev.off()
+```

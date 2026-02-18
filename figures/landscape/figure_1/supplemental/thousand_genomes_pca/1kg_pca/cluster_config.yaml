@@ -1,0 +1,7 @@
+__default__:
+  account: default
+  partition: interactive
+  time: "12:00:00"
+  output: 1kg_pca-%j.out
+  error: 1kg_pca-%j.err
+  memory: 1G

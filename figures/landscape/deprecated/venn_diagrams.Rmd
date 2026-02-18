@@ -1,0 +1,446 @@
+---
+title: "venn_diagrams"
+output: html_document
+date: "2025-02-25"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(MotrpacHumanPreSuspension)
+library(MotrpacHumanPreSuspensionData)
+library(dplyr)
+library(tidyr)
+library(ggVennDiagram)
+library(conflicted)
+
+config = jsonlite::fromJSON("~/config.json")
+repo_local_dir = config$precovid_repo_path
+devtools::load_all(config$r_package_path)
+```
+
+```{r}
+full_da_results_all_tissues = MotrpacHumanPreSuspensionData::load_differential_analysis(single_matrix = TRUE,
+                                                                                        combine_with_featgene = TRUE)
+qc_norm_all_tissues = MotrpacHumanPreSuspensionData::load_qc(repo_local_dir)
+pheno_loading = load_pheno()
+```
+
+
+```{r}
+specific_tissue = "muscle"
+full_da_results = full_da_results_all_tissues %>% 
+  filter(tissue == specific_tissue) %>%
+  mutate(contrast_left = stringr::str_split_fixed(contrast_short, " - ", 2)[,1],
+         # Split the left part on the period to get the group and timepoint
+         Group = stringr::str_split_fixed(contrast_left, "\\.", 2)[,1],
+         Timepoint = stringr::str_split_fixed(contrast_left, "\\.", 2)[,2]) %>%
+  filter(!contrast_type == "baseline") %>%
+  select(tissue, assay, Group, Timepoint, contrast_type, adj_p_value, feature_id) %>%
+  pivot_wider(., names_from = c("contrast_type"), #aaaa i could also just split by group here? will do both
+              values_from = adj_p_value) %>%
+  select(-c(Endur_vs_Resist)) %>% #useless, will remove control only later
+  group_by(tissue, assay, Timepoint, feature_id) %>%
+  mutate(control_only = ifelse(is.na(control_only), first(na.omit(control_only)), control_only)) %>% #just filling in control values for both endur and resist 
+  ungroup() %>%
+  filter(!Group == "Control")
+head(full_da_results[5:8])
+```
+```{r}
+both_re_endur = full_da_results %>%
+  mutate(
+    exercise_with_controls = ifelse(exercise_with_controls <= 0.05, "Sig", "Non-sig"),
+    exercise_no_controls = ifelse(exercise_no_controls <= 0.05, "Sig", "Non-sig"),
+    control_only = ifelse(control_only <= 0.05, "Sig", "Non-sig")
+  ) %>%
+  pivot_wider(., names_from = c("Group"), 
+              values_from = c("exercise_with_controls", "exercise_no_controls", "control_only"))
+venn_data = list(
+  "Exercise w/ Controls (Endur)" = both_re_endur %>% filter(exercise_with_controls_Endur == "Sig") %>% pull(feature_id),
+  "Exercise w/ Controls (Resist)" = both_re_endur %>% filter(exercise_with_controls_Resist == "Sig") %>% pull(feature_id),
+  "Exercise No Controls (Endur)" = both_re_endur %>% filter(exercise_no_controls_Endur == "Sig") %>% pull(feature_id),
+  "Exercise No Controls (Resist)" = both_re_endur %>% filter(exercise_no_controls_Resist == "Sig") %>% pull(feature_id),
+  "Control Only" = both_re_endur %>% filter(control_only_Endur == "Sig") %>% pull(feature_id) #so only 1 needed bc its the same from above
+)
+p = ggVennDiagram(venn_data, 
+                  label = "count",
+                  label_size = 4) +
+  scale_fill_gradient(low = "white", high = "blue") +
+  theme_minimal() + 
+  scale_x_continuous(expand = expansion(mult = .2)) + 
+  ggtitle("ok this was worth a try but unreadable") +
+  theme(
+    plot.title = element_text(size = 14, hjust = 0.5),  
+    text = element_text(size = 8)  
+  )
+print(p)
+#so overlaps are based on multiple timepoints, if a feature is mediated by some mix of the categories at diff timepoints
+```
+
+```{r}
+for(randomGroupCode in c("Resist", "Endur")){
+  possible_combinations = full_da_results %>%
+    filter(Group == randomGroupCode) %>%
+    mutate(
+      exercise_with_controls = ifelse(exercise_with_controls <= 0.05, "Sig", "Non-sig"),
+      exercise_no_controls = ifelse(exercise_no_controls <= 0.05, "Sig", "Non-sig"),
+      control_only = ifelse(control_only <= 0.05, "Sig", "Non-sig")
+    ) 
+  venn_data = list(
+    "Exercise w/ Controls" = possible_combinations %>% filter(exercise_with_controls == "Sig") %>% pull(feature_id),
+    "Exercise No Controls" = possible_combinations %>% filter(exercise_no_controls == "Sig") %>% pull(feature_id),
+    "Control Only" = possible_combinations %>% filter(control_only == "Sig") %>% pull(feature_id)
+  )
+  p = ggVennDiagram(venn_data, 
+                    label = "count",
+                    label_size = 4) +
+    scale_fill_gradient(low = "white", high = "blue") +
+    theme_minimal() + 
+    scale_x_continuous(expand = expansion(mult = .2)) + 
+    ggtitle(paste("Significance in categories: ", randomGroupCode)) +
+    theme(
+      plot.title = element_text(size = 10, hjust = 0.5),  
+      text = element_text(size = 8)  
+    )
+  print(p)
+}
+#so overlaps are based on multiple timepoints, if a feature is mediated by some mix of the categories at diff timepoints
+```
+
+Ok so now we can be a bit more selective and choose more meaningful stuff
+
+```{r}
+#specific lines of interest (note these are available in the above venns too, just highlighting categories)
+# 1: YES in controls, NOT in exercise no controls, YES in exercise with controls "control mediated"  
+# -> so this represents something exclusive to the controls (aka probably not circadian)
+# Not actually sure if this is one of the "high importance" categories
+
+# 2: NOT in controls, YES in exercise no controls, YES in exercise with controls "standard exercise effect"
+# This one is probably the most standard category
+
+# 3: NOT in controls, NOT in exercise no controls, YES in exercise with controls "dependent on combination"
+# This one is situation where the controls and exercise go in opposite directions
+
+# 4: YES in controls, YES in exercise no controls, NO in exercise with controls "probably circadian/biopsy/other mediated"
+# This one is situations where controls and exercise go in same dir (more likely same at least)
+
+for(randomGroupCode in c("Resist", "Endur")){
+  selective_combos = full_da_results %>%
+    filter(Group == randomGroupCode) %>%
+    mutate(
+      exercise_with_controls = ifelse(exercise_with_controls <= 0.05, "Sig", "Non-sig"),
+      exercise_no_controls = ifelse(exercise_no_controls <= 0.05, "Sig", "Non-sig"),
+      control_only = ifelse(control_only <= 0.05, "Sig", "Non-sig")
+    ) %>%
+    mutate(
+      control_mediated = ifelse(control_only == "Sig" & exercise_no_controls == "Non-sig" & exercise_with_controls == "Sig", "Yes", "No"), #see cat 1
+      standard_exercise_effect = ifelse(control_only == "Non-sig" & exercise_no_controls == "Sig" & exercise_with_controls == "Sig", "Yes", "No"), #see cat 2
+      controls_ex_opposite_contribute = ifelse(control_only == "Non-sig" & exercise_no_controls == "Non-sig" & exercise_with_controls == "Sig", "Yes", "No"), #see cat 3
+      probably_circadian = ifelse(control_only == "Sig" & exercise_no_controls == "Sig" & exercise_with_controls == "Non-sig", "Yes", "No") #see cat 4
+    ) 
+  venn_data = list(
+    "Control Effect" = selective_combos %>% filter(control_mediated == "Yes") %>% pull(feature_id),
+    "Exercise Effect" = selective_combos %>% filter(standard_exercise_effect == "Yes") %>% pull(feature_id),
+    "Combined Effect" = selective_combos %>% filter(controls_ex_opposite_contribute == "Yes") %>% pull(feature_id),
+    "Circadian Effect" = selective_combos %>% filter(probably_circadian == "Yes") %>% pull(feature_id)
+  )
+  p = ggVennDiagram(venn_data, 
+                    label = "count", 
+                    label_size = 4) +
+    scale_fill_gradient(low = "white", high = "blue") +
+    theme_minimal() + 
+    scale_x_continuous(expand = expansion(mult = .2))
+  ggtitle(paste("Overlaps bc of multiple timepoints - Mutually exclusive @ 1 tp"), randomGroupCode) +
+    theme(
+      plot.title = element_text(size = 10, hjust = 0.5),
+      text = element_text(size = 8)
+    )
+  
+  print(p)
+}
+#so overlaps are based on multiple timepoints, if a feature is mediated by some mix of the categories at diff timepoints
+```
+Based on some feedback, I don't think venn diagrams are really the best way to 
+present some of the info. I'm going to try and expand to some barplots to possibly
+jitter some different combos. 
+```{r}
+wide_by_contrasts = full_da_results_all_tissues %>% 
+  mutate(contrast_left = stringr::str_split_fixed(contrast_short, " - ", 2)[,1],
+         # Split the left part on the period to get the group and timepoint
+         Group = stringr::str_split_fixed(contrast_left, "\\.", 2)[,1],
+         Timepoint = stringr::str_split_fixed(contrast_left, "\\.", 2)[,2]) %>% #add easy way to filter into group, tp
+  filter(!contrast_type == "baseline") %>%
+  select(tissue, assay, Group, Timepoint, contrast_type, adj_p_value, feature_id) %>%
+  pivot_wider(., names_from = c("contrast_type"), #aaaa i could also just split by group here? will do both
+              values_from = adj_p_value) %>%
+  select(-c(Endur_vs_Resist)) %>% #useless, will remove control only later
+  group_by(tissue, assay, Timepoint, feature_id) %>%
+  mutate(control_only = ifelse(is.na(control_only), first(na.omit(control_only)), control_only)) %>% #just filling in control values for both endur and resist 
+  ungroup() %>%
+  filter(!Group == "Control") %>%
+  mutate(assay = case_when(grepl("metab", assay) ~ "metab", 
+                           grepl("prot-ol|prot-pr", assay) ~ "prot", 
+                           TRUE ~ assay))  %>%
+  filter(!(grepl("during", Timepoint) | grepl("10_min", Timepoint))) %>%
+  mutate(Timepoint = factor(Timepoint,
+                            levels = c("post_15_30_45_min", "post_3.5_4_hr", "post_24_hr")))
+#remove timepoint for blood samples
+#now we actually categorize things similar to before. 
+wide_by_contrasts = wide_by_contrasts %>%
+  # filter(!(exercise_with_controls > 0.05 & exercise_no_controls > 0.05 & control_only > 0.05)) %>%
+  mutate(
+    exercise_with_controls_cat = ifelse(exercise_with_controls <= 0.05, "Sig", "Non-sig"),
+    exercise_no_controls_cat = ifelse(exercise_no_controls <= 0.05, "Sig", "Non-sig"),
+    control_only_cat = ifelse(control_only <= 0.05, "Sig", "Non-sig")
+  ) %>%
+  mutate(
+    category = case_when(
+      (control_only_cat == "Sig" & exercise_no_controls_cat == "Non-sig" & exercise_with_controls_cat == "Sig") ~ "Control Effect",
+      (exercise_no_controls_cat == "Sig" & exercise_with_controls_cat == "Sig") ~ "Exercise Effect", #we're deciding to include regardless of control_only_cat
+      #which could be a bit arbitrary, but i 
+      (control_only_cat == "Non-sig" & exercise_no_controls_cat == "Non-sig" & exercise_with_controls_cat == "Sig") ~ "Combined group effect",
+      (control_only_cat == "Sig" & exercise_no_controls_cat == "Sig" & exercise_with_controls_cat == "Non-sig") ~ "Circadian/Non exercise",
+      TRUE ~ "Other"
+    )
+  ) 
+
+wide_all_save = wide_by_contrasts #saving for false negatives analysis
+wide_by_contrasts = wide_by_contrasts %>%
+  filter(!category == "Other")
+```
+
+finding good examples of items in ea category
+
+Starting with Standard Exercise Effect: 
+```{r}
+#this one is our generic example, just going to keep using PGC1a, just using muscle
+plot_single_feature(feature = "PPARGC1A", 
+                    selected_tissues = "muscle",
+                    repo_local_dir = repo_local_dir,
+                    da_object = full_da_results_all_tissues,
+                    qc_object = qc_norm_all_tissues,
+                    pheno_object = pheno_loading)
+```
+
+```{r}
+control_med_examples = wide_by_contrasts %>% 
+  filter(category == "Control Effect") %>%
+  group_by(feature_id) %>%
+  filter(all(c("Resist", "Endur") %in% Group)) %>%
+  ungroup()
+
+temp_da_blood = full_da_results_all_tissues %>% filter(tissue == "blood")
+temp_qc_blood = list(); temp_qc_blood$blood = qc_norm_all_tissues$blood
+
+# 
+# plot_single_feature(feature = "PER1", 
+#                     repo_local_dir = repo_local_dir,
+#                     da_object = full_da_results_all_tissues,
+#                     qc_object = qc_norm_all_tissues,
+#                     pheno_object = pheno_loading,
+#                     selected_tissues = "blood")
+
+plot_single_feature(feature = "PER1",
+                    repo_local_dir = repo_local_dir,
+                    da_object = temp_da_blood,
+                    qc_object = temp_qc_blood,
+                    pheno_object = pheno_loading,
+                    selected_tissues = "blood")
+#maybe not the greatest example?
+```
+
+```{r}
+circadian_type = wide_by_contrasts %>% 
+  filter(category == "Circadian/Non exercise") %>%
+  group_by(feature_id) %>%
+  filter(all(c("Resist", "Endur") %in% Group)) %>%
+  ungroup()
+
+plot_single_feature(feature = "Alloisoleucine", 
+                    repo_local_dir = repo_local_dir,
+                    da_object = full_da_results_all_tissues,
+                    qc_object = qc_norm_all_tissues,
+                    selected_tissues = "adipose",
+                    pheno_object = pheno_loading)
+#adipose is a good example here, I think
+```
+```{r}
+plot_single_feature(feature = "ENSG00000168209.6", 
+                    repo_local_dir = repo_local_dir,
+                    da_object = full_da_results_all_tissues,
+                    qc_object = qc_norm_all_tissues,
+                    selected_tissues = "adipose",
+                    pheno_object = pheno_loading)
+#PER2 in adipose is another good example
+```
+```{r}
+synergistic = wide_by_contrasts %>% 
+  filter(category == "Significant together with controls") %>%
+  group_by(feature_id) %>%
+  filter(all(c("Resist", "Endur") %in% Group)) %>%
+  ungroup() %>%
+  arrange(exercise_with_controls)
+
+plot_single_feature(feature = "Q86TB9_S177s", 
+                    repo_local_dir = repo_local_dir,
+                    da_object = full_da_results_all_tissues,
+                    qc_object = qc_norm_all_tissues,
+                    pheno_object = pheno_loading)
+
+#slightly weaker example but I think its fine. This group is kinda the weakest
+#or least exciting example bc it just helps with power a bit
+```
+
+```{r}
+ggplot(wide_by_contrasts, aes(x = assay, fill = category)) +
+  geom_bar(stat = "count", position = "stack") + #making the y axis counts
+  facet_grid(Group ~ tissue, scales = "free_x") +
+  theme_minimal() +
+  labs(x = "Assay", y = "Count", title = "Assay + Tissue, still combining all tp") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+#ok attempt at different timepoint inclusion
+wide_by_contrasts <- wide_by_contrasts %>%
+  mutate(assay_timepoint = factor(paste(assay, Timepoint, sep = " - "),
+                                  levels = unique(paste(rep(levels(factor(assay)), 
+                                                            each = length(levels(factor(Timepoint)))),
+                                                        rep(levels(factor(Timepoint)), 
+                                                            times = length(levels(factor(assay)))),
+                                                        sep = " - ")))) %>%
+  mutate(tissue_group = factor(paste(tissue, Group, sep = " - "),
+                               levels = unique(paste(rep(levels(factor(tissue)), 
+                                                         each = length(levels(factor(Group)))),
+                                                     rep(levels(factor(Group)), 
+                                                         times = length(levels(factor(tissue)))),
+                                                     sep = " - ")))) 
+
+
+ggplot(wide_by_contrasts, aes(x = Timepoint, fill = category)) +
+  geom_bar(stat = "count", position = "stack") +
+  facet_grid(assay ~ tissue_group, scales = "free_y") +  # Facet by ome (rows) and tissue-group (columns)
+  theme_minimal() +
+  labs(x = "Timepoint", y = "Count", title = "Selected Categories by Ome/Timepoint") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Keep x-axis readable
+
+#notably: i can't really label all the timepoints + assays very easily
+```
+
+So the above all describes 4 specific patterns of interest that we can gain information
+about by using the controls.
+
+One other way to describe the dataset is through analysis of inference results
+that would otherwise be obtained if an experiment exactly like pre-cawg 
+was done but without the controls. 
+
+So we have the categories:
+1: True Positives - This includes all of the "standard exercise effect" category,
+essentially any feature that matches 
+
+2: False Positives - This includes all of the "Non exercise induced"
+
+3: False Negatives - This includes "Control mediated" category,
+also includes "significant together with controls" category
+
+4: True Negatives - This is not described in any of the above categories,
+but it's just any situation where a feature is considered non-significant in 
+the delta-delta and also in the exercise without controls section. 
+
+The 
+```{r}
+numbers = wide_all_save %>%
+  group_by(exercise_no_controls_cat, exercise_with_controls_cat, control_only_cat) %>%
+  mutate(n = n()) %>%
+  ungroup() %>%
+  distinct(exercise_no_controls_cat, exercise_with_controls_cat, control_only_cat, n) %>%
+  select(exercise_with_controls_cat, everything())
+```
+
+```{r}
+true_positives = wide_all_save %>%
+  filter(exercise_no_controls_cat == "Sig" & exercise_with_controls_cat == "Sig")
+nrow(true_positives)
+```
+
+```{r}
+false_negatives = wide_all_save %>%
+  filter(exercise_no_controls_cat == "Non-sig" & exercise_with_controls_cat == "Sig")
+nrow(false_negatives)
+```
+
+```{r}
+false_positives = wide_all_save %>%
+  filter(exercise_no_controls_cat == "Sig" & exercise_with_controls_cat == "Non-sig")
+nrow(false_positives)
+```
+And so it may seem alarming that "false-positives" is the largest category, but
+in most cases, this is just a power/threshold issue--the estimation needed to 
+evaluate the controls, and the relatively more limited number of controls makes 
+many features simply not achieve the `adj_p < 0.05` threshold. So even if the
+features are in the same 'direction' but one doesn't reach a threshold, it 
+comes out to look like its a "false negative"
+
+```{r}
+true_negatives = wide_all_save %>%
+  filter(exercise_no_controls_cat == "Non-sig" & exercise_with_controls_cat == "Non-sig")
+nrow(true_negatives)
+```
+
+Finding examples of RE vs EE
+```{r}
+re_v_ee_index = full_da_results_all_tissues %>%
+  mutate(contrast_left = stringr::str_split_fixed(contrast_short, " - ", 2)[,1],
+         # Split the left part on the period to get the group and timepoint
+         Group = stringr::str_split_fixed(contrast_left, "\\.", 2)[,1],
+         Timepoint = stringr::str_split_fixed(contrast_left, "\\.", 2)[,2]) %>%
+  filter(contrast_type == "Endur_vs_Resist") %>%
+  select(assay, feature_id, z.std, adj_p_value, tissue, contrast_type, Timepoint) %>%
+  filter(!Timepoint %in% c("during_20_min", "during_40_min", "post_10_min")) %>%
+  mutate(assay = case_when(grepl("metab", assay) ~ "metab",
+                           TRUE ~ assay)) %>%
+  filter(adj_p_value < 0.05)
+
+# pdf(file = "~/Downloads/tempreee.pdf", width = 10)
+re_v_ee_index %>%
+  count(assay, tissue, Timepoint, name = "n_features") %>%
+  mutate(Timepoint = factor(Timepoint, levels =c("post_15_30_45_min", "post_3.5_4_hr","post_24_hr"))) %>%
+  ggplot(aes(x = tissue, y = assay, label = n_features)) +
+  geom_tile(fill = "white", color = "grey70") +
+  geom_text(size = 4) +
+  facet_wrap(~ Timepoint, ncol = 1) +
+  labs(x = "Tissue", y = "Assay", title = "Significant Differences for RE vs EE") +
+  theme_minimal() +
+  theme(
+    panel.grid = element_blank(),
+    strip.text = element_text(face = "bold", size = 12),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+dev.off()
+
+
+```
+
+```{r}
+re_v_ee_index_tests  = re_v_ee_index 
+
+for(feat in re_v_ee_index_tests$feature_id[1:10]){
+  p = plot_single_feature(feature = feat, 
+                          repo_local_dir = repo_local_dir,
+                          da_object = full_da_results_all_tissues,
+                          qc_object = qc_norm_all_tissues,
+                          pheno_object = pheno_loading)
+  print(p)
+}
+
+# pdf(file = "~/Downloads/tempmyog.pdf", width = 10)
+plot_single_feature(feature = "MYOG", 
+                    repo_local_dir = repo_local_dir,
+                    da_object = full_da_results_all_tissues,
+                    qc_object = qc_norm_all_tissues,
+                    pheno_object = pheno_loading)
+dev.off()
+```
+
+
+
+

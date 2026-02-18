@@ -1,0 +1,37 @@
+__default__:
+  account: default
+  partition: interactive
+  time: "12:00:00"
+  output: process-%j.out
+  error: process-%j.err
+  memory: 1G
+
+annotate_with_homozygote_reference_calls:
+  memory: 8G
+
+haplotype_caller:
+  memory: 5G
+
+genotype_gvcfs:
+  memory: 5G
+
+call_shared_variants:
+  memory: 8G
+
+sort_shared_variant_samples:
+  memory: 16G
+
+merge_sample_vcfs_by_chromosome:
+  memory: 8G
+
+annotate_known_variants:
+  memory: 8G
+
+maf_filter:
+  memory: 8G
+
+snp_filter:
+  memory: 8G
+
+hwe_filter:
+  memory: 8G

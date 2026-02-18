@@ -1,0 +1,1888 @@
+---
+title: "c-means_main_figure"
+author: "Dan Katz"
+date: "2025-11-13"
+output: html_document
+---
+
+
+```{r setup, message=FALSE, warning=FALSE}
+# --- Configuration Setup ---
+# This script uses a JSON configuration file to manage local file paths and machine-specific settings.
+#
+# To use the MoTrPAC config file:
+# 1. Open the template 'example_config.json' in the 'precovid-analyses/' root folder.
+# 2. Save a copy to a persistent location (e.g., your home directory: '~/motrpac_config.json').
+# 3. Customize the file paths for your machine and remove any comments from the JSON file.
+# 4. This script requires the following fields in the config file:
+#    a. "gsutil_user" and "gsutil_path": Specifies the path to the gsutil executable.
+#    b. "local_path": The absolute path to the 'precovid-analyses' repository, without a trailing slash.
+# 5. Provide the path to your config file below.
+
+# config <- jsonlite::read_json(path = "//mnt/c/Users/dankatz/Documents/motrpac_config.json")
+# config <- rjson::fromJSON(file = '//mnt/c/Users/dankatz/Documents/motrpac_config.json')
+# config = jsonlite::fromJSON("~/config.json")
+# source(file.path(config$precovid_repo_path,"/library/library-general.R"))
+
+# --- Package Loading ---
+# Load all required packages for the session.
+session_packages <- c('pheatmap', 'limma', 'UpSetR', 'ComplexHeatmap', 'gprofiler2',
+                      'plier', 'cluster', 'readxl','qvalue', 'reshape2', 'ggh4x','ggVennDiagram','ggpattern',
+                      'MASS', 'splitstackshape', 'MotrpacBicQC', 'tidyverse', 
+                      'powerjoin','MotrpacHumanPreSuspensionAnalysis','variancePartition','patchwork','ggbeeswarm','circlize', 'forcats',
+                      'grid','gridExtra')
+
+for(i in session_packages) {
+  tryCatch(
+    {
+      library(i, character.only = TRUE)
+    }, error = function(e) {
+      print(paste("Cannot load package:", i, ", please install."))
+    }
+  )
+}
+
+# --- Namespace Conflict Preferences ---
+# conflict_prefer('select','dplyr')
+# conflict_prefer('filter','dplyr')
+
+sessionInfo()
+```
+
+# C-means Trajectory Visualizations
+
+## Combined C-means Trajectory Line Plots
+This plot generates trajectories for all cluster centroids across all tissues. While not used in the final paper, its code provides a basis for subsequent analyses.
+
+```{r All c-means lines} 
+# --- User Configuration ---
+# Define which clusters to highlight (alpha = 1) for each tissue.
+# Non-selected clusters will be dimmed (alpha = 0.3).
+selected_clusters <- list(
+  muscle = c("7","4"),    # Highlight clusters 7 and 4 in 'muscle'
+  adipose = c("7", "8"),  # Highlight clusters 7 and 8 in 'adipose'
+  blood = c("5","6","4")  # Highlight clusters 5, 6, and 4 in 'blood'
+)
+
+# --- Abbreviation Map ---
+# Maps long contrast names from the data to abbreviated labels for the plot.
+contrast_recode_map <- c(
+  "Pre" = "pre_exercise",
+  "P10M" = "post_10_min",
+  "P15-45M" = "post_15_30_45_min",
+  "P3.5/4H" = "post_3.5_4_hr",
+  "P24H" = "post_24_hr"
+)
+# Define the chronological order for the abbreviated contrast levels.
+ordered_contrast_levels <- names(contrast_recode_map)
+
+# --- Data Preparation ---
+tissues <- c("muscle", "adipose", "blood")
+all_tissue_dfs <- list()
+
+for (t in tissues) {
+  # (Assuming FCM_CLUSTERS is available in the environment)
+  centers <- FCM_CLUSTERS[[t]]$centers
+  
+  # 1. Standardize column names
+  colnames(centers) <- sub("group_timepointADU([^ ]+) .*",
+                           "\\1",
+                           colnames(centers))
+  
+  # 2. Include pre-exercise timepoints (all zeros)
+  pre_ex <- matrix(data = 0,
+                   nrow = nrow(centers),
+                   ncol = 2L)
+  colnames(pre_ex) <- c("Endur.pre_exercise", "Resist.pre_exercise")
+  centers <- cbind(pre_ex, centers)
+  
+  # 3. Reorder columns to group by modality (Endurance, Resistance)
+  col_order <- c(grep("Endur", colnames(centers)),
+                 grep("Resist", colnames(centers)))
+  centers <- centers[, col_order]
+  
+  # 4. Pivot and clean data
+  df_temp <- centers %>%
+    as.data.frame() %>%
+    tibble::rownames_to_column("cluster") %>%
+    tidyr::pivot_longer(
+      cols = -cluster,
+      names_to = "contrast",
+      values_to = "center"
+    ) %>%
+    dplyr::mutate(modality = ifelse(grepl("Endur", contrast),
+                                    "EE",
+                                    "RE"),
+                  contrast = sub("[^.]+\\.", "", contrast),
+                  tissue = t) # Add tissue column
+  
+  all_tissue_dfs[[t]] <- df_temp
+}
+
+# Combine data from all tissues
+center_df <- dplyr::bind_rows(all_tissue_dfs) %>%
+  # Apply recoding to the contrast column using the abbreviation map
+  dplyr::mutate(contrast = forcats::fct_recode(contrast, !!!contrast_recode_map)) %>%
+  # Re-factor all categorical columns based on the combined data
+  dplyr::mutate(
+    # Set explicit chronological order for contrast
+    contrast = factor(contrast, levels = ordered_contrast_levels),
+    # Re-factor other categorical columns
+    across(.cols = c(cluster, modality, tissue),
+           .fns = ~ factor(.x, levels = unique(.x)))
+  ) %>%
+  # Determine if a cluster is selected for highlighting (tissue-specific)
+  dplyr::rowwise() %>%
+  dplyr::mutate(
+    is_selected = cluster %in% selected_clusters[[tissue]]
+  ) %>%
+  dplyr::ungroup()
+
+# --- Color Logic: Determine Color by Tissue-Specific Max Absolute Value ---
+# Group by tissue and cluster to calculate color independently for each trajectory.
+center_df <- center_df %>%
+  dplyr::group_by(tissue, cluster) %>%
+  dplyr::mutate(
+    # Find the index of the row with the max absolute center value within the group
+    max_abs_idx = which.max(abs(center)),
+    # Get the contrast name at that index
+    max_abs_contrast = contrast[max_abs_idx],
+    # Get the sign of the center value at that index
+    max_abs_sign = ifelse(center[max_abs_idx] >= 0, "Positive", "Negative"),
+    # Combine contrast and sign into a final color group
+    max_abs_contrast_group = paste(max_abs_contrast, max_abs_sign, sep = "_")
+  ) %>%
+  dplyr::ungroup() %>%
+  # Ensure the new color variable is a factor
+  dplyr::mutate(
+    max_abs_contrast_group = factor(max_abs_contrast_group, 
+                                    levels = unique(max_abs_contrast_group))
+  ) %>%
+  # Arrange by 'is_selected' so highlighted lines (TRUE) are plotted on top
+  dplyr::arrange(is_selected)
+
+# --- Plotting ---
+p <- ggplot2::ggplot(center_df,
+                     aes(x = contrast,
+                         y = center,
+                         # Group by interaction to ensure independent lines across facets
+                         group = interaction(tissue, cluster),
+                         # Color by the max absolute contrast group
+                         color = max_abs_contrast_group,
+                         # Map alpha to the selection status for highlighting
+                         alpha = is_selected)) + 
+  
+  # Lines are solid and thin
+  ggplot2::geom_line(linewidth = 0.8) + 
+  
+  # Use shape 21 (filled circle) and map 'fill' to the color group
+  ggplot2::geom_point(
+    aes(fill = max_abs_contrast_group), # Map fill to the color group
+    color = "black", # Black stroke for contrast
+    shape = 21,      # Shape 21 uses both 'color' (stroke) and 'fill'
+    size = 5,        # Increased point size
+    show.legend = FALSE
+  ) + 
+  
+  # Add cluster number text inside the points
+  ggplot2::geom_text(
+    aes(label = cluster), 
+    # Filter out 'Pre' points for labeling
+    data = dplyr::filter(center_df, contrast != "Pre"), 
+    color = "black", # Text color for high contrast
+    size = 3, 
+    show.legend = FALSE
+  ) +
+  
+  # Facet by Modality (rows) and Tissue (columns) with free x-scales
+  ggplot2::facet_grid(modality ~ tissue, scales = "free_x", space = "free_x") +
+  
+  ggplot2::scale_x_discrete(
+    expand = ggplot2::expansion(add = 0.15) 
+  ) +
+  
+  # Manual alpha scale for highlighting (TRUE=1, FALSE=0.2)
+  ggplot2::scale_alpha_manual(values = c("FALSE" = 0.2, "TRUE" = 1), guide = "none") +
+  
+  # Set color for lines (suppress legend)
+  ggplot2::scale_color_brewer(palette = "Set2", guide = "none") +
+  # Set fill for points (suppress legend)
+  ggplot2::scale_fill_brewer(palette = "Set2", guide = "none") +
+  
+  ggplot2::labs(x = NULL,
+                y = "Cluster Centroid",
+                color = "Max Absolute Center Group") + 
+  
+  ggplot2::theme_bw() +
+  ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 90,
+                                                     hjust = 1,
+                                                     vjust = 0.5),
+                 panel.grid.major.x = ggplot2::element_blank(),
+                 legend.position = "none")
+
+# --- Export to PDF ---
+# pdf("cluster_centroid_lineplot.pdf", width = 6.5, height = 6.75)
+print(p)
+# dev.off()
+
+# Display the plot in the R environment
+# print(p)
+```
+
+## Sparkline Plots
+This section generates a series of small, individual "sparkline" plots for each cluster group.
+```{r Sparklines figure 3C}
+# --- USER CONFIGURATION ---
+contrast_recode_map <- c(
+  "Pre" = "pre_exercise",
+  "P10M" = "post_10_min",
+  "P15-45M" = "post_15_30_45_min",
+  "P3.5/4H" = "post_3.5_4_hr",
+  "P24H" = "post_24_hr"
+)
+ordered_contrast_levels <- names(contrast_recode_map)
+
+# --- Load Required Libraries ---
+library(dplyr)
+library(tidyr)
+library(forcats)
+library(ggplot2)
+library(purrr)
+library(RColorBrewer)
+library(patchwork)
+
+# --- 1-5. Data Preparation (Unchanged) ---
+# (This code is identical to before and is included for completeness)
+tissues <- c("muscle", "adipose", "blood")
+all_tissue_dfs <- list()
+for (t in tissues) {
+  centers <- FCM_CLUSTERS[[t]]$centers
+  colnames(centers) <- sub("group_timepointADU([^ ]+) .*", "\\1", colnames(centers))
+  pre_ex <- matrix(data = 0, nrow = nrow(centers), ncol = 2L)
+  colnames(pre_ex) <- c("Endur.pre_exercise", "Resist.pre_exercise")
+  centers <- cbind(pre_ex, centers)
+  col_order <- c(grep("Endur", colnames(centers)), grep("Resist", colnames(centers)))
+  centers <- centers[, col_order]
+  df_temp <- centers %>% as.data.frame() %>% tibble::rownames_to_column("cluster") %>%
+    tidyr::pivot_longer(cols = -cluster, names_to = "contrast", values_to = "center") %>%
+    dplyr::mutate(modality = ifelse(grepl("Endur", contrast), "EE", "RE"), contrast = sub("[^.]+\\.", "", contrast), tissue = t)
+  all_tissue_dfs[[t]] <- df_temp
+}
+center_df <- dplyr::bind_rows(all_tissue_dfs) %>%
+  dplyr::mutate(contrast = forcats::fct_recode(contrast, !!!contrast_recode_map)) %>%
+  dplyr::mutate(contrast = factor(contrast, levels = ordered_contrast_levels), across(.cols = c(cluster, modality, tissue), .fns = ~ factor(.x, levels = unique(.x)))) %>%
+  dplyr::rowwise() %>% dplyr::ungroup()
+center_df <- center_df %>%
+  dplyr::group_by(tissue, cluster) %>%
+  dplyr::mutate(max_abs_idx = which.max(abs(center)), max_abs_contrast = contrast[max_abs_idx], max_abs_sign = ifelse(center[max_abs_idx] >= 0, "Positive", "Negative")) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(max_abs_contrast = as.character(max_abs_contrast), max_abs_contrast = dplyr::case_when(tissue == "blood" & max_abs_contrast == "P10M" ~ "P15-45M", TRUE ~ max_abs_contrast),
+                max_abs_contrast = factor(max_abs_contrast, levels = unique(max_abs_contrast)), max_abs_contrast_group = paste(max_abs_contrast, max_abs_sign, sep = "_"),
+                max_abs_contrast_group = factor(max_abs_contrast_group, levels = unique(max_abs_contrast_group)))
+user_palette_map <- c("P3.5/4H_Negative" = "Reds", "P3.5/4H_Positive" = "Greens", "P15-45M_Positive" = "Blues", "P24H_Positive" = "Purples", "P15-45M_Negative" = "Oranges", "P24H_Negative" = "YlOrBr")
+all_groups_in_data <- levels(center_df$max_abs_contrast_group); unmapped_groups <- setdiff(all_groups_in_data, names(user_palette_map))
+if (length(unmapped_groups) > 0) { warning(paste("Found unmapped groups, assigning 'Greys' palette:", paste(unmapped_groups, collapse = ", "))); default_map <- rep("Greys", length(unmapped_groups)); names(default_map) <- unmapped_groups } else { default_map <- c() }
+group_palette_map <- c(user_palette_map, default_map)
+color_lookup_df <- center_df %>% distinct(tissue, cluster, max_abs_contrast_group) %>% group_by(tissue, max_abs_contrast_group) %>% tidyr::nest(items_to_color = c(cluster)) %>%
+  mutate(palette_name = group_palette_map[as.character(max_abs_contrast_group)]) %>% rowwise() %>%
+  mutate(n_clusters = nrow(items_to_color), cluster_shades = list(if (n_clusters > 9) { colorRampPalette(rev(RColorBrewer::brewer.pal(9, palette_name)))(n_clusters) } else { rev(RColorBrewer::brewer.pal(max(3, n_clusters), palette_name))[1:n_clusters] })) %>%
+  ungroup() %>% mutate(items_with_color = map2(items_to_color, cluster_shades, ~ .x %>% arrange(cluster) %>% bind_cols(cluster_color = .y))) %>%
+  select(tissue, max_abs_contrast_group, items_with_color) %>% tidyr::unnest(cols = items_with_color) %>% select(tissue, cluster, max_abs_contrast_group, cluster_color)
+center_df <- center_df %>% select(-any_of("cluster_color")) %>% left_join(color_lookup_df, by = c("tissue", "cluster", "max_abs_contrast_group"))
+
+# --- 6. PLOTTING LOGIC (Revised for Perfect Alignment) ---
+
+# 6a. Define plot order and create the list of sparkline plots
+tissue_order <- c("adipose", "blood", "muscle")
+contrast_order <- c("P15-45M", "P3.5/4H", "P24H")
+
+plot_groups <- center_df %>%
+  distinct(tissue, max_abs_contrast) %>%
+  mutate(
+    tissue = factor(tissue, levels = tissue_order),
+    max_abs_contrast = factor(max_abs_contrast, levels = contrast_order)
+  ) %>%
+  filter(!is.na(tissue), !is.na(max_abs_contrast)) %>% 
+  arrange(tissue, max_abs_contrast) %>%
+  mutate(plot_index = 1:n())
+
+plot_list <- pmap(
+  .l = list(t = plot_groups$tissue, c = plot_groups$max_abs_contrast, i = plot_groups$plot_index),
+  .f = function(t, c, i) {
+    plot_data <- center_df %>% filter(tissue == t, max_abs_contrast == c)
+    cluster_color_map <- plot_data %>% distinct(cluster, cluster_color) %>% tibble::deframe()
+    p_single <- ggplot(plot_data, aes(x = contrast, y = center, group = cluster)) +
+      geom_hline(yintercept = 0, linetype = "dashed", color = "grey50", linewidth = 0.25) +
+      geom_line(color = "black", linewidth = 0.85, alpha = 0.7) +
+      geom_line(aes(color = cluster), linewidth = 0.75, alpha = 0.9) +
+      scale_color_manual(values = cluster_color_map, guide = "none") +
+      labs(x = NULL, y = NULL) + theme_bw(base_size = 8)
+    
+    # Base theme for all sparklines
+    p_single <- p_single + theme(
+      panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5),
+      axis.ticks = element_blank(), axis.text = element_blank(), axis.title = element_blank(),
+      panel.grid = element_blank(), legend.position = "none",
+      panel.spacing = unit(0, "lines"),
+      # *** KEY CHANGE: Remove plot margins to ensure plots are flush ***
+      plot.margin = margin(0, 0, 0, 0) 
+    )
+    
+    if (i == 1) {
+      # Add modality strip only to the very first plot
+      p_single <- p_single + facet_grid(modality ~ ., switch = "y") +
+        theme(strip.text.y = element_text(size = 5, angle = 0), strip.background = element_blank())
+    } else {
+      # All other plots have no strip
+      p_single <- p_single + facet_grid(modality ~ .) +
+        theme(strip.text.y = element_blank())
+    }
+    return(p_single)
+  }
+)
+
+# 6b. Create the plot for the `max_abs_contrast` labels (middle row)
+contrast_color_lookup <- tibble(max_abs_contrast = names(contrast_recode_map), long_contrast_name = unname(contrast_recode_map))
+plot_groups_for_labels <- left_join(plot_groups, contrast_color_lookup, by = "max_abs_contrast")
+
+p_contrast_labels <- ggplot(plot_groups_for_labels, aes(label = max_abs_contrast, fill = long_contrast_name)) +
+  # *** KEY CHANGE: Set color = NA to remove borders between rectangles ***
+  geom_rect(aes(xmin = plot_index - 0.5, xmax = plot_index + 0.5, ymin = 0, ymax = 1), color = NA) +
+  #geom_text(aes(x = plot_index, y = 0.5), color = "black", fontface = "bold", size = 1.5) +
+  scale_fill_manual(values = HUMAN_ACUTE_TIMEPOINT_COLORS, guide = "none") +
+  scale_x_continuous(limits = c(0.5, nrow(plot_groups) + 0.5), expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  theme_void()
+
+# 6c. Create the plot for the Tissue labels (top row)
+tissue_label_data <- plot_groups %>%
+  group_by(tissue) %>%
+  summarise(x_center = mean(plot_index), xmin = min(plot_index) - 0.5, xmax = max(plot_index) + 0.5, .groups = 'drop')
+
+p_tissue_labels <- ggplot(tissue_label_data, aes(label = tissue, fill = tissue)) +
+  # *** KEY CHANGE: Set color = NA to remove borders between rectangles ***
+  geom_rect(aes(xmin = xmin, xmax = xmax, ymin = 0, ymax = 1), color = NA) +
+  geom_text(aes(x = x_center, y = 0.5), color = "black", fontface = "bold", size = 1.5) +
+  scale_fill_manual(values = HUMAN_TISSUE_COLORS, guide = "none") +
+  scale_x_continuous(limits = c(0.5, nrow(plot_groups) + 0.5), expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  theme_void()
+
+# --- 7. Combine and Export Plots ---
+sparklines_plot <- patchwork::wrap_plots(plot_list, nrow = 1)
+
+final_combined_plot <- p_tissue_labels / p_contrast_labels / sparklines_plot +
+  plot_layout(heights = c(0.1, 0.08, 1)) # Adjusted heights for better proportions
+
+plot_width_in <- 0.5
+plot_height_in <- 0.9
+num_plots <- length(plot_list) 
+total_width_in <- num_plots * plot_width_in
+
+pdf("cluster_centroid_sparklines_with_labels.pdf", width = total_width_in, height = plot_height_in)
+print(final_combined_plot)
+dev.off()
+```
+```{r figure 3F}
+# --- 1. Manual Selection Setup ---
+# Define exactly which clusters you want for each tissue here.
+# The names of the list must match the 'tissue' values in your dataframe.
+tissue_selections <- list(
+  "adipose"  = c(10),       # Example: Clusters 1, 3, 5 for Blood
+  "blood" = c(4,5),    # Example: Clusters 2, 4, 6, 8 for Spleen
+  "muscle"  = c(4,10,6,12)           # Add as many tissues as needed
+)
+
+# --- 2. Generate Plot List ---
+plot_list <- imap(tissue_selections, function(clusters, t_name) {
+  
+  is_first_plot <- t_name == names(tissue_selections)[1]
+  
+  plot_data <- center_df %>% 
+    filter(tissue == t_name, cluster %in% clusters)
+  
+  # --- SHARED LOCATION GREEDY ALGORITHM ---
+  
+  # 1. Rank every (Cluster, Contrast) pair by its "Peak Score".
+  #    We define Peak Score as the highest value this cluster reaches 
+  #    at this timepoint in ANY modality.
+  ranking_data <- plot_data %>%
+    group_by(cluster, contrast) %>%
+    summarise(peak_score = max(center, na.rm = TRUE), .groups = "drop") %>%
+    arrange(desc(peak_score))
+  
+  # 2. Iteratively select best timepoints, removing used Clusters & Timepoints
+  final_assignments <- tibble(cluster = character(), contrast = character())
+  
+  # Loop until we run out of options
+  while(nrow(ranking_data) > 0) {
+    # Pick the winner (highest remaining peak)
+    winner <- ranking_data %>% slice(1)
+    
+    # Save the assignment
+    final_assignments <- bind_rows(final_assignments, 
+                                   tibble(cluster = winner$cluster, contrast = winner$contrast))
+    
+    # ELIMINATE:
+    # Remove this cluster (it's assigned)
+    # Remove this contrast (it's taken - enforcing x-axis spread)
+    ranking_data <- ranking_data %>%
+      filter(cluster != winner$cluster, contrast != winner$contrast)
+  }
+  
+  # 3. Create Final Label Data
+  #    KEY CHANGE: Join assignment back to original plot_data.
+  #    This grabs the rows for ALL modalities at that specific contrast.
+  label_data <- plot_data %>%
+    inner_join(final_assignments, by = c("cluster", "contrast"))
+  
+  # --- END ALGORITHM ---
+  
+  cluster_color_map <- plot_data %>% 
+    distinct(cluster, cluster_color) %>% 
+    tibble::deframe()
+  
+  p_single <- ggplot(plot_data, aes(x = contrast, y = center, group = cluster)) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "grey50", linewidth = 0.25) +
+    
+    # 1. The Sparklines
+    geom_line(color = "black", linewidth = 0.85, alpha = 0.7) +
+    geom_line(aes(color = cluster), linewidth = 0.75, alpha = 0.9) +
+    
+    # 2. The Label Background (True Circle)
+    geom_point(data = label_data, aes(fill = cluster,y=center+0.3), 
+               shape = 21,          # Circle with outline
+               color = "black",     # Black outline
+               size = 1.2,            # Size of the circle (adjust as needed)
+               stroke = 0.2) +      # Thickness of the black outline
+    
+    # 3. The Label Number
+    geom_text(data = label_data, aes(label = cluster, y=center+0.3), 
+              color = "black",      # Number is always black
+              size = 0.8,             # Text size
+              fontface = "bold") +
+    
+    # Scales
+    scale_color_manual(values = cluster_color_map, guide = "none") +
+    scale_fill_manual(values = cluster_color_map, guide = "none") +
+    
+    # Formatting
+    coord_cartesian(ylim = c(-0.2, 2.55), clip = "off") + 
+    labs(x = NULL, y = NULL) + 
+    theme_bw(base_size = 8)
+  
+  p_single <- p_single + theme(
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5),
+    axis.ticks = element_blank(), 
+    axis.text = element_blank(), 
+    axis.title = element_blank(),
+    panel.grid = element_blank(), 
+    legend.position = "none",
+    panel.spacing = unit(0.01, "cm"), 
+    plot.margin = margin(0, 5, 0, 0), # Small right margin
+    
+    strip.background.x = element_rect(fill = HUMAN_TISSUE_COLORS[t_name], color = NA),
+    strip.text.x = element_text(face = "bold", size = 2,margin = margin(.01, 0, .01, 0, "cm")))
+  
+  
+  
+  if (is_first_plot) {
+    p_single <- p_single + 
+      facet_grid(modality ~ tissue, switch = "y") +
+      theme(
+        strip.text.y = element_text(size = 5, angle = 180), 
+        strip.background.y = element_blank()
+      )
+  } else {
+    p_single <- p_single + 
+      facet_grid(modality ~ tissue) +
+      theme(strip.text.y = element_blank(),
+            strip.background.y = element_blank())
+  }
+  
+  return(p_single)
+})
+
+# --- 3. Combine and Export ---
+sparklines_plot <- patchwork::wrap_plots(plot_list, nrow = 1)
+
+plot_width_in <- 0.5  
+plot_height_in <- 0.9 
+num_plots <- length(plot_list)
+total_width_in <- num_plots * plot_width_in
+
+pdf("cluster_centroid_sparklines_smart_spaced.pdf", width = total_width_in, height = plot_height_in)
+print(sparklines_plot)
+dev.off()
+```
+
+
+# Top ORA Enrichments of C-means Clusters
+This section identifies the top Over-Representation Analysis (ORA) gene sets from the C-means clusters (hard-clustered with probability > 0.3) and finds which sets are common across all three tissues.
+
+```{r ora_enrichment}
+# Filter for significant ORA results
+FCM_ORA_top_hits <- FCM_ORA %>% 
+  filter(adj_p_value < 0.05)
+
+# Extract unique significant sets for each tissue
+adipose_ids <- FCM_ORA_top_hits %>%
+  filter(tissue == "adipose") %>%
+  pull(set) %>%
+  unique()
+
+blood_ids <- FCM_ORA_top_hits %>%
+  filter(tissue == "blood") %>%
+  pull(set) %>%
+  unique()
+
+muscle_ids <- FCM_ORA_top_hits %>%
+  filter(tissue == "muscle") %>%
+  pull(set) %>%
+  unique()
+
+# Find the intersection of the three vectors to get common sets
+common_sets <- intersect(intersect(adipose_ids, blood_ids), muscle_ids)
+
+# Print the list of common sets
+cat("The following sets appear in all three tissues (adipose, blood, and muscle):\n")
+if (length(common_sets) > 0) {
+  cat(common_sets, sep = "\n")
+} else {
+  cat("No common sets were found.\n")
+}
+```
+
+# Bar Graphs for Hard-Clustered FCM Results
+This section performs a "hard clustering" assignment on the fuzzy c-means results. It assigns each feature to the cluster with the highest membership score, filters assignments below a confidence threshold, and creates a faceted, stacked bar plot showing the omics composition of each cluster by tissue.
+
+```{r hard_clustering_prep}
+# --- Hard Clustering and Data Aggregation ---
+
+# Set the threshold for hard clustering. Features with a maximum membership
+# probability below this threshold will not be assigned to any cluster (NA).
+# Note: A value of 0.3 was used for the FCM_ORA results. A value of 0 would
+# assign ALL features to their top cluster.
+cluster_theshold <- 0.3
+
+# Load differential analysis results
+da_obj <- load_differential_analysis(single_matrix = TRUE, epigen = FALSE, combine_with_featgene = TRUE)
+
+signif_da <- da_obj %>% 
+  filter(adj_p_value < 0.05, contrast_type == "exercise_with_controls") %>% 
+  select(feature_id, tissue, gene_symbol, assay) %>% 
+  distinct()
+
+# --- Process and Aggregate Data from All Tissues ---
+# Get tissue names to iterate over
+tissue_names <- names(FCM_CLUSTERS)
+
+# Use `lapply` to process each tissue and `bind_rows` to combine the results.
+all_tissues_df <- bind_rows(lapply(tissue_names, function(tissue) {
+  
+  # Extract the feature-by-cluster membership matrix
+  membership_matrix <- FCM_CLUSTERS[[tissue]][["membership"]]
+  
+  # Process the membership matrix
+  processed_df <- membership_matrix %>% 
+    as.data.frame() %>% 
+    rownames_to_column("rowname") %>% 
+    # Split the feature identifier (e.g., "TRNSCRPT ENSEMBL_ID") into ome and feature_id
+    separate(col = rowname, sep = " ", into = c("Ome", "feature_id"), extra = "merge") %>% 
+    mutate(
+      # --- Hard Clustering Step ---
+      # Assign each feature to the cluster with the highest membership probability.
+      max_cluster = {
+        # Isolate numeric columns (cluster memberships)
+        numeric_cols <- select(., where(is.numeric))
+        # `max.col` efficiently finds the column index of the maximum value for each row.
+        names(numeric_cols)[max.col(numeric_cols, ties.method = "first")]
+      }
+    ) %>% 
+    rowwise() %>%
+    mutate(
+      # Find the maximum membership score for each feature
+      max_value = max(c_across(where(is.numeric)), na.rm = TRUE)
+    ) %>%
+    ungroup() %>% 
+    # Filter for high-confidence assignments based on the threshold
+    mutate(high_cluster = if_else(max_value > cluster_theshold, max_cluster, NA)) %>% 
+    # Add a column for the tissue of origin
+    mutate(tissue = tissue)
+  
+  return(processed_df)
+}))
+```
+
+### Combined Bar Graph and Dot Plot
+This visualization combines a bar chart showing the omics composition of each cluster with a dot plot showing the top ORA pathway enrichments for those clusters.
+
+```{r combined_bar_dot_plot figure 3D}
+# --- Load Libraries ---
+library(dplyr)
+library(forcats)
+library(ggplot2)
+library(ggnewscale) # For using multiple 'fill' scales
+library(patchwork)  # For combining plots
+
+# --- 1. Global Plotting Parameters ---
+my_base_size <- 6 
+my_geom_text_size <- my_base_size / 3.5 
+my_legend_point_max <- my_base_size / 1.5 # Max size of legend points
+my_legend_key_size_pt <- 8 # Size of legend color squares (in points)
+
+# --- 2. Data Preparation ---
+# (Assumes center_df, all_tissues_df, and FCM_ORA are in the environment)
+
+# Create a lookup table for cluster sign (Positive/Negative)
+cluster_sign_lookup <- center_df %>%
+  distinct(tissue, cluster, max_abs_sign) %>%
+  mutate(cluster_num = as.numeric(as.character(cluster)))
+
+# Create a lookup table for the timepoint of maximum effect
+max_cluster_timepoint <- center_df %>% 
+  select(tissue, cluster, max_abs_contrast) %>% 
+  mutate(cluster = as.numeric(cluster)) %>% 
+  mutate(max_abs_contrast = if_else(max_abs_contrast == "P10M", "P15-45M", max_abs_contrast)) %>% 
+  distinct()
+
+# Define ordering for tissues, contrasts, and signs
+tissue_order <- c("adipose", "blood", "muscle")
+contrast_order <- c("P15-45M", "P3.5/4H", "P24H")
+sign_order <- c("Positive", "Negative")
+
+# Create all possible group levels in the correct order for sorting
+contrast_group_levels <- tidyr::crossing(
+  max_abs_contrast = factor(contrast_order, levels = contrast_order), 
+  max_abs_sign = factor(sign_order, levels = sign_order)
+) %>%
+  mutate(max_abs_contrast_group = paste(max_abs_contrast, max_abs_sign, sep = "_")) %>%
+  pull(max_abs_contrast_group)
+
+# --- 3. Create Bar Plot Data (plot_data_bar) ---
+plot_data_bar <- all_tissues_df %>%
+  group_by(tissue, high_cluster, Ome) %>%
+  summarise(Count = n(), .groups = 'drop') %>%
+  mutate(high_cluster = as.numeric(as.character(high_cluster))) %>% 
+  left_join(MotrpacBicQC::assay_codes, by = c("Ome" = "assay_code"), relationship = "many-to-many") %>% 
+  select(tissue, high_cluster, Ome, ome_text, Count) %>% 
+  mutate(ome_text = if_else(Ome == "metab", "Metabolomics", ome_text)) %>% 
+  distinct() %>% 
+  filter(!is.na(high_cluster)) %>% 
+  left_join(max_cluster_timepoint, by = c("tissue", "high_cluster" = "cluster")) %>%
+  # Join the Positive/Negative sign info
+  left_join(cluster_sign_lookup, 
+            by = c("tissue" = "tissue", "high_cluster" = "cluster_num")) %>%
+  # Create the full sorting group
+  mutate(max_abs_contrast_group = paste(max_abs_contrast, max_abs_sign, sep = "_")) %>%
+  # Re-factor tissue and the new contrast group for sorting
+  mutate(
+    tissue = factor(tissue, levels = tissue_order),
+    max_abs_contrast_group = factor(max_abs_contrast_group, levels = contrast_group_levels) 
+  ) %>%
+  # Arrange data based on the new factors
+  arrange(tissue, max_abs_contrast_group, high_cluster) %>%
+  # Create the final cluster label for the x-axis
+  mutate(cluster_label = paste(high_cluster, tissue, sep = " - ")) %>%
+  mutate(cluster_label = forcats::fct_inorder(cluster_label))
+
+# --- 4. Prepare ORA Data and Select Sets for Plotting ---
+FCM_ORA_top_hits <- FCM_ORA %>% 
+  filter(adj_p_value < 0.05) %>% 
+  mutate(set = as.character(set))
+
+# Create a p-value lookup for all sets to use as a tie-breaker
+set_pvalue_lookup <- FCM_ORA_top_hits %>%
+  group_by(set) %>%
+  summarise(min_p_value = min(adj_p_value)) %>%
+  ungroup()
+
+# --- Hybrid Set Selection: Manual + Greedy Algorithm ---
+# Manually define a list of key pathways to include in the plot.
+
+manually_curated_pathways = readxl::read_excel(path = file.path(here(), "figures", "landscape", "curated_pathways.xlsx"),
+                                          sheet = "3")
+
+manual_sets_to_plot <- manually_curated_pathways %>%  pull(set)
+
+print(paste("Manually selected", length(manual_sets_to_plot), "sets:"))
+print(manual_sets_to_plot)
+
+# Determine which tissue-cluster items need to be covered by pathways
+all_items_to_cover <- FCM_ORA_top_hits %>%
+  mutate(tissue_cluster_id = paste(tissue, cluster, sep = "_")) %>%
+  distinct(tissue_cluster_id) %>%
+  pull(tissue_cluster_id)
+
+# Create a mapping of sets to the items they cover
+set_coverage_all <- FCM_ORA_top_hits %>%
+  mutate(tissue_cluster_id = paste(tissue, cluster, sep = "_")) %>%
+  distinct(set, tissue_cluster_id)
+
+items_covered_by_manual <- set_coverage_all %>%
+  filter(set %in% manual_sets_to_plot) %>%
+  distinct(tissue_cluster_id) %>%
+  pull(tissue_cluster_id)
+
+uncovered_items <- setdiff(all_items_to_cover, items_covered_by_manual)
+print(paste("Manual sets covered", length(items_covered_by_manual), "items."))
+print(paste("There are", length(uncovered_items), "items left to cover."))
+
+# --- Optional: Greedy Algorithm to Cover Remaining Items ---
+# This block can be enabled to automatically select additional pathways
+# to ensure every significant cluster has at least one pathway shown.
+selected_sets <- manual_sets_to_plot
+
+# # The pool of sets the greedy algorithm can pick from (excluding manual selections).
+# remaining_coverage_pool <- set_coverage_all %>%
+#   filter(!set %in% manual_sets_to_plot)
+# 
+# if (length(uncovered_items) > 0) {
+#   print("Running greedy algorithm to find remaining sets...")
+# 
+#   while (length(uncovered_items) > 0) {
+# 
+#     # Find the best set from the remaining pool based on coverage and p-value.
+#     best_set <- remaining_coverage_pool %>%
+#       filter(tissue_cluster_id %in% uncovered_items) %>%
+#       count(set, name = "coverage_count") %>%
+#       left_join(set_pvalue_lookup, by = "set") %>%
+#       # Sort by coverage (desc) then p-value (asc)
+#       arrange(desc(coverage_count), min_p_value) %>%
+#       slice(1)
+# 
+#     # Safety break
+#     if (nrow(best_set) == 0) {
+#       print("Warning: No remaining sets can cover the remaining items.")
+#       break
+#     }
+# 
+#     chosen_set_name <- best_set$set
+# 
+#     # Add the new set to our selected list
+#     selected_sets <- c(selected_sets, chosen_set_name)
+# 
+#     # Find items this set just covered
+#     items_just_covered <- remaining_coverage_pool %>%
+#       filter(set == chosen_set_name) %>%
+#       pull(tissue_cluster_id)
+# 
+#     # Update the list of uncovered items
+#     uncovered_items <- setdiff(uncovered_items, items_just_covered)
+# 
+#     # Remove the chosen set from the pool
+#     remaining_coverage_pool <- remaining_coverage_pool %>%
+#       filter(set != chosen_set_name)
+# 
+#     print(paste0("...chose '", chosen_set_name, "'. ", length(uncovered_items), " items left."))
+#   }
+# } else {
+#   print("Manual sets provided full coverage. No greedy algorithm needed.")
+# }
+# 
+# print("---")
+# print(paste("Finished. Total sets selected:", length(selected_sets)))
+# print(selected_sets)
+
+# --- 5. Create ORA Data for Clustering Pathway Order ---
+# This data is used only to determine the optimal order of pathways on the y-axis.
+# We aggregate by max ratio to get one value per (cluster_label, set).
+plot_data_ora_raw_for_clustering <- FCM_ORA_top_hits %>%
+  filter(set %in% selected_sets) %>%
+  mutate(included_ratio = set_size_in_cluster/cluster_size) %>% 
+  mutate(cluster_label = paste(cluster, tissue, sep = " - ")) %>%
+  # Aggregate by taking the max ratio if a set appears in multiple assays for the same cluster
+  group_by(cluster_label, set) %>%
+  summarise(included_ratio = max(included_ratio), .groups = 'drop')
+
+plot_data_ora_complete_for_clustering <- plot_data_ora_raw_for_clustering %>%
+  mutate(
+    cluster_label = factor(cluster_label, levels = levels(plot_data_bar$cluster_label)),
+    set = factor(set, levels = selected_sets)
+  ) %>%
+  complete(cluster_label, set) %>%
+  filter(!is.na(cluster_label))
+
+# Pivot data to a wide matrix for clustering
+wide_data <- plot_data_ora_complete_for_clustering %>%
+  mutate(included_ratio = replace_na(included_ratio, 0)) %>%
+  pivot_wider(
+    id_cols = set,
+    names_from = cluster_label,
+    values_from = included_ratio,
+    values_fill = 0 
+  )
+
+# Convert to a numeric matrix
+wide_matrix <- wide_data %>%
+  column_to_rownames("set") %>%
+  as.matrix()
+
+# Filter matrix for clustering (e.g., exclude 'adipose' columns)
+cols_to_use <- !grepl("adipose", colnames(wide_matrix), ignore.case = TRUE)
+matrix_for_clustering <- wide_matrix[, cols_to_use]
+
+print("---")
+print("Clustering will be based on these columns:")
+print(colnames(matrix_for_clustering))
+
+# Perform hierarchical clustering on rows (pathways)
+row_dist <- dist(matrix_for_clustering, method = "euclidean")
+row_hclust <- hclust(row_dist, method = "complete")
+
+# Get the new row order from clustering and reverse it for plotting
+new_row_indices <- row_hclust$order
+new_row_order <- rownames(wide_matrix)[new_row_indices]
+reversed_row_order <- rev(new_row_order)
+
+# --- 6. Create Final ORA Data for Plotting ---
+# Create the raw data with assay info, propagating all necessary columns
+plot_data_ora_raw_for_plot <- FCM_ORA_top_hits %>%
+  filter(set %in% selected_sets) %>%
+  mutate(included_ratio = set_size_in_cluster/cluster_size) %>% 
+  mutate(cluster_label = paste(cluster, tissue, sep = " - ")) %>%
+  left_join(MotrpacBicQC::assay_codes, by = c("assay" = "assay_code"), relationship = "many-to-many") %>%
+  mutate(ome_text = if_else(assay == "metab", "Metabolomics", ome_text)) %>%
+  filter(!is.na(ome_text)) %>%
+  select(cluster_label, set, included_ratio, ome_text) %>%
+  distinct()
+
+# Create the complete data frame for plotting, ensuring alignment
+plot_data_ora_complete <- plot_data_ora_raw_for_plot %>%
+  mutate(
+    cluster_label = factor(cluster_label, levels = levels(plot_data_bar$cluster_label)),
+    set = factor(set, levels = reversed_row_order)
+  ) %>%
+  filter(!is.na(cluster_label), !is.na(set)) %>%
+  # Use complete() to add NA rows for missing combinations, ensuring alignment with the bar plot
+  complete(cluster_label, set)
+
+print("---")
+print("Check the new (reversed) factor levels for 'set':")
+print(levels(plot_data_ora_complete$set))
+
+# --- 7. Create Manual Name Map for Plotting Labels ---
+# This map provides shorter, more readable names for the pathways.
+# Note: To build this map, you can run `dput(levels(plot_data_ora_complete$set))`
+# in the console and copy the output.
+set_rename_map = manually_curated_pathways$figure_name
+names(set_rename_map) = manually_curated_pathways$set
+
+# --- 8. Create Plot Enhancements (Colors & Backgrounds) ---
+set_names <- levels(plot_data_ora_complete$set)
+n_sets <- length(set_names)
+
+# Define a high-contrast color palette for pathway labels
+base_dark2_palette <- c(
+  "#CC0000", "#006400", "#E65C00", "#0000B2", "#B8860B",
+  "#008080", "#8B008B", "#556B2F", "#800000", "#4B0082"
+)
+# Repeat the palette if there are more sets than colors
+set_colors_ordered <- rep_len(base_dark2_palette, n_sets)
+set_color_map <- set_colors_ordered
+names(set_color_map) <- set_names
+
+# Data for background tissue rectangles
+background_data <- plot_data_bar %>%
+  mutate(x_index = as.numeric(cluster_label)) %>%
+  group_by(tissue) %>%
+  summarise(
+    xmin = min(x_index) - 0.5,
+    xmax = max(x_index) + 0.5
+  ) %>%
+  ungroup()
+
+# Data for the top circles indicating cluster number and color
+color_lookup <- center_df %>%
+  distinct(tissue, cluster, cluster_color) %>%
+  mutate(cluster_num = as.numeric(as.character(cluster))) 
+
+circle_data <- plot_data_bar %>%
+  distinct(cluster_label, high_cluster, tissue) %>%
+  left_join(color_lookup, 
+            by = c("high_cluster" = "cluster_num", "tissue" = "tissue"))
+
+# --- 9. Generate Individual Plots ---
+
+# Plot 0: Top Circles (p_top_circles)
+p_top_circles <- ggplot(circle_data, aes(x = cluster_label, y = 1)) +
+  geom_point(aes(fill = cluster_color), 
+             shape = 21, 
+             size = 3, 
+             color = "black") +
+  geom_text(aes(label = high_cluster), 
+            size = my_geom_text_size, 
+            color = "black") +
+  scale_fill_identity() + 
+  theme_void() + 
+  theme(
+    plot.margin = unit(c(2, 0, 0, 0), "pt"), 
+    legend.position = "none"
+  )
+
+# Plot 1: Bar Chart (Top)
+p1_vert <- ggplot(plot_data_bar, aes(x = cluster_label)) + 
+  geom_rect(
+    data = background_data,
+    aes(xmin = xmin, xmax = xmax, fill = tissue),
+    ymin = -Inf, ymax = Inf,
+    alpha = 0.2,
+    inherit.aes = FALSE
+  ) +
+  scale_fill_manual(values = HUMAN_TISSUE_COLORS) +
+  guides(fill = "none") + 
+  new_scale_fill() +
+  geom_col(aes(y = -Count, fill = ome_text), position = "stack") +
+  scale_y_continuous(labels = abs, position = "left") +
+  scale_fill_manual(values = c(HUMAN_OME_COLORS, "metab" = "#6D4B08")) + 
+  labs(
+    y = "Number of Features", 
+    x = NULL, 
+    fill = "Omics Layer" 
+  ) + 
+  theme_minimal(base_size = my_base_size) +
+  theme(
+    legend.position = "left",
+    axis.text.x = element_blank(), 
+    axis.ticks.x = element_blank(),
+    # Use 'color = NA' to make gridlines invisible without warnings
+    panel.grid.major.x = element_line(),
+    panel.grid.major.y = element_line(color = NA),
+    panel.grid.minor.y = element_line(color = NA),
+    plot.margin = margin(t = 0.1, b = 0.1, unit = "pt") 
+  ) +
+  guides(fill = guide_legend(
+    reverse = TRUE,
+    keywidth = unit(my_legend_key_size_pt, "pt"),
+    keyheight = unit(my_legend_key_size_pt, "pt")
+  ))
+
+# Plot 2: Dot Plot (Bottom)
+p2_vert <- ggplot(plot_data_ora_complete, aes(x = cluster_label, y = set)) +
+  # Background tissue rectangles
+  geom_rect(
+    data = background_data,
+    aes(xmin = xmin, xmax = xmax, fill = tissue),
+    ymin = -Inf, ymax = Inf,
+    alpha = 0.2,
+    inherit.aes = FALSE
+  ) +
+  scale_fill_manual(values = HUMAN_TISSUE_COLORS) +
+  guides(fill = "none") +
+  new_scale_fill() +
+  # Horizontal lines for each pathway
+  geom_hline(aes(yintercept = set, color = set), linetype = "solid", alpha = 0.6) +
+  # Points representing enrichment
+  geom_point(
+    aes(size = included_ratio, fill = ome_text),
+    shape = 21,
+    color = "black"
+  ) +
+  scale_x_discrete(position = "bottom") + 
+  scale_y_discrete(
+    position = "left",
+    labels = set_rename_map, # Apply custom short names
+    expand = expansion(mult = c(0.04, 0.07))
+  ) +
+  scale_color_manual(values = set_color_map) + # For hline
+  scale_fill_manual(
+    name = "Omics Layer",
+    values = c(HUMAN_OME_COLORS, "metab" = "#6D4B08"),
+    na.translate = FALSE
+  ) +
+  labs(
+    x = NULL,
+    y = "Pathway Set",
+    size = "Included Ratio"
+  ) +
+  scale_size_continuous(range = c(1, my_legend_point_max)) + 
+  theme_minimal(base_size = my_base_size) +
+  theme(
+    axis.text.x = element_blank(), 
+    axis.ticks.x = element_blank(), 
+    axis.text.y = element_text(color = set_colors_ordered),
+    axis.ticks.y = element_line(),
+    panel.grid.major.x = element_line(color = "grey90", linetype = "solid"),
+    panel.grid.major.y = element_blank(), 
+    panel.grid.minor = element_blank(),
+    legend.position = "bottom",
+    legend.margin = margin(t = -5, r = 0, b = 0, l = 0, unit = "pt"),
+    legend.box.margin = margin(t = -5, r = 0, b = 0, l = 0, unit = "pt"),
+    plot.margin = margin(t = 0.1, unit = "pt")
+  ) +
+  guides(
+    color = "none", # Hide hline legend
+    fill = "none"   # Hide "Omics Layer" legend
+  )
+
+# --- 10. Combine and Export Plots ---
+# Combine all three plots vertically
+final_plot <- p_top_circles / p1_vert / p2_vert + 
+  plot_layout(
+    heights = c(0.2, 1, 1.8) # Adjust relative heights
+  )
+
+# Save to PDF
+pdf("combined_cluster_plot_resized_colorized.pdf", width = 7, height = 2.5)
+print(final_plot)
+dev.off()
+```
+
+# Feature Heatmaps of Selected Pathways
+
+## Custom Heatmap Function with Row Annotations
+This section defines a modified heatmap function that includes a custom row annotation to display C-means cluster membership, using the same colors as the combined plot above.
+
+```{r special_heatmap_function}
+#' @title Create a feature heatmap with custom row annotations
+#'
+#' @description A wrapper around the `feature_heatmap` function that adds a
+#'   `right_annotation` to display cluster membership for each feature.
+#'
+#' @param feature_ids character or \code{NULL}; vector of feature IDs.
+#' @param da_obj A local DA object to save time.
+#' @param set_id character of \code{NULL}; if not \code{NULL}, used to select features.
+#' @param platforms character or \code{NULL}; for metabolomics filtering.
+#' @param selected_tissue character; the tissue(s) for the heatmap.
+#' @param selected_ome character; the ome for the heatmap.
+#' @param filename character; optional file name to save the heatmap.
+#' @param row_annotation_matrix data.frame; data for the row annotation.
+#' @param row_annotation_colors list; named list of colors for the row annotation.
+#' @param ... Additional arguments passed to the internal `feature_heatmap` function.
+#'
+#' @returns A ComplexHeatmap object.
+#'
+#' @author Tyler Sagendorf, Damon Leach, Dan Katz
+#'
+#' @import ComplexHeatmap
+#' @importFrom dplyr %>% filter mutate bind_rows
+#' @importFrom grDevices dev.off
+#' @importFrom tibble column_to_rownames
+#' @importFrom tidyr pivot_wider
+
+## Example Usage:
+# feature_heatmap_with_RA(
+#   set_id = "11725",
+#   contrast_type = "exercise_with_controls",
+#   selected_tissue = "muscle",
+#   selected_ome = "prot-ph",
+#   filename = "sandbox/test_heatmap_with_RA.pdf",
+#   row_annotation_matrix = my_row_anno_data,
+#   row_annotation_colors = my_row_anno_colors
+# )
+
+library(MotrpacHumanPreSuspensionAnalysis)
+library(ComplexHeatmap)
+library(gridtext)
+library(dplyr)
+library(grDevices)
+library(tibble)
+library(tidyr)
+library(TMSig) # enrichmap
+
+feature_heatmap_with_RA <- function(feature_ids = NULL,
+                                    da_obj = NULL,
+                                    set_id = NULL,
+                                    platforms = NULL,
+                                    selected_tissue = c("adipose", "blood", "muscle"),
+                                    selected_ome = c("transcript-rna-seq", "prot-pr",
+                                                     "prot-ph", "metab", "prot-ol"),
+                                    contrast_type = "exercise_with_controls",
+                                    column_title = "",
+                                    multi_tissue_clust_rows = FALSE,
+                                    filename = NULL,
+                                    post_min = NULL,
+                                    post_hr = NULL,
+                                    full_modality_names = FALSE,
+                                    row_annotation_matrix = NULL,
+                                    row_annotation_colors = NULL) 
+{ 
+  if(is.null(da_obj)){
+    DA_list <- load_differential_analysis(combine_with_featgene = TRUE)
+  } else {
+    DA_list <- da_obj
+  }
+  
+  # Parameter validation
+  if(!is.null(post_min)){
+    if(length(post_min) > 1){ stop("If not NULL, post_min can only have length 1") }
+    if(!is.numeric(post_min)){ stop("If not NULL, post_min must be numeric") }
+    if(!post_min %in% c(15,30,45)){ stop("If not NULL, post_min can only take on the numeric values of 15, 30, or 45") }
+  }
+  if(!is.null(post_hr)){
+    if(length(post_hr) > 1){ stop("If not NULL, post_hr can only have length 1") }
+    if(!is.numeric(post_hr)){ stop("If not NULL, post_hr must be numeric") }
+    if(!post_hr %in% c(3.5,4)){ stop("If not NULL, post_hr can only take on the numeric values of 3.5 or 4") }
+  }
+  if(length(full_modality_names) > 1){ stop("full_modality_names can only have length 1") }
+  if(!is.logical(full_modality_names)){ stop("full_modality_names must be a logical argument") }
+  
+  # If set_id is provided, select the features from the set
+  if (!is.null(set_id)) {
+    if (!is.character(set_id) || length(set_id) != 1L) {
+      stop("`set_id` must be a character string specifying a set ID from the `SET_TO_ID` object.")
+    }
+    pathway <- SET_TO_ID %>%
+      filter(set_id == !!set_id) %>%
+      pull(set)
+    pathways <- unlist(structure(MOLECULAR_SIGNATURES, names = NULL), recursive = FALSE)
+    feature_ids <- pathways[[pathway]]
+  }
+  
+  if (!is.vector(feature_ids, mode = "character")) {
+    stop("If `set_id` is not provided, `feature_ids` must be a character vector of feature IDs.")
+  }
+  
+  selected_tissue <- match.arg(selected_tissue, choices = c("adipose", "blood", "muscle"), several.ok = TRUE)
+  selected_ome <- match.arg(selected_ome, choices = c("transcript-rna-seq", "prot-pr", "prot-ph", "metab", "prot-ol"))
+  contrast_type <- match.arg(contrast_type, choices = c("exercise_with_controls", "exercise_no_controls", "Endur_vs_Resist", "baseline", "control_only"))
+  
+  # --- Prepare DA results ---
+  DA_res_list <- purrr::map(selected_tissue, function(st){
+    filt_dat = DA_list[[st]][[selected_ome]] %>%
+      filter(contrast_type == !!contrast_type) %>%
+      mutate(across(.cols = any_of(c("feature_id", "gene_symbol", "platform", "flanking_sequence")), .fns = as.character)) %>%
+      droplevels.data.frame()
+    filt_dat
+  })
+  names(DA_res_list) <- selected_tissue
+  DA_res = dplyr::bind_rows(DA_res_list)
+  
+  if (is.null(set_id)) {
+    DA_res <- filter(DA_res, feature_id %in% feature_ids)
+  }
+  
+  if (!nrow(DA_res)) {
+    stop(sprintf("`feature_ids` do not match feature IDs in the %s %s differential analysis results.", selected_tissue, selected_ome))
+  }
+  
+  # Format feature IDs based on ome
+  if (selected_ome %in% c("prot-pr", "transcript-rna-seq", "prot-ol")) {
+    DA_res <- DA_res %>% mutate(feature_id = ifelse(!is.na(gene_symbol), gene_symbol, feature_id))
+  } else if (selected_ome == "prot-ph") {
+    DA_res <- DA_res %>% mutate(feature_id = paste(gene_symbol, sub(".*_", "", sub("(.*);$", "\\1", gsub("[sty]", ";", feature_id)))))
+  } else if (selected_ome == "metab" && !is.null(platforms)) {
+    platforms <- match.arg(arg = platforms, choices = paste0("metab-", c("t-amines", "t-conv", "t-imm-crt", "t-imm-glc", "t-imm-ins", "t-oxylipneg", "t-tca", "u-hilicpos", "u-ionpneg", "u-lrpneg", "u-lrppos", "u-rpneg", "u-rppos")), several.ok = TRUE)
+    DA_res <- DA_res %>% filter(platform %in% platforms)
+    if (!nrow(DA_res)) { stop("Metabolites in `feature_ids` not found in the provided platforms.") }
+  }
+  
+  if (!is.null(set_id)) {
+    if (selected_ome %in% c("prot-pr", "transcript-rna-seq")) {
+      DA_res <- filter(DA_res, feature_id %in% feature_ids)
+    } else if (selected_ome == "prot-ph") {
+      DA_res <- filter(DA_res, flanking_sequence %in% feature_ids)
+    } else if (selected_ome == "metab") {
+      DA_res <- filter(DA_res, feature_id %in% feature_ids)
+    }
+  }
+  
+  if (nrow(DA_res) == 0L) {
+    stop("The combination of `set_id`, `selected_tissue`, and `selected_ome` is not valid.")
+  }
+  
+  # if (selected_ome == "metab") {
+  #   DA_res <- DA_res %>%
+  #     # Include platform in the row names of the heatmap
+  #     mutate(feature_id = paste(sub("^metab-", "", platform), feature_id))
+  # }
+  
+  x <- DA_res %>%
+    dplyr::mutate(contrast2 = paste(tissue, contrast),
+                  contrast2 = factor(contrast2, levels = unique(contrast2))) %>%
+    arrange(contrast2, abs(z.std), feature_id) %>%
+    filter(.by = contrast2, !duplicated(feature_id)) %>%
+    select(feature_id, contrast, contrast2, z.std, adj_p_value, tissue) %>%
+    droplevels.data.frame()
+  
+  # --- Prepare Annotations ---
+  contrast_df <- .add_contrast_labels() %>% 
+    filter(contrast %in% levels(x$contrast)) %>% 
+    droplevels.data.frame()
+  contrast_colors_vector <- .contrast_colors()
+  
+  if(!is.null(post_min)){
+    post_min_str = paste0("post ", post_min, " min")
+    new_levels = levels(contrast_df$contrast_labels)
+    new_levels[new_levels == "post 15/30/45 min"] = post_min_str
+    contrast_df$contrast_labels <- factor(as.character(contrast_df$contrast_labels) %>% 
+                                            `[<-`(. == "post 15/30/45 min", post_min_str), levels = new_levels)
+    names(contrast_colors_vector)[names(contrast_colors_vector) == "post 15/30/45 min"] = post_min_str
+  }
+  
+  if(!is.null(post_hr)){
+    post_hr_str = paste0("post ", post_hr, " hr")
+    new_levels = levels(contrast_df$contrast_labels)
+    new_levels[new_levels == "post 3.5/4 hr"] = post_hr_str
+    contrast_df$contrast_labels <- factor(as.character(contrast_df$contrast_labels) %>% 
+                                            `[<-`(. == "post 3.5/4 hr", post_hr_str), levels = new_levels)
+    names(contrast_colors_vector)[names(contrast_colors_vector) == "post 3.5/4 hr"] = post_hr_str
+  }
+  
+  # --- Create Heatmap ---
+  column_df <- distinct(x, tissue, contrast) %>%
+    mutate(tissue = factor(tissue, levels = selected_tissue)) %>%
+    arrange(contrast, tissue) %>%
+    left_join(contrast_df, by = "contrast") %>%
+    rename(modality = anno_group) %>%
+    mutate(modality = factor(modality, levels = c("EE", "RE")))
+  
+  if(full_modality_names == TRUE){
+    column_df$modality <- factor(ifelse(column_df$modality == "EE", "Endurance Exercise", "Resistance Exercise"), levels = c("Endurance Exercise", "Resistance Exercise"))
+  }
+  
+  anno_df <- dplyr::select(column_df, Tissue = tissue, 
+                           Modality = modality, 
+                           Timepoint = contrast_labels) %>%
+    dplyr::arrange(Tissue, Modality, Timepoint)
+  
+  anno_col <- list(
+    "Tissue" = HUMAN_TISSUE_COLORS[selected_tissue],
+    "Modality" = if(full_modality_names) setNames(c("#d95f02", "#1b9e77"), 
+                                                  c("Endurance Exercise", "Resistance Exercise")) else setNames(c("#d95f02", "#1b9e77"), c("EE", "RE")),
+    "Timepoint" = contrast_colors_vector[levels(anno_df$Timepoint)]
+  )
+  
+  column_df <- column_df %>% mutate(contrast2 = factor(paste(tissue, contrast), levels = unique(paste(tissue, contrast))))
+  if (length(selected_tissue) == 1L) { anno_df$Tissue <- NULL; anno_col["Tissue"] <- NULL }
+  
+  show_column_names <- FALSE
+  if (contrast_type == "baseline") { anno_df$Timepoint <- NULL; anno_col["Timepoint"] <- NULL; show_column_names <- TRUE }
+  if (!contrast_type %in% c("exercise_with_controls", "exercise_no_controls")) { anno_df$Modality <- NULL; anno_col["Modality"] <- NULL }
+  
+  if (length(anno_col)) {
+    column_split <- if (!is.null(anno_df[["Tissue"]]) && !is.null(anno_df[["Modality"]])) {
+      anno_df %>% 
+        mutate(column_split = paste(Tissue, Modality), row_order = 1:n()) %>% 
+        arrange(Tissue, Modality) %>% 
+        mutate(column_split = factor(column_split, levels = unique(column_split))) %>% 
+        arrange(row_order) %>% 
+        pull(column_split)
+    } else if (!is.null(anno_df[["Tissue"]])) {
+      anno_df[["Tissue"]]
+    } else if (!is.null(anno_df[["Modality"]])) {
+      anno_df[["Modality"]]
+    }
+    
+    top_annotation <- HeatmapAnnotation(df = anno_df, 
+                                        col = anno_col, 
+                                        which = "column", 
+                                        border = TRUE, 
+                                        gap = unit(2, "pt"), 
+                                        annotation_name_gp = gpar(fontsize = 0.9 * 14), 
+                                        annotation_legend_param = list(border = TRUE, 
+                                                                       title_gp = gpar(fontsize = 0.9 * unit(14, "pt"), 
+                                                                                       fontface = "bold"), 
+                                                                       labels_gp = gpar(fontsize = 0.9 * unit(14, "pt"))))
+  } else {
+    top_annotation <- column_split <- NULL
+  }
+  
+  n_features <- length(unique(x[["feature_id"]]))
+  height <- max(as.numeric(convertUnit(n_features * unit(14, "pt"), "in")), 4.5) + 1.5 + show_column_names
+  row_label_width <- convertUnit(ComplexHeatmap::max_text_width(text = x[["feature_id"]], gp = gpar(fontsize = 0.9 * 14)), "in")
+  width <- as.numeric(convertUnit(nlevels(x[["contrast"]]) * unit(14, "pt"), "in") + row_label_width) + 5
+  
+  draw_args <- list(annotation_legend_list = NULL, merge_legends = TRUE)
+  if (n_features <= 10L) { draw_args[["padding"]] <- unit(c(80, 0, 0, 0), "pt") }
+  
+  extended_range <- TMSig::extendRangeNum(x[["z.std"]], nearest = 0.1)
+  breaks <- if (all(extended_range <= 0)) c(extended_range[1], 0) else if (all(extended_range >= 0)) c(0, extended_range[2]) else c(extended_range[1], 0, extended_range[2])
+  
+  # Handle multi-tissue clustering and row annotation filtering
+  if (multi_tissue_clust_rows == TRUE){
+    test_x <- x %>% group_by(feature_id) %>% 
+      summarise(count = n()) %>% 
+      filter(count == max(count))
+    
+    df_to_filter_x <- x %>% 
+      left_join(row_annotation_matrix, by = c("feature_id" = "gene_symbol")) %>%
+      filter(feature_id %in% test_x$feature_id)
+    
+    x <- df_to_filter_x %>% 
+      select(-adipose, -muscle, -blood)
+    
+    row_annotation_matrix_filtered <- df_to_filter_x %>% 
+      select(adipose, blood, muscle, feature_id) %>% 
+      distinct()
+    
+    row_annotation_matrix_final <- row_annotation_matrix %>% select(gene_symbol) %>%
+      inner_join(row_annotation_matrix_filtered, 
+                 by = c("gene_symbol" = "feature_id")) %>%  
+      distinct() %>%
+      select(-gene_symbol)
+    
+    clust_row_info <- TRUE 
+  } else {
+    row_annotation_matrix_final <- row_annotation_matrix %>% select(-gene_symbol)
+    clust_row_info <- ifelse(length(selected_tissue) > 1, FALSE, TRUE)
+  }
+  
+  # Create row annotations if provided
+  row_anno <- if (!is.null(row_annotation_matrix)) rowAnnotation(df = row_annotation_matrix_final, col = row_annotation_colors) else NULL
+  
+  # Draw the heatmap
+  heatmap_result <- TMSig::enrichmap(
+    x = x, n_top = Inf, set_column = "feature_id", statistic_column = "z.std", contrast_column = "contrast2",
+    padj_column = "adj_p_value", plot_sig_only = FALSE, filename = filename, height = height, width = width,
+    heatmap_color_fun = .feature_color_function,
+    heatmap_args = list(
+      layer_fun = .feature_layer_fun, cluster_rows = clust_row_info, column_split = column_split,
+      column_labels = contrast_df$specific, show_column_names = show_column_names, column_names_side = "top",
+      column_title = gt_render(column_title, padding = unit(c(0, 0, 0, 0.8), "in")),
+      column_title_gp = gpar(fontsize = 12), top_annotation = top_annotation,
+      right_annotation = row_anno,  # Add row annotations here
+      heatmap_legend_param = list(title = "Z-Score", at = breaks, labels = breaks)
+    ),
+    draw_args = draw_args
+  )
+  
+  return(heatmap_result)
+}
+
+# --- Helper Functions (re-defined for this scope) ---
+.add_contrast_labels <- function() {
+  # (Function content is identical to the previous definition)
+  contrast_labels <- c(rep(c("during 20 min", "during 40 min", "post 10 min", "post 15/30/45 min", "post 3.5/4 hr", "post 24 hr", "post 10 min", "post 15/30/45 min", "post 3.5/4 hr", "post 24 hr"), times = 2L), c("post 10 min", "post 15/30/45 min", "post 3.5/4 hr", "post 24 hr"), c("Endur - Resist", "Endur - Control", "Resist - Control"), c("during 20 min", "during 40 min", "post 10 min", "post 15/30/45 min", "post 3.5/4 hr", "post 24 hr"))
+  contrast_labels <- factor(contrast_labels, levels = c("Endur - Resist", "Endur - Control", "Resist - Control", "during 20 min", "during 40 min", "post 10 min", "post 15/30/45 min", "post 3.5/4 hr", "post 24 hr"))
+  anno_group <- c(rep(rep(c("EE", "RE"), c(6L, 4L)), times = 2L), rep(NA, 13L))
+  return(cbind(CONTRAST_CONVERTER, contrast_labels, anno_group))
+}
+.contrast_colors <- function() {
+  # (Function content is identical to the previous definition)
+  structure(c("#fde725", "#bad071", "#d1bbd7", "#ae76a3", "#882e72", "#61194f"), names = c("during 20 min", "during 40 min", "post 10 min", "post 15/30/45 min", "post 3.5/4 hr", "post 24 hr"))
+}
+.feature_layer_fun <- function(j, i, x, y, w, h, f) {
+  # (Function content is identical to the previous definition)
+  grid.rect(x = x, y = y, width = w, height = h, gp = gpar(col = heatmap_args[["rect_gp"]][["col"]], fill = f))
+  grid.text("*", x = x, y = y, gp = gpar(col = ifelse(pindex(padj_mat, i, j) < padj_cutoff, "black", NA)))
+}
+.feature_color_function <- function(statistics, colors = c("#3366ff", "darkred")) {
+  # (Function content is identical to the previous definition)
+  r <- range(statistics, na.rm = TRUE)
+  extended_range <- TMSig::extendRangeNum(r, nearest = 0.1)
+  max_r <- max(abs(extended_range))
+  if (all(r >= 0)) { breaks <- c(0, +1) * max_r; colors <- c("white", colors[2]) } else if (all(r <= 0)) { breaks <- c(-1, 0) * max_r; colors <- c(colors[1], "white") } else { breaks <- c(-1, 0, 1) * max_r; colors <- c(colors[1], "white", colors[2]) }
+  return(list(breaks = breaks, colors = colors))
+}
+```
+
+## Generating Curated Heatmaps
+This section uses the custom heatmap function to generate plots for specific pathways, with row annotations indicating cluster membership.
+
+```{r prepare_heatmap_parameters}
+# --- 1. Define Shared Parameters ---
+CURRENT_PATHWAY <- "WP_VEGFA_VEGFR2_SIGNALING"
+CURRENT_OME <- "transcript-rna-seq"
+TISSUES_TO_PLOT <- c("adipose", "blood", "muscle")
+CONTRAST_TO_USE <- "exercise_with_controls"
+
+# --- 2. Prepare Custom Color List for Annotations ---
+# This creates the required color mapping for the heatmap row annotations.
+# The final format is a named list, e.g., list(adipose = c("1" = "#hex1"), ...).
+center_df_formatted <- center_df %>%
+  mutate(cluster = as.character(cluster))
+
+# Create the named list of named color vectors
+custom_row_colors <- split(center_df_formatted, center_df_formatted$tissue) %>%
+  purrr::map(~ tibble::deframe(dplyr::select(., cluster, cluster_color))) %>%
+  # Filter for only the tissues being plotted
+  .[names(.) %in% TISSUES_TO_PLOT]
+```
+
+```{r heatmap_generator_wrapper}
+
+#' @title Generate a Filtered Multi-Tissue Heatmap
+#' @description A wrapper function to prepare data for a specific pathway and
+#'   cluster, then generate a heatmap with custom row annotations.
+#'
+#' @param filter_tissue character. The tissue to filter by (e.g., "muscle").
+#' @param filter_cluster character or numeric. The cluster(s) to filter by.
+#' @param ... Additional filter conditions passed to \code{dplyr::filter()}.
+#' @param pathway_name character. The pathway name or set id for feature selection.
+#' @param ome_name character. The ome name for feature selection.
+#' @param output_filename character. The path for the output PDF.
+#' @param color_list list. The pre-computed list of custom annotation colors.
+#' @param tissues_to_plot character vector. Tissues for the heatmap columns.
+#' @param contrast_to_use character. The contrast type for the heatmap.
+#' @return A ComplexHeatmap object or NULL if no features are found.
+
+generate_cluster_heatmap <- function(
+    filter_tissue,
+    filter_cluster,
+    ..., # For additional filter conditions
+    pathway_name,
+    ome_name,
+    output_filename,
+    color_list,
+    tissues_to_plot = TISSUES_TO_PLOT,
+    contrast_to_use = CONTRAST_TO_USE
+) {
+  
+  # --- 1. Get Key Clusters for the Pathway/Ome ---
+  key_clusters <- FCM_ORA_top_hits %>%
+    filter((set == pathway_name | set_id == pathway_name) & assay == ome_name) %>%
+    mutate(cluster = as.character(as.numeric(cluster))) %>%
+    select(cluster, tissue) %>%
+    distinct() %>%
+    mutate(sig_cluster = "Yes")
+  
+  if(str_detect(pathway_name,pattern = "^\\d+$")==F){
+    feature_list <- .choose_pathway_features_text(pathway = pathway_name)
+  } else {
+    feature_list <- .choose_pathway_features_numeric(pathway = as.numeric(pathway_name))
+  }
+  print(feature_list)
+  # --- 2. Get Feature List for the Pathway ---
+  if(ome_name !="metab"){
+    feature_list <- feature_list %>%
+      as_tibble() %>%
+      dplyr::rename(gene_symbol = value) %>%
+      left_join(HUMAN_FEATURE_TO_GENE) %>%
+      filter(assay == ome_name) %>%
+      mutate(feature_id = as.character(feature_id)) %>%
+      select(feature_id) %>%
+      distinct()
+  } else {
+    feature_list <- feature_list %>%
+      as_tibble() %>%
+      dplyr::rename(refmet_name = value) %>%
+      left_join(HUMAN_FEATURE_TO_GENE) %>%
+      filter(assay == ome_name) %>%
+      mutate(feature_id = as.character(feature_id)) %>%
+      select(feature_id) %>%
+      distinct()
+  }
+  
+  # --- 3. Build Row Annotation Data ---
+  filter_column_name <- paste0("high_cluster_", filter_tissue)
+  
+  row_ha <- all_tissues_df %>%
+    left_join(feature_list) %>%
+    select(feature_id, tissue, high_cluster) %>%
+    distinct() %>%
+    left_join(key_clusters, by = c("tissue", "high_cluster" = "cluster")) %>%
+    pivot_wider(id_cols = feature_id,
+                values_from = c(high_cluster, sig_cluster),
+                names_from = tissue) %>%
+    # Filter dynamically using rlang (!!) and pass additional filters (...)
+    filter(
+      !!sym(filter_column_name) %in% as.character(filter_cluster),
+      ...
+    ) %>%
+    select(feature_id,
+           adipose = high_cluster_adipose,
+           blood = high_cluster_blood,
+           muscle = high_cluster_muscle)
+  
+  # --- 4. Finalize Annotation Data ---
+  arranged_row_ha <- inner_join(feature_list, row_ha) %>%
+    as.data.frame() %>%
+    left_join(HUMAN_FEATURE_TO_GENE) %>%
+    select(adipose, blood, muscle, gene_symbol, feature_id) %>%
+    distinct()
+  
+  print(nrow(arranged_row_ha))
+  print(arranged_row_ha$gene_symbol)
+  
+  # --- 5. Generate Heatmap ---
+  if (nrow(arranged_row_ha) == 0) {
+    warning(sprintf("No features found for %s cluster %s in pathway %s (with additional filters). Skipping plot.",
+                    filter_tissue, paste(filter_cluster, collapse=", "), pathway_name))
+    return(NULL)
+  }
+  
+  hm <- feature_heatmap_with_RA(
+    feature_ids = arranged_row_ha$feature_id,
+    contrast_type = contrast_to_use,
+    selected_tissue = tissues_to_plot,
+    selected_ome = ome_name,
+    filename = file.path(output_filename),
+    multi_tissue_clust_rows = TRUE,
+    full_modality_names = FALSE,
+    row_annotation_matrix = arranged_row_ha,
+    row_annotation_colors = color_list
+  )
+  cat("Generated heatmap:", output_filename, "\n")
+  return(hm)
+}
+```
+
+```{r generate_curated_heatmaps}
+# # Plot 1: VEGF, Adipose Cluster 10
+# adipose10_VEGF <- generate_cluster_heatmap(
+#   filter_tissue = "adipose",
+#   filter_cluster = "10",
+#   pathway_name = CURRENT_PATHWAY,
+#   ome_name = CURRENT_OME,
+#   output_filename = "multitissue_heatmap_adipose-10_VEGF.png",
+#   color_list = custom_row_colors
+# )
+# 
+# # Plot 2: VEGF, Blood Cluster 4 (with features also in muscle)
+# blood_4_VEGF <- generate_cluster_heatmap(
+#   filter_tissue = "blood",
+#   filter_cluster = "4",
+#   !is.na(high_cluster_muscle),
+#   pathway_name = CURRENT_PATHWAY,
+#   ome_name = CURRENT_OME,
+#   output_filename = "multitissue_heatmap_blood-4_VEGF.png",
+#   color_list = custom_row_colors
+# )
+
+# Plot 1: Early muscle/adipose overlap. CCN1 does not plot here becuase it is not measured in blood
+# Corresponds to figure 3H
+muscle_adipose_early_VEGF <- generate_cluster_heatmap(
+  filter_tissue = "muscle",
+  filter_cluster = c("10","4"),
+  (high_cluster_adipose %in% c("10")) ,
+  pathway_name = CURRENT_PATHWAY,
+  ome_name = CURRENT_OME,
+  output_filename = "multitissue_heatmap_muscle-adipose-early_overlap_VEGF.pdf",
+  color_list = custom_row_colors
+)
+
+pdf("multitissue_heatmap_muscle-adipose-early_overlap_VEGF.pdf", width = 10, height = 10)
+draw(muscle_adipose_early_VEGF, padding = unit(c(5, 1, 1, 1), "cm"))
+dev.off()
+
+
+
+
+# Plot 2: Middle muscle/blood overlap
+# Corresponds to 3I
+muscle_blood_middle_VEGF <- generate_cluster_heatmap(
+  filter_tissue = "muscle",
+  filter_cluster = c("12"),
+  (high_cluster_blood %in% c("4","5")) ,
+  pathway_name = CURRENT_PATHWAY,
+  ome_name = CURRENT_OME,
+  output_filename = "multitissue_heatmap_muscle-blood-middle_overlap_VEGF.pdf",
+  color_list = custom_row_colors
+)
+
+pdf("multitissue_heatmap_muscle-blood-middle_overlap_VEGF.pdf", width = 10, height = 10)
+draw(muscle_blood_middle_VEGF, padding = unit(c(5, 1, 1, 1), "cm"))
+dev.off()
+
+
+
+# Plot 3: VEGF, Muscle Clusters 6  
+# Corresponds to 3J
+muscle_6_VEGF <- generate_cluster_heatmap(
+  filter_tissue = "muscle",
+  filter_cluster = c("6"),
+  #!is.na(high_cluster_adipose),
+  pathway_name = CURRENT_PATHWAY,
+  ome_name = CURRENT_OME,
+  output_filename = "multitissue_heatmap_muscle-6_VEGF.png",
+  color_list = custom_row_colors
+)
+
+pdf("multitissue_heatmap_muscle-6_VEGF.pdf", width = 10, height = 10)
+draw(muscle_6_VEGF, padding = unit(c(5, 1, 1, 1), "cm"))
+dev.off()
+
+
+
+# Plot 4: Autophagy, Muscle Clusters 12  
+# Corresponds to S3D
+muscle_12_autophagy <- generate_cluster_heatmap(
+  filter_tissue = "muscle",
+  filter_cluster = c("12"),
+  #!is.na(high_cluster_adipose),
+  pathway_name = "GOBP_PROCESS_UTILIZING_AUTOPHAGIC_MECHANISM",
+  ome_name = CURRENT_OME,
+  output_filename = "multitissue_heatmap_muscle-12_autophagy.png",
+  color_list = custom_row_colors
+)
+
+pdf("multitissue_heatmap_muscle-12_autophagy.pdf", width = 10, height = 20)
+draw(muscle_12_autophagy, padding = unit(c(5, 1, 1, 1), "cm"))
+dev.off()
+
+
+# Plot 5: Autophagy, blood Clusters 4 
+# Corresponds to S3B
+blood_4_autophagy <- generate_cluster_heatmap(
+  filter_tissue = "blood",
+  filter_cluster = c("4"),
+  (high_cluster_muscle != "12"),
+  pathway_name = "GOBP_PROCESS_UTILIZING_AUTOPHAGIC_MECHANISM",
+  ome_name = CURRENT_OME,
+  output_filename = "multitissue_heatmap_blood4_autophagy.png",
+  color_list = custom_row_colors
+)
+
+pdf("multitissue_heatmap_blood4_autophagy.pdf", width = 10, height = 15)
+draw(blood_4_autophagy, padding = unit(c(5, 1, 1, 1), "cm"))
+dev.off()
+
+# Plot 6: Autophagy, blood Clusters 5
+# Corresponds to S3C
+blood_5_autophagy <- generate_cluster_heatmap(
+  filter_tissue = "blood",
+  filter_cluster = c("5"),
+   (high_cluster_muscle != "12"),
+  pathway_name = "GOBP_PROCESS_UTILIZING_AUTOPHAGIC_MECHANISM",
+  ome_name = CURRENT_OME,
+  output_filename = "multitissue_heatmap_blood5_autophagy.png",
+  color_list = custom_row_colors
+)
+
+pdf("multitissue_heatmap_blood5_autophagy.pdf", width = 10, height = 15)
+draw(blood_5_autophagy, padding = unit(c(5, 1, 1, 1), "cm"))
+dev.off()
+
+```
+
+#Upset plot of VEGF enriched clusters
+
+```{r ACTIVE USE}
+#' @title Generate UpSet Plot with Merged Sets and Stacked Original Cluster Colors
+#' @description Filters data for a specific pathway, merges sets for the main interaction 
+#'   plot, but visualizes the composition of those sets using stacked bars of the 
+#'   original cluster colors.
+#'
+#' @param pathway_name character. The name of the pathway.
+#' @param ome_name character. The assay type.
+#' @param merge_groups named list. Defines groups to merge.
+#' @param fcm_hits_df dataframe. The FCM_ORA_top_hits data frame.
+#' @param all_data_df dataframe. The all_tissues_df data frame.
+#' @param cluster_info_df dataframe. Dataframe containing cluster colors. 
+#'   Must have columns: "tissue", "cluster", "cluster_color". 
+#'   Defaults to `center_df_formatted`.
+#' @return A ComplexHeatmap UpSet plot object.
+
+generate_pathway_upset <- function(
+    pathway_name, 
+    ome_name, 
+    merge_groups = NULL,
+    fcm_hits_df = FCM_ORA_top_hits, 
+    all_data_df = all_tissues_df,
+    cluster_info_df = center_df_formatted,
+    top_anno_height = NULL,
+    right_anno_width = NULL
+) {
+  
+  # --- 1. Build Color Map from center_df_formatted ---
+  # Create a named vector: "tissue-cluster" -> "hex_code"
+  # We ensure cluster is treated as a character to match the ID generation later
+  flat_color_map <- cluster_info_df %>%
+    mutate(unique_id = paste0(tissue, "-", as.character(cluster))) %>%
+    select(unique_id, cluster_color) %>%
+    tibble::deframe()
+  
+  # --- 2. Identify Enriched Tissue-Cluster Combinations ---
+  enriched_targets <- fcm_hits_df %>%
+    filter(set == pathway_name | set_id == pathway_name, assay == ome_name) %>%
+    mutate(cluster = as.character(as.numeric(cluster))) %>% 
+    mutate(group_id = paste0(tissue, "-", cluster)) %>% 
+    select(tissue, cluster, group_id) %>%
+    distinct()
+  
+  if (nrow(enriched_targets) == 0) {
+    warning(paste("No enriched clusters found for", pathway_name))
+    return(NULL)
+  }
+  
+  # --- 3. Get Feature List for the Pathway ---
+  pathway_features_df <- .choose_pathway_features_text(pathway = pathway_name) %>%
+    as_tibble() %>%
+    dplyr::rename(gene_symbol = value) %>%
+    left_join(HUMAN_FEATURE_TO_GENE, by = "gene_symbol") %>% 
+    filter(assay == ome_name) %>%
+    select(feature_id) %>%
+    distinct()
+  
+  # --- 4. Filter Main Data (Granular Level) ---
+  plot_data <- all_data_df %>%
+    filter(Ome == ome_name) %>% 
+    inner_join(pathway_features_df, by = "feature_id") %>% 
+    mutate(cluster = as.character(high_cluster)) %>%
+    mutate(group_id = paste0(tissue, "-", cluster)) %>% 
+    filter(group_id %in% enriched_targets$group_id)
+  
+  if (nrow(plot_data) == 0) return(NULL)
+  
+  # --- 5. Build the "Merged" List for the UpSet Matrix ---
+  input_list_granular <- split(plot_data$feature_id, plot_data$group_id)
+  input_list_merged <- input_list_granular 
+  
+  if (!is.null(merge_groups)) {
+    for (new_group_name in names(merge_groups)) {
+      targets_to_merge <- merge_groups[[new_group_name]]
+      valid_targets <- intersect(targets_to_merge, names(input_list_merged))
+      
+      if (length(valid_targets) > 0) {
+        # Create merged set (Union)
+        combined_features <- unique(unlist(input_list_merged[valid_targets]))
+        input_list_merged[[new_group_name]] <- combined_features
+        
+        # Remove originals from the main list
+        targets_to_remove <- setdiff(valid_targets, new_group_name)
+        if (length(targets_to_remove) > 0) {
+          input_list_merged[targets_to_remove] <- NULL
+        }
+      }
+    }
+  }
+  
+  # --- 6. Build the Stacked Bar Matrix for Right Annotation ---
+  final_set_names <- names(input_list_merged)
+  original_clusters_present <- names(input_list_granular)
+  
+  # Initialize matrix with 0s
+  count_matrix <- matrix(0, 
+                         nrow = length(final_set_names), 
+                         ncol = length(original_clusters_present),
+                         dimnames = list(final_set_names, original_clusters_present))
+  
+  # Fill the matrix
+  for (set_name in final_set_names) {
+    if (!is.null(merge_groups) && set_name %in% names(merge_groups)) {
+      constituents <- intersect(merge_groups[[set_name]], original_clusters_present)
+    } else {
+      constituents <- intersect(set_name, original_clusters_present)
+    }
+    
+    for (orig in constituents) {
+      count_matrix[set_name, orig] <- length(input_list_granular[[orig]])
+    }
+  }
+  
+  # --- 7. Prepare Colors for the Stacked Bars ---
+  bar_colors <- flat_color_map[colnames(count_matrix)]
+  bar_colors[is.na(bar_colors)] <- "grey50" # Fallback
+  
+  # --- 8. Generate Plot ---
+  comb_mat <- make_comb_mat(input_list_merged)
+  
+  # upset_plot <- UpSet(
+  #   comb_mat,
+  #   pt_size = unit(3, "mm"), 
+  #   lwd = 1,
+  #   
+  #   # REMOVED: col = "black" (This fixes the error; UpSet defaults to black/grey)
+  #   
+  #   comb_order = order(comb_size(comb_mat), decreasing = TRUE),
+  #   set_order = order(set_size(comb_mat), decreasing = TRUE),
+  #   
+  #   top_annotation = upset_top_annotation(comb_mat, add_numbers = TRUE, height = unit(top_anno_height,"cm")),
+  #   
+  #   # Custom Right Annotation: Stacked Bars
+  #   right_annotation = rowAnnotation(
+  #     "Set Size" = anno_barplot(
+  #       count_matrix[set_name(comb_mat), ], 
+  #       gp = gpar(fill = bar_colors, col = NA), 
+  #       border = FALSE,
+  #       axis_param = list(side = "bottom")
+  #     ),
+  #     width = unit(right_anno_width*0.6, "cm")
+  #   ),
+  #   
+  #   column_title = paste0("Feature Overlap: ", pathway_name)
+  # )
+  
+  # 1. Define Physical Dimensions (Inches)
+  target_w <- 2.16
+  target_h <- 1.68
+  
+  # 2. Define Proportions based on your request
+  top_h_dim   <- target_h * 0.40  # 40% of height
+  right_w_dim <- target_w * 0.20  # 30% of width
+  
+  # 3. Define Font Sizes (optimized for small figures)
+  # At this small scale, 12pt is massive. We scale down to ~6-8pt.
+  fs_title <- 3.5      # Title font size
+  fs_label <- 3.5      # Axis labels/numbers
+  fs_names <- 3.5      # Set names (rows)
+  pt_size_val <- 1.5 # Dot size in mm (reduced from 3mm to fit scale)
+  
+  # 4. Create the Plot Object
+  upset_plot <- UpSet(
+    comb_mat,
+    
+    # Matrix Dot Styling
+    pt_size = unit(pt_size_val, "mm"), 
+    lwd = 1,
+    
+    # Sorting
+    comb_order = order(comb_size(comb_mat), decreasing = TRUE),
+    set_order = order(set_size(comb_mat), decreasing = TRUE),
+    
+    # --- Top Annotation (Intersection Size) ---
+    top_annotation = upset_top_annotation(
+      comb_mat, 
+      add_numbers = TRUE,
+      numbers_offset = unit(1, "mm"),
+      height = unit(top_h_dim, "inch"),
+      numbers_rot = 0,
+      # Control font size of the intersection numbers
+      numbers_gp = gpar(fontsize = fs_label*0.8), 
+      # Control font size of the y-axis
+      annotation_name_gp = gpar(fontsize = fs_label),
+      axis_param = list(gp = gpar(fontsize = fs_label)) 
+    ),
+    
+    # --- Right Annotation (Set Size / Stacked Bars) ---
+    right_annotation = rowAnnotation(
+      "Set Size" = anno_barplot(
+        count_matrix[set_name(comb_mat), ], 
+        gp = gpar(fill = bar_colors, col = NA), 
+        border = FALSE,
+        axis_param = list(
+          side = "bottom", 
+          gp = gpar(fontsize = fs_label) # Axis numbers size
+        )
+      ),
+      # Set width exactly to 30% of total canvas
+      width = unit(right_w_dim, "inch"), 
+      annotation_name_gp = gpar(fontsize = fs_label)
+    ),
+    
+    # --- Text Styling ---
+    # Row names (the set names on the left of the matrix)
+    row_names_gp = gpar(fontsize = fs_names),
+    
+    # Column Title
+    column_title = paste0("Feature Overlap: ", pathway_name),
+    column_title_gp = gpar(fontsize = fs_title, fontface = "bold")
+  )
+  
+  return(upset_plot)
+}
+```
+
+```{r figure3G}
+# 1. Define Merges
+my_merges <- list(
+  "blood-4/5 (Combined)" = c("blood-4", "blood-5"),
+  "muscle-4/10 (Combined)" = c("muscle-10", "muscle-4")
+)
+
+# 2. Run
+hm <- generate_pathway_upset(
+  pathway_name = CURRENT_PATHWAY,
+  ome_name = CURRENT_OME,
+  merge_groups = my_merges,
+  top_anno_height = 1.3*3, right_anno_width = 2.1*3
+  # cluster_info_df = center_df_formatted (Implicit default)
+)
+
+# 3. Draw
+if (!is.null(hm)) {
+  draw(hm)
+}
+
+target_w <- 2.3
+target_h <- 1.68
+
+
+#pdf("VEGF_c-means_upset.pdf", width = 2.1*3, height = 1.3*2.5*1.5)
+pdf(file = "VEGF_c-means_upset.pdf", width = target_w, height = target_h)
+# use draw() to render ComplexHeatmap objects
+draw(hm)
+dev.off()
+```
+

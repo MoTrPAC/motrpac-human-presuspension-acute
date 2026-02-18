@@ -1,0 +1,78 @@
+---
+title: "Scion Figures"
+output: html_document
+params:
+  permute: NULL  # Default value
+  num_cores: 1
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+config = jsonlite::fromJSON("~/config.json")
+repo_local_dir = config$precovid_repo_path
+
+# permute = 1
+permute = params$permute
+num_cores = params$num_cores
+devtools::load_all(path = config$r_package_path)
+```
+
+```{r}
+regulators_network_one = .load_scion_matrixes(desired_matrixes = "muscle.prot-ph",
+                                              repo_local_dir = repo_local_dir,
+                                              subset_TFs = TRUE,
+                                              subset_DE = FALSE)
+
+regulators_network_one_test = .load_scion_matrixes(desired_matrixes = "muscle.prot-ph",
+                                              repo_local_dir = repo_local_dir,
+                                              subset_TFs = TRUE,
+                                              subset_DE = TRUE)
+```
+
+```{r, eval = F}
+regulators_network_one = .load_scion_matrixes(desired_matrixes = "muscle.prot-ph",
+                                              subset_TFs = TRUE,
+                                              subset_DE = FALSE)
+targets_network_one = .load_scion_matrixes(desired_matrixes = "muscle.transcript-rna-seq",
+                                           subset_TFs = FALSE,
+                                           subset_DE = TRUE)
+
+for(randomGroupCode in c("ADUResist", "ADUEndur")){
+  #the permutation will get automatically appended after this output_dir
+  output_dir = file.path(repo_local_dir, "data/tmp", "muscle_protph_transcript", randomGroupCode)
+  run_SCION(randomGroupCode,
+            regulators = regulators_network_one,
+            targets = targets_network_one,
+            permute = permute,
+            dir.name = output_dir,
+            num.cores = num_cores
+  )
+}
+```
+
+```{r}
+regulators_network_two = .load_scion_matrixes(desired_matrixes = "blood.metabolomics",
+                                              repo_local_dir = repo_local_dir,
+                                              subset_TFs = FALSE, #this doesn't actually do anything unless the 2nd input name is prot-pr/ph
+                                              subset_DE = FALSE)
+targets_network_two = .load_scion_matrixes(desired_matrixes = "muscle.transcript-rna-seq",
+                                           repo_local_dir = repo_local_dir,
+                                           subset_TFs = FALSE,
+                                           subset_DE = TRUE)
+num_cores = 11
+for(permute in seq(1:100)){
+  for(randomGroupCode in c("ADUResist", "ADUEndur")){
+    #the permutation will get automatically appended after this output_dir
+    output_dir = file.path(repo_local_dir, "data/tmp", "blood_metab_muscle_transcript", randomGroupCode)
+    run_SCION(randomGroupCode,
+              regulators = regulators_network_two,
+              targets = targets_network_two,
+              permute = permute,
+              dir.name = output_dir,
+              num.cores = num_cores
+    )
+  }
+}
+```

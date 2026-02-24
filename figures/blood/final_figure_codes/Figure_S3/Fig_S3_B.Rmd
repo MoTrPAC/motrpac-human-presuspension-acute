@@ -1,0 +1,227 @@
+---
+title: "Blood_Metabolomics_Kinetics_Plot"
+author: "Gaurav Tiwari"
+date: "2025-11-08"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+session_packages = c("dplyr", "ggplot2", "ggrepel", "stringr", "scales","tidyverse", "ComplexUpset","MotrpacHumanPreSuspension", "MotrpacHumanPreSuspensionData","glue","openxlsx")
+for (lib_name in session_packages){
+  tryCatch({library(lib_name,character.only = T)}, error = function(e) {
+    print(paste("Cannot load",lib_name,", please install"))
+  })
+}
+
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+
+theme_set(theme_minimal())
+```
+
+
+```{r session setup}
+# Save date in case output files requiring date version
+date <- Sys.Date()
+date <- gsub("-", "", date)
+
+# setwd(file.path(normalizePath(config$local_path), "precovid-analyses", "integrative"))
+# Load libraries
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/unsupervised_normalization_functions.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/gcp_functions.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/qc_report_aux_functions.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/config_session.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/association_analysis_methods.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/MetabolomicsLibrary.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/metabolomics_data_parsing_functions.R"))
+# source(file.path(normalizePath(config$general_shared_functions_library)))
+# 
+# repo_local_dir = file.path(config$precovid_repo_path, "data", "tmp")
+repo_local_dir = NULL
+library(here)
+here::i_am("figures/blood/final_figure_codes/Figure_S3/Fig_S3_B.Rmd")
+data_dir  <- here("figures", "blood", "final_figure_input_data_files")
+plot_dir  <- here("figures", "blood", "final_figures")
+output_data_dir <- here("figures", "blood", "final_output_files")
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+
+plot_metabolite_kinetics_pdf <- function(
+    repo_local_dir = NULL,
+    pdf_output_path,
+    selected_tissue = "blood",
+    gsutil_cmd = "gsutil"
+) {
+  # --- 1. Load required libraries ---
+  required_libs <- c(
+    "dplyr", "ggplot2", "tidyverse", "glue",
+    "MotrpacHumanPreSuspension", "MotrpacHumanPreSuspensionData",
+    "openxlsx"
+  )
+  missing_libs <- required_libs[!sapply(required_libs, requireNamespace, quietly = TRUE)]
+  if (length(missing_libs) > 0) {
+    stop(paste0("Missing packages: ", paste(missing_libs, collapse = ", "),
+                ". Please install them first."))
+  }
+  suppressPackageStartupMessages(lapply(required_libs, library, character.only = TRUE))
+  
+  plot_dir  <- dirname(pdf_output_path)
+  
+  if (!dir.exists(plot_dir)) {
+    dir.create(plot_dir, recursive = TRUE)
+    message(glue::glue("📂 Created Plot output directory: {plot_dir}"))
+  }
+  
+  # --- 2. Set colors ---
+  color_exercise <- MotrpacHumanPreSuspension::HUMAN_EXERCISE_GROUP_COLORS
+  color_resist <- color_exercise[["ADUResist"]]
+  color_endur <- color_exercise[["ADUEndur"]]
+  color_control <- color_exercise[["ADUControl"]]
+  
+  # --- 3. Load DA data ---
+  differential_analysis <- load_differential_analysis(
+    repo_local_dir = repo_local_dir,
+    selected_omes = "all",
+    selected_tissues = selected_tissue,
+    single_matrix = TRUE,
+    combine_with_featgene = TRUE,
+    epigen = FALSE,
+    gsutil = gsutil_cmd
+    
+  ) %>%
+    filter(contrast_type == "exercise_with_controls") %>%
+    mutate(
+      assay = if_else(str_detect(assay, "metab"), "metab", assay),
+      gene_symbol = if_else(assay == "metab", feature_id, gene_symbol)
+    )
+  
+  # --- 4. Filter for blood metabolites ---
+  differential_analysis_metab_targeted <- differential_analysis %>%
+    filter(tissue == "blood", assay == "metab") %>%
+    distinct(feature_id, p_value, randomGroupCode, Timepoint, .keep_all = TRUE)
+  
+  # --- 5. Compute significance for each group/timepoint ---
+  targeted_df_post_10_min_ADUEndur <- differential_analysis_metab_targeted %>%
+    filter(Timepoint == "post_10_min", randomGroupCode == "ADUEndur") %>%
+    mutate(sig = ifelse(adj_p_value < 0.05, "FDR Significant",
+                        ifelse(p_value < 0.05, "Nominal Significant", "Not Significant"))) %>%
+    arrange(desc(sig), desc(p_value))
+  
+  targeted_df_post_10_min_ADUResist <- differential_analysis_metab_targeted %>%
+    filter(Timepoint == "post_10_min", randomGroupCode == "ADUResist") %>%
+    mutate(sig = ifelse(adj_p_value < 0.05, "FDR Significant",
+                        ifelse(p_value < 0.05, "Nominal Significant", "Not Significant"))) %>%
+    arrange(desc(sig), desc(p_value))
+  
+  # --- 6. Define significant opposite-response features (placeholder logic) ---
+  # ⚠️ The object `post_10_min_targeted_df` wasn’t defined in your original code,
+  # so we’ll assume you meant to merge the two datasets:
+  post_10_min_targeted_df <- full_join(
+    targeted_df_post_10_min_ADUEndur %>% 
+      dplyr::select(feature_id, post_10_min_ADUEndur_logFC = logFC, 
+             sig_diff_post_10_min_ADUEndur = sig),
+    targeted_df_post_10_min_ADUResist %>% 
+      dplyr::select(feature_id, post_10_min_ADUResist_logFC = logFC, 
+             sig_diff_post_10_min_ADUResist = sig),
+    by = "feature_id"
+  )
+  
+  # Keep only those significant and opposite direction
+  significant_features_post_10_min <- post_10_min_targeted_df %>%
+    filter(sig_diff_post_10_min_ADUResist == "FDR Significant" &
+             sig_diff_post_10_min_ADUEndur == "FDR Significant") %>%
+    filter((post_10_min_ADUEndur_logFC > 0 & post_10_min_ADUResist_logFC < 0) |
+             (post_10_min_ADUEndur_logFC < 0 & post_10_min_ADUResist_logFC > 0)) %>%
+    distinct(feature_id, .keep_all = TRUE) %>%
+    mutate(diff = post_10_min_ADUEndur_logFC - post_10_min_ADUResist_logFC) %>%
+    arrange(diff)
+  
+  significant_feature_ids <- significant_features_post_10_min$feature_id
+  
+  # --- 7. Filter full dataset for these features ---
+  filtered_data <- differential_analysis_metab_targeted %>%
+    filter(Timepoint %in% c("pre_exercise", "post_10_min", "post_15_30_45_min",
+                            "post_24_hr", "post_3.5_4_hr")) %>%
+    filter(feature_id %in% significant_feature_ids &
+             randomGroupCode %in% c("ADUResist", "ADUEndur", "ADUControl")) %>%
+    distinct(feature_id, randomGroupCode, Timepoint, .keep_all = TRUE)
+  
+  # Add baseline
+  baseline_data <- filtered_data %>%
+    distinct(feature_id, randomGroupCode) %>%
+    mutate(Timepoint = "baseline", logFC = 0)
+  
+  filtered_data <- bind_rows(filtered_data, baseline_data)
+  
+  # --- 8. Label and order timepoints ---
+  timepoint_labels <- c(
+    "baseline" = "Pre-Exercise",
+    "pre_exercise" = "Pre-Exercise",
+    "during_20_min" = "During 20 Min",
+    "during_40_min" = "During 40 Min",
+    "post_10_min" = "Post 10 Min",
+    "post_15_30_45_min" = "Post 30 Min",
+    "post_3.5_4_hr" = "Post 3.5 Hour",
+    "post_24_hr" = "Post 24 Hour"
+  )
+  
+  filtered_data$Timepoint <- factor(filtered_data$Timepoint,
+                                    levels = c("baseline", "pre_exercise", "post_10_min",
+                                               "post_15_30_45_min", "post_3.5_4_hr", "post_24_hr"))
+  
+  # --- 9. Create plot ---
+  p <- ggplot(filtered_data, aes(x = Timepoint, y = logFC, color = randomGroupCode, group = randomGroupCode)) +
+    geom_line(size = 1) +
+    geom_point(size = 2) +
+    scale_color_manual(
+      values = c("ADUEndur" = color_endur, "ADUResist" = color_resist),
+      labels = c("ADUEndur" = "EE", "ADUResist" = "RE")
+    ) +
+    scale_x_discrete(labels = timepoint_labels) +
+    labs(
+      x = "Timepoint",
+      y = "logFC",
+      color = "Group",
+      title = ""
+    ) +
+    facet_wrap(~ feature_id, scales = "free_y") +
+    theme_minimal() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      strip.text = element_text(size = 11.5),
+      panel.spacing = unit(1, "lines")
+    )
+  
+  # --- 10. Save PDF safely ---
+  ggsave(
+    filename = pdf_output_path,
+    plot = p,
+    device = cairo_pdf,
+    width = 14,
+    height = 10,
+    units = "in",
+    limitsize = FALSE,
+    bg = "white"
+  )
+  
+  message("✅ Metabolite kinetics PDF saved to: ", pdf_output_path)
+  return(p)
+}
+
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+
+
+
+plot_metabolite_kinetics_pdf(
+  repo_local_dir = repo_local_dir,
+  pdf_output_path = file.path(plot_dir,"Figure_S3" ,"Figure_S3B.pdf"),
+  selected_tissue = "blood"
+)
+
+```
+

@@ -1,0 +1,431 @@
+---
+title: "Blood_Metabolomics_CMeans_Clustering_Plot_w_Cluster_members_counts"
+author: "Gaurav Tiwari"
+date: "2025-11-08"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+session_packages = c("dplyr", "ggplot2", "ggrepel", "stringr", "scales","tidyverse", "ComplexUpset","MotrpacHumanPreSuspension", "MotrpacHumanPreSuspensionData","ggpubr","grid")
+for (lib_name in session_packages){
+  tryCatch({library(lib_name,character.only = T)}, error = function(e) {
+    print(paste("Cannot load",lib_name,", please install"))
+  })
+}
+
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+
+theme_set(theme_minimal())
+```
+
+
+```{r session setup}
+# Save date in case output files requiring date version
+date <- Sys.Date()
+date <- gsub("-", "", date)
+
+# setwd(file.path(normalizePath(config$local_path), "precovid-analyses", "integrative"))
+# Load libraries
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/unsupervised_normalization_functions.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/gcp_functions.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/qc_report_aux_functions.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/config_session.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/association_analysis_methods.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/MetabolomicsLibrary.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/metabolomics_data_parsing_functions.R"))
+# source(file.path(normalizePath(config$general_shared_functions_library)))
+# repo_local_dir = file.path(config$precovid_repo_path, "data", "tmp")
+repo_local_dir = NULL
+library(here)
+here::i_am("figures/blood/final_figure_codes/Figure_2/Fig_2C.Rmd")
+data_dir       <- here("figures", "blood", "final_figure_input_data_files")
+plot_dir       <- here("figures", "blood", "final_figures")
+output_data_dir <- here("figures", "blood", "final_output_files")
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+
+plot_cmeans_single <- function(FCM,
+                               filename,
+                               keep_clusters,
+                               modality,
+                               min_membership = 0,
+                               common_ylim = TRUE,
+                               ncol = 4L,
+                               dpi = 250,
+                               excel_path = NULL,
+                               feature_label = "metabolites")
+{
+  if (class(FCM) != "fclust") {
+    stop("`FCM` must be an object of class 'fclust'. See documentation ",
+         "for details.")
+  }
+  
+  min_membership <- max(0, min(min_membership, 1, na.rm = TRUE))
+  
+  if (missing(keep_clusters)) {
+    keep_clusters <- as.integer(rownames(FCM[["centers"]]))
+  }
+  
+  if (!(modality %in% c("Endur", "Resist"))) {
+    stop("Invalid modality. Choose either 'Endur' or 'Resist'.")
+  }
+  
+  excel_dir <- dirname(excel_path)
+  plot_dir  <- dirname(filename)
+  
+  if (!dir.exists(excel_dir)) {
+    dir.create(excel_dir, recursive = TRUE)
+    message(glue::glue("📂 Created Excel output directory: {excel_dir}"))
+  }
+  
+  if (!dir.exists(plot_dir)) {
+    dir.create(plot_dir, recursive = TRUE)
+    message(glue::glue("📂 Created Plot output directory: {plot_dir}"))
+  }
+  
+  mem <- FCM[["membership"]][, keep_clusters, drop = FALSE]
+  centers <- FCM[["centers"]][keep_clusters, , drop = FALSE]
+  colnames(mem) <- rownames(centers) <- paste0("Cluster ", colnames(mem))
+  colnames(centers) <- sub("group_timepointADU([^ ]+) .*", "\\1", colnames(centers))
+  colnames(centers) <- paste0("timepoint_", colnames(centers))
+  
+  zmat <- FCM[["input"]]
+  colnames(zmat) <- sub("group_timepointADU([^ ]+) .*", "\\1", colnames(zmat))
+  colnames(zmat) <- paste0("timepoint_", colnames(zmat))
+  
+  ## Include pre_exercise timepoint for the selected modality
+  pre_ex <- matrix(data = 0, nrow = nrow(zmat), ncol = 1L)
+  rownames(pre_ex) <- rownames(zmat)
+  colnames(pre_ex) <- sprintf("timepoint_%s.pre_exercise", modality)
+  
+  zmat <- cbind(pre_ex, zmat)
+  zmat <- zmat[, grep(modality, colnames(zmat))]
+  
+  # Include a column of zeros in the centers
+  pre_ex_center <- matrix(data = 0, nrow = nrow(centers), ncol = 1L)
+  rownames(pre_ex_center) <- rownames(centers)
+  colnames(pre_ex_center) <- sprintf("timepoint_%s.pre_exercise", modality)
+  
+  centers <- cbind(centers, pre_ex_center)
+  centers <- centers[, grep(modality, colnames(centers))]
+  
+  cluster_assignment <- data.frame(feature = names(FCM$cluster),
+                                   cluster = paste0("Cluster ", FCM$cluster))
+  
+  z_df <- zmat %>%
+    as.data.frame() %>%
+    tibble::rownames_to_column("feature") %>%
+    tidyr::pivot_longer(cols = -feature,
+                        names_to = "timepoint",
+                        names_pattern = "timepoint_(.*)",
+                        values_to = "z") %>%
+    mutate(timepoint = gsub("(?<=\\d)_(?=\\d)", "/", timepoint, perl = TRUE),
+           timepoint = gsub("_", " ", timepoint),
+           timepoint = factor(timepoint, levels = unique(timepoint)))
+  
+  cluster_df <- mem %>%
+    as.data.frame() %>%
+    tibble::rownames_to_column("feature") %>%
+    tidyr::pivot_longer(cols = -feature,
+                        names_to = "cluster",
+                        values_to = "membership") %>%
+    filter(membership >= min_membership) %>%
+    inner_join(cluster_assignment, by = c("feature", "cluster")) %>%
+    mutate(cluster = factor(cluster, levels = rownames(centers)))
+  
+  df <- inner_join(z_df, cluster_df, by = "feature")  %>%
+    arrange(cluster, membership) %>%
+    mutate(feature = factor(feature, levels = unique(feature))) %>%
+    droplevels.data.frame() %>%
+    mutate(cluster = factor(cluster, levels = rownames(centers)))
+  
+  # Cluster centroids
+  center_df <- centers %>%
+    as.data.frame() %>%
+    tibble::rownames_to_column("cluster") %>%
+    tidyr::pivot_longer(cols = -cluster,
+                        names_to = "timepoint",
+                        names_pattern = "timepoint_(.*)",
+                        values_to = "center") %>%
+    mutate(timepoint = gsub("(?<=\\d)_(?=\\d)", "/", timepoint, perl = TRUE),
+           timepoint = gsub("_", " ", timepoint),
+           timepoint = factor(timepoint, levels = unique(timepoint)),
+           cluster = factor(cluster, levels = rownames(centers)))
+  
+  if (common_ylim) {
+    ylim <- range(df$z)
+  } else {
+    ylim <- rep(NA, 2L)
+  }
+  
+  df <- df %>%
+    mutate(timepoint = gsub("^(Endur|Resist)\\.", "", timepoint))%>%
+    mutate(timepoint = case_when(
+      timepoint == "pre exercise" ~ "Pre-Exercise",
+      timepoint == "during 20 min" ~ "During 20 Min",
+      timepoint == "during 40 min" ~ "During 40 Min",
+      timepoint == "post 10 min" ~ "Post 10 Min",
+      timepoint == "post 15/30/45 min" ~ "Post 30 Min",
+      timepoint == "post 3.5/4 hr" ~ "Post 3.5 Hour",
+      timepoint == "post 24 hr" ~ "Post 24 Hour",
+      TRUE ~ timepoint
+    ))
+  
+  center_df <- center_df %>%
+    mutate(timepoint = gsub("^(Endur|Resist)\\.", "", timepoint))%>%
+    mutate(timepoint = case_when(
+      timepoint == "pre exercise" ~ "Pre-Exercise",
+      timepoint == "during 20 min" ~ "During 20 Min",
+      timepoint == "during 40 min" ~ "During 40 Min",
+      timepoint == "post 10 min" ~ "Post 10 Min",
+      timepoint == "post 15/30/45 min" ~ "Post 30 Min",
+      timepoint == "post 3.5/4 hr" ~ "Post 3.5 Hour",
+      timepoint == "post 24 hr" ~ "Post 24 Hour",
+      TRUE ~ timepoint
+    ))
+  
+  timepoint_levels <- c("Pre-Exercise","Post 10 Min","Post 30 Min","Post 3.5 Hour","Post 24 Hour" )
+  df <- df %>%
+    mutate(timepoint = factor(timepoint, levels = timepoint_levels))
+  
+  center_df <- center_df %>%
+    mutate(timepoint = factor(timepoint, levels = timepoint_levels))
+  
+  df_list <- tidyr::nest(df, .by = cluster)
+  center_df_list <- tidyr::nest(center_df, .by = cluster)
+  
+  ## Iridescent color scheme
+  cmeans_palette <- c("#fefbe9", "#fcf7d5", "#f5f3c1", "#eaf0b5", "#ddecbf",
+                      "#d0e7ca", "#c2e3d2", "#b5ddd8", "#a8d8dc", "#9bd2e1",
+                      "#8dcbe4", "#81c4e7", "#7bbce7", "#7eb2e4", "#88a5dd",
+                      "#9398d2", "#9b8ac4", "#9d7db2", "#9a709e", "#906388",
+                      "#805770", "#684957", "#46353a")
+  
+  plotlist <- lapply(seq_len(nrow(df_list)), function(i) {
+    df_i <- df_list$data[[i]]
+    centroid_i <- center_df_list$data[[i]]
+    cluster_name <- as.character(df_list$cluster[i])
+    cluster_size <- nrow(df_i %>% distinct(feature))  # Count unique metabolites
+    
+    ggplot(df_i, aes(x = timepoint, y = z)) +
+      geom_line(aes(color = membership, group = feature)) +
+      geom_line(aes(x = timepoint, y = center, group = 1),
+                data = centroid_i, color = "black") +
+      annotate("text", x = 1, y = -Inf,
+               label = paste(cluster_size, feature_label),
+               hjust = 0, vjust = -1.2, size = 3.5, fontface = "bold") +
+      scale_x_discrete(name = NULL, expand = expansion(add = 0.2)) +
+      scale_y_continuous(limits = ylim) +
+      scale_color_gradientn(name = "Membership\nProbability",
+                            colors = cmeans_palette,
+                            values = seq(0, 1, length.out = length(cmeans_palette)),
+                            limits = c(0, 1), breaks = seq(0, 1, 0.2)) +
+      labs(y = NULL, title = cluster_name) +
+      theme_bw() +
+      theme(panel.grid = element_blank(),
+            strip.text = element_text(face = "bold", margin = ggplot2::margin(t = 3)),
+            plot.title = element_text(size = rel(0.9), face = "bold",
+                                      hjust = 0.5, margin = ggplot2::margin(b = 0)),
+            strip.background = element_blank(),
+            axis.title.y = element_text(color = "black", face = "bold",
+                                        margin = ggplot2::margin(t = 0, r = 8, b = 0, l = 0)),
+            axis.text.x = element_text(size = rel(0.9), color = "black",
+                                       angle = 90, vjust = 0.5, hjust = 1),
+            axis.text.y = element_text(color = "black"))
+  })
+  
+  
+  ncol <- min(length(plotlist), ncol)
+  nrow <- ceiling(length(plotlist) / ncol)
+  # Each cluster occupies a space that is 2x2 inches
+  height <- nrow * 2
+  width <- ncol * 2 + 0.5 # 0.5 = space for legend
+  
+  p <- ggarrange(plotlist = plotlist,
+                 ncol = ncol,
+                 nrow = nrow,
+                 common.legend = TRUE,
+                 legend = "right")
+  p <- annotate_figure(
+    p = p,
+    left = textGrob("Scaled Z-Score", rot = 90, vjust = 1,
+                    gp = gpar(fontsize = 11,
+                              fontface = "bold"))
+  )
+  
+  # Save image
+  ggsave(filename = filename, plot = p, height = height, width = width, dpi = dpi, bg = "white")
+  
+  # ============================
+  # Build cluster-members dataframe (columns = clusters, rows padded with NA)
+  # ============================
+  cluster_members_list <- split(cluster_assignment$feature, cluster_assignment$cluster)
+  cluster_members_list <- cluster_members_list[order(names(cluster_members_list))]
+
+  cluster_members_list <- lapply(cluster_members_list, function(features) {
+    cleaned <- gsub("^(metab|prot|rna)[[:space:]]+", "", features)
+    cleaned <- cleaned[!is.na(cleaned) & cleaned != ""]  # remove NAs or empty entries
+    cleaned
+  })
+  
+  # Find max length
+  max_len <- max(sapply(cluster_members_list, length))
+  
+  # Pad with NA safely to ensure equal column lengths
+  cluster_df <- setNames(
+    as.data.frame(
+      lapply(cluster_members_list, function(x) {
+        c(x, rep(NA, max_len - length(x)))
+      }),
+      stringsAsFactors = FALSE
+    ),
+    names(cluster_members_list)
+  )
+  
+  # Optionally write excel
+  if (!is.null(excel_path)) {
+    if (!requireNamespace("writexl", quietly = TRUE)) {
+      stop("Please install the 'writexl' package to write Excel output: install.packages('writexl')")
+    }
+    writexl::write_xlsx(list(Clusters = cluster_df), path = excel_path)
+  }
+
+  return(list(plot = p, clusters = cluster_df))
+}
+
+# requires: ggpubr, writexl (for excel writing)
+library(ggpubr)
+if (!requireNamespace("writexl", quietly = TRUE)) install.packages("writexl")
+
+
+combine_cmeans_outputs_stacked <- function(res_out, endur_out,
+                                           combined_pdf = "/path/to/combined_cmeans_plots.pdf",
+                                           combined_excel = "/path/to/combined_cmeans_clusters.xlsx") {
+  # --- Required packages ---
+  required_libs <- c("ggplot2", "ggpubr", "grid", "writexl", "dplyr", "tidyr", "tibble")
+  invisible(lapply(required_libs, function(pkg) {
+    if (!requireNamespace(pkg, quietly = TRUE)) install.packages(pkg)
+    library(pkg, character.only = TRUE)
+  }))
+  
+  excel_dir <- dirname(combined_excel)
+  plot_dir  <- dirname(combined_pdf)
+  
+  if (!dir.exists(excel_dir)) {
+    dir.create(excel_dir, recursive = TRUE)
+    message(glue::glue("📂 Created Excel output directory: {excel_dir}"))
+  }
+  
+  if (!dir.exists(plot_dir)) {
+    dir.create(plot_dir, recursive = TRUE)
+    message(glue::glue("📂 Created Plot output directory: {plot_dir}"))
+  }
+  
+  # --- 1. Prepare dataframes ---
+  df_res <- as.data.frame(res_out$clusters, stringsAsFactors = FALSE)
+  df_end <- as.data.frame(endur_out$clusters, stringsAsFactors = FALSE)
+  
+  names(df_res) <- paste0("RE_", names(df_res))
+  names(df_end) <- paste0("EE_", names(df_end))
+  
+  n1 <- nrow(df_res)
+  n2 <- nrow(df_end)
+  maxn <- max(n1, n2)
+  if (n1 < maxn) df_res[(n1 + 1):maxn, ] <- NA
+  if (n2 < maxn) df_end[(n2 + 1):maxn, ] <- NA
+  
+  combined_side_by_side <- dplyr::bind_cols(df_end, df_res)
+  
+  # --- 2. Write Excel file ---
+  writexl::write_xlsx(
+    x = list(
+      Combined_side_by_side = combined_side_by_side,
+      Endurance = df_end,
+      Resistance = df_res
+    ),
+    path = combined_excel
+  )
+  message("✅ Excel saved to: ", combined_excel)
+  
+  # --- 3. Arrange plots vertically with labels ---
+  # Use ggdraw for clean stacking with text labels
+  library(cowplot)
+  
+  # Title grobs
+  title_ee <- ggdraw() + draw_label("EE", fontface = "bold", size = 18, hjust = 0.5)
+  title_re <- ggdraw() + draw_label("RE", fontface = "bold", size = 18, hjust = 0.5)
+  
+  # Combine plots vertically with spacing
+  stacked_plot <- plot_grid(
+    title_ee, endur_out$plot,
+    title_re, res_out$plot,
+    ncol = 1,
+    rel_heights = c(0.08, 1, 0.08, 1)
+  )
+  
+  # --- 4. Save PDF ---
+  ggsave(
+    filename = combined_pdf,
+    plot = stacked_plot,
+    device = "pdf",
+    width = 12, height = 6
+  )
+  message("✅ PDF saved to: ", combined_pdf)
+  
+  # --- 5. Return combined objects ---
+  return(list(
+    combined_clusters_side_by_side = combined_side_by_side,
+    arranged_plot = stacked_plot,
+    pdf_path = combined_pdf,
+    excel_path = combined_excel
+  ))
+}
+
+
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+
+
+fcm3 <- MotrpacHumanPreSuspension::run_cmeans(
+  selected_tissues = "blood",
+  selected_omes = c("metab"),
+  num_clusters_blood = 4L,
+  modality = c("Endur"))
+
+fcm4 <- MotrpacHumanPreSuspension::run_cmeans(
+  selected_tissues = "blood",
+  selected_omes = c("metab"),
+  num_clusters_blood = 4L,
+  modality = c("Resist"))
+
+
+res_out <- plot_cmeans_single(
+  FCM = fcm4[["blood"]],
+  filename = file.path(plot_dir, "Figure_2"  ,"Fig2C_Metab_cmeans_resist.pdf"),
+  modality = "Resist",
+  min_membership = 0.3,
+  excel_path = file.path(output_data_dir, "Metab_cluster_members_resist.xlsx")
+)
+
+endur_out <- plot_cmeans_single(
+  FCM = fcm3[["blood"]],
+  filename = file.path(plot_dir, "Figure_2" , "Fig2C_Metab_cmeans_endur.pdf"),
+  modality = "Endur",
+  min_membership = 0.3,
+  excel_path = file.path(output_data_dir, "Metab_cluster_members_endur.xlsx")
+)
+
+out <- combine_cmeans_outputs_stacked(
+  res_out = res_out,
+  endur_out = endur_out,
+  combined_pdf   = file.path(plot_dir, "Figure_2","Fig2C_Metab_cmeans_combined.pdf"),
+  combined_excel = file.path(output_data_dir, "Metab_cmeans_combined_clusters.xlsx")
+)
+
+```
+

@@ -1,0 +1,266 @@
+---
+title: "Blood_Proteomics_Endurance_Sig40mins_EGFR_Correlation_Bar_Plots"
+author: "Gaurav Tiwari"
+date: "2025-11-08"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+session_packages = c("dplyr", "ggplot2", "ggrepel", "stringr", "scales","tidyverse", "ComplexUpset","MotrpacHumanPreSuspension", "MotrpacHumanPreSuspensionData", "glue","openxlsx")
+for (lib_name in session_packages){
+  tryCatch({library(lib_name,character.only = T)}, error = function(e) {
+    print(paste("Cannot load",lib_name,", please install"))
+  })
+}
+
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+
+theme_set(theme_minimal())
+```
+
+
+```{r session setup}
+# Save date in case output files requiring date version
+date <- Sys.Date()
+date <- gsub("-", "", date)
+
+# setwd(file.path(normalizePath(config$local_path), "precovid-analyses", "integrative"))
+# Load libraries
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/unsupervised_normalization_functions.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/gcp_functions.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/qc_report_aux_functions.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/config_session.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/association_analysis_methods.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/MetabolomicsLibrary.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/metabolomics_data_parsing_functions.R"))
+# source(file.path(normalizePath(config$general_shared_functions_library)))
+# 
+# repo_local_dir = file.path(config$precovid_repo_path, "data", "tmp")
+repo_local_dir = NULL
+library(here)
+here::i_am("figures/blood/final_figure_codes/Figure_S5/Fig_S5_A.Rmd")
+data_dir       <- here("figures", "blood", "final_figure_input_data_files")
+plot_dir       <- here("figures", "blood", "final_figures")
+output_data_dir <- here("figures", "blood", "final_output_files")
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+
+generate_protein_correlation_summary <- function(
+    repo_local_dir,
+    selected_tissue = "blood",
+    selected_ome = "prot-ol",
+    group_code = "ADUEndur",
+    timepoint = "during_40_min",
+    outcome_var = "egfr_labr",
+    output_prefix = "Protein_EGFR_Correlation",
+    figure_dir,
+    file_dir, 
+    output_format = "pdf",
+    gsutil_cmd = "gsutil"
+) {
+  
+  required_libs <- c(
+    "dplyr", "ggplot2", "tidyverse", "glue",
+    "MotrpacHumanPreSuspension", "MotrpacHumanPreSuspensionData",
+    "openxlsx"
+  )
+  missing_libs <- required_libs[!sapply(required_libs, requireNamespace, quietly = TRUE)]
+  if (length(missing_libs) > 0) {
+    stop(paste0("Missing packages: ", paste(missing_libs, collapse = ", "),
+                ". Please install them first."))
+  }
+  suppressPackageStartupMessages(lapply(required_libs, library, character.only = TRUE))
+  
+  valid_omes <- c("prot-ol", "metab", "transcript-rna-seq")
+  valid_groups <- c("ADUEndur", "ADUResist", "ADUControl")
+  
+  if (!(selected_ome %in% valid_omes)) {
+    message(glue::glue("⚠️ Skipping: '{selected_ome}' is not a valid omics type. Must be one of {toString(valid_omes)}."))
+    return(invisible(NULL))
+  }
+  
+  if (!(group_code %in% valid_groups)) {
+    message(glue::glue("⚠️ Skipping: '{group_code}' is not a valid group. Must be one of {toString(valid_groups)}."))
+    return(invisible(NULL))
+  }
+  
+
+  
+  if (!dir.exists(figure_dir)) {
+    dir.create(figure_dir, recursive = TRUE)
+    message(glue::glue("📂 Created Plot output directory: {figure_dir}"))
+  }
+  
+  if (!dir.exists(file_dir)) {
+    dir.create(file_dir, recursive = TRUE)
+    message(glue::glue("📂 Created Files output directory: {file_dir}"))
+  }
+  
+  # ----------------------------- #
+  # 3️⃣ Load differential analysis
+  # ----------------------------- #
+  differential_analysis <- load_differential_analysis(
+    repo_local_dir = repo_local_dir,
+    selected_omes = selected_ome,
+    selected_tissues = selected_tissue,
+    single_matrix = TRUE,
+    combine_with_featgene = TRUE,
+    epigen = FALSE
+  ) %>%
+    dplyr::filter(contrast_type == "exercise_with_controls")
+  
+  da_filtered <- differential_analysis %>%
+    dplyr::filter(randomGroupCode == group_code, Timepoint == timepoint)
+  
+  # ----------------------------- #
+  # 4️⃣ Load QC-normalized omics data
+  # ----------------------------- #
+  omes_data <- MotrpacHumanPreSuspensionData::load_qc(
+    selected_tissues = selected_tissue,
+    selected_omes = selected_ome,
+    epigen = FALSE,
+    gsutil = gsutil_cmd,
+    repo_local_dir = NULL,
+    load_acute_only = TRUE,
+    remove_unnamed_metab = TRUE,
+    remove_redundant_metab = TRUE,
+    verbose = TRUE
+  )
+  
+  sample_metadata <- omes_data[[selected_tissue]][[selected_ome]][["sample_metadata"]]
+  feature_metadata <- omes_data[[selected_tissue]][[selected_ome]][["feature_metadata"]]
+  qc_norm <- omes_data[[selected_tissue]][[selected_ome]][["qc_norm"]]
+  
+  df_qc_norm <- as.data.frame(t(qc_norm))
+  df_qc_norm$vialLabel <- row.names(df_qc_norm)
+  df_qc_norm <- df_qc_norm[, c("vialLabel", setdiff(names(df_qc_norm), "vialLabel"))]
+  
+  df_sample <- merge(sample_metadata, df_qc_norm, by = "vialLabel")
+  df_sample <- df_sample[df_sample$Timepoint == "pre_exercise",]
+  
+  # ----------------------------- #
+  # 5️⃣ Merge with clinical data
+  # ----------------------------- #
+  lab_data <- MotrpacHumanPreSuspensionData::cln_raw_local_lab_results[["data"]] %>%
+    dplyr::select(pid, visit_code, all_of(outcome_var)) %>%
+    dplyr::filter(visit_code == "ADU_SCP")
+  
+  df_merged <- merge(lab_data, df_sample, by = "pid")
+  
+  # ----------------------------- #
+  # 6️⃣ Mapping for protein IDs
+  # ----------------------------- #
+  mapping <- MotrpacHumanPreSuspensionData::HUMAN_FEATURE_TO_GENE %>%
+    filter(assay == selected_ome) %>%
+    dplyr::select(feature_id, uniprot, gene_symbol)
+  
+  protein_list <- mapping$feature_id
+  
+  # ----------------------------- #
+  # 7️⃣ Correlation Calculation
+  # ----------------------------- #
+  calculate_protein_correlation_individual <- function(df, protein_list, outcome, mapping_df = NULL) {
+    protein_list <- intersect(protein_list, colnames(df))
+    cor_values <- sapply(protein_list, function(prot) {
+      cor(df[[prot]], df[[outcome]], use = "complete.obs")
+    })
+    p_values <- sapply(protein_list, function(prot) {
+      temp <- df[, c(outcome, prot)]
+      temp <- temp[complete.cases(temp), ]
+      if (nrow(temp) < 3) return(NA)
+      cor.test(temp[[prot]], temp[[outcome]], method = "pearson")$p.value
+    })
+    n_obs <- sapply(protein_list, function(prot) {
+      sum(complete.cases(df[, c(prot, outcome)]))
+    })
+    cor_df <- data.frame(feature_id = protein_list,
+                         correlation = cor_values,
+                         p_value_corr = p_values,
+                         n_obs = n_obs,
+                         stringsAsFactors = FALSE)
+    if (!is.null(mapping_df)) {
+      cor_df <- merge(mapping_df, cor_df, by = "feature_id")
+    }
+    cor_df
+  }
+  
+  cor_df_full <- calculate_protein_correlation_individual(df_merged, protein_list, outcome_var, mapping)
+  
+  cor_df_full_ex <- merge(
+    cor_df_full,
+    da_filtered[, c("feature_id", "p_value", "adj_p_value")],
+    by = "feature_id"
+  ) %>% filter(!is.na(correlation))
+  
+  # ----------------------------- #
+  # 8️⃣ Save correlation data
+  # ----------------------------- #
+  output_csv <- file.path(file_dir, paste0(output_prefix, "_correlations.csv"))
+  write.csv(cor_df_full, output_csv, row.names = FALSE)
+  
+  # ----------------------------- #
+  # 9️⃣ Plot significant correlations
+  # ----------------------------- #
+  df_sig <- cor_df_full_ex %>% filter(adj_p_value <= 0.05)
+  df_sig$gene_symbol <- as.character(df_sig$gene_symbol)
+  if (nrow(df_sig) > 0) {
+    df_sig <- df_sig %>%
+      mutate(label = ifelse(is.na(gene_symbol), feature_id, gene_symbol)) %>%
+      arrange(desc(correlation)) %>%
+      mutate(label = factor(label, levels = label))
+    df_sig$label <- factor(df_sig$label, levels = df_sig$label)
+    
+  p <- ggplot(df_sig, aes(x = label, y = correlation, fill = correlation > 0)) +
+      geom_bar(stat = "identity") +
+      scale_fill_manual(values = c("TRUE" = "blue", "FALSE" = "red")) +
+      theme_minimal() +
+      labs(title = "",
+           x = "Protein Assay", y = "Correlation") +
+      theme(
+        legend.position = "none",
+        axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5,
+                                   size = 4, face = "bold"),
+        axis.text.y = element_text(size = 6, face = "bold"),
+        axis.title.x = element_text(size = 10, face = "bold"),
+        axis.title.y = element_text(size = 10, face = "bold"),
+        plot.title = element_text(size = 12, face = "bold", hjust = 0.5)
+      )
+    output_plot <- file.path(figure_dir, paste0(output_prefix, "_barplot.", output_format))
+    ggsave(output_plot, plot = p, width = 8, height = 4, dpi = 300)
+    }else {
+      message("⚠️ No significant correlations found.")}
+
+  
+  message(glue::glue("✅ Saved correlation table: {output_csv}"))
+  message(glue::glue("✅ Saved correlation plot: {figure_dir}"))
+  
+  invisible(list(correlation_data = cor_df_full_ex,
+                 correlation_file = output_csv,
+                 plot_file = output_plot))
+}
+
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+
+
+
+generate_protein_correlation_summary(
+  repo_local_dir = repo_local_dir,
+  selected_tissue = "blood",
+  selected_ome = "prot-ol",
+  group_code = "ADUEndur",
+  timepoint = "during_40_min",
+  outcome_var = "egfr_labr",
+  output_prefix = "FigureS5A",
+  figure_dir = file.path(plot_dir,"Figure_S5"),
+  file_dir = output_data_dir,
+  output_format = "pdf"
+)
+
+```
+

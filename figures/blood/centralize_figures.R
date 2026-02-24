@@ -50,7 +50,7 @@ names(files) <- paste0(
 )
 
 # Central location to save the files (relative to precovid-analyses/)
-file_dir <- "figures/blood/final_figure_files"
+file_dir <- "figures/blood/final_figures"
 
 if (!dir.exists(file_dir))
   dir.create(file_dir)

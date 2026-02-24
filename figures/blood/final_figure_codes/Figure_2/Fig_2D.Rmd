@@ -1,0 +1,101 @@
+---
+title: "Blood_Metabolomics_Cluster_Enrichment_Plot"
+author: "Gaurav Tiwari"
+date: "2025-11-08"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+session_packages = c("magick","MotrpacHumanPreSuspension","tidyverse","UpSetR","Mfuzz","repfdr","MotrpacRatTraining6mo","pdftools")
+for (lib_name in session_packages){
+  tryCatch({library(lib_name,character.only = T)}, error = function(e) {
+    print(paste("Cannot load",lib_name,", please install"))
+  })
+}
+
+
+
+
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+
+theme_set(theme_minimal())
+```
+
+
+```{r session setup}
+# Save date in case output files requiring date version
+date <- Sys.Date()
+date <- gsub("-", "", date)
+
+# setwd(file.path(normalizePath(config$local_path), "precovid-analyses", "integrative"))
+# Load libraries
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/unsupervised_normalization_functions.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/gcp_functions.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/qc_report_aux_functions.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/config_session.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/association_analysis_methods.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/MetabolomicsLibrary.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/metabolomics_data_parsing_functions.R"))
+# source(file.path(normalizePath(config$general_shared_functions_library)))
+# repo_local_dir = file.path(config$precovid_repo_path, "data", "tmp")
+repo_local_dir = NULL
+library(here)
+here::i_am("figures/blood/final_figure_codes/Figure_2/Fig_2D.Rmd")
+data_dir       <- here("figures", "blood", "final_figure_input_data_files")
+plot_dir       <- here("figures", "blood", "final_figures")
+output_data_dir <- here("figures", "blood", "final_output_files")
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+
+
+plot_dir <- file.path(plot_dir, "Figure_2")
+
+if (!dir.exists(plot_dir)) {
+  dir.create(plot_dir, recursive = TRUE)
+  message(glue::glue("📂 Created Plot output directory: {plot_dir}"))
+}
+  
+
+fcm3 <- MotrpacHumanPreSuspension::run_cmeans(
+  selected_tissues = "blood",
+  selected_omes = c("metab"),
+  num_clusters_blood = 4L,
+  modality = c("Endur"))
+
+fcm4 <- MotrpacHumanPreSuspension::run_cmeans(
+  selected_tissues = "blood",
+  selected_omes = c("metab"),
+  num_clusters_blood = 4L,
+  modality = c("Resist"))
+
+
+res_metab_blood_cluster_fcm3_endur <- MotrpacHumanPreSuspension::run_cluster_cameraPR(fcm3,selected_omes = "metab", selected_tissues = "blood")
+res_metab_blood_cluster_fcm4_resist <- MotrpacHumanPreSuspension::run_cluster_cameraPR(fcm4,selected_omes = "metab", selected_tissues = "blood")
+
+p3 <- plot_cluster_enrichment(res_metab_blood_cluster_fcm3_endur, selected_tissues = c("blood"), selected_ome = c("metab"),
+                              padj_cutoff = 0.05,
+                              n_top = 6L,
+                              column_title = NULL,
+                              filename = file.path(plot_dir, "Figure2D_Endur.pdf"))
+
+
+p4 <- plot_cluster_enrichment(res_metab_blood_cluster_fcm4_resist, selected_tissues = c("blood"), selected_ome = c("metab"),
+                              padj_cutoff = 0.05,
+                              n_top = 6L,
+                              column_title = NULL,
+                              filename = file.path(plot_dir,"Figure2D_Resist.pdf"))
+
+
+img1 <- image_read_pdf(file.path(plot_dir,"Figure2D_Endur.pdf"), density = 600)
+img2 <- image_read_pdf(file.path(plot_dir,"Figure2D_Resist.pdf"), density = 600)
+
+combined_img <- image_append(c(img1, img2), stack = TRUE)
+
+# Save as PDF
+output_path <- file.path(plot_dir,"Figure2D.pdf")
+image_write(combined_img, path = output_path, format = "pdf")
+
+```

@@ -1,0 +1,471 @@
+---
+title: "Blood_Proteomics_Sig_post_3.5_hr_Genes_Muscle_Adipose_Heatmap"
+author: "Gaurav Tiwari"
+date: "2025-11-08"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+session_packages = c("dplyr", "ggplot2", "ggrepel", "stringr", "scales","tidyverse", "ComplexUpset","MotrpacHumanPreSuspension", "MotrpacHumanPreSuspensionData","tidyr", "ComplexHeatmap", "circlize", "RColorBrewer","grid", "openxlsx", "purrr","grDevices")
+for (lib_name in session_packages){
+  tryCatch({library(lib_name,character.only = T)}, error = function(e) {
+    print(paste("Cannot load",lib_name,", please install"))
+  })
+}
+
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+
+theme_set(theme_minimal())
+```
+
+
+```{r session setup}
+# Save date in case output files requiring date version
+date <- Sys.Date()
+date <- gsub("-", "", date)
+
+# setwd(file.path(normalizePath(config$local_path), "precovid-analyses", "integrative"))
+# Load libraries
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/unsupervised_normalization_functions.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/gcp_functions.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/qc_report_aux_functions.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/config_session.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/association_analysis_methods.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/MetabolomicsLibrary.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/metabolomics_data_parsing_functions.R"))
+# source(file.path(normalizePath(config$general_shared_functions_library)))
+# 
+# repo_local_dir = file.path(config$precovid_repo_path, "data", "tmp")
+repo_local_dir = NULL
+library(here)
+here::i_am("figures/blood/final_figure_codes/Figure_S6/Fig_S6_A.Rmd")
+data_dir       <- here("figures", "blood", "final_figure_input_data_files")
+plot_dir       <- here("figures", "blood", "final_figures")
+output_data_dir <- here("figures", "blood", "final_output_files")
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+
+generate_heatmap_interactive5 <- function(
+    repo_local_dir,
+    figure_path,
+    timepoint = "post_3.5_4_hr"
+) {
+  
+  # ---- Load required libraries ----
+  required_libs <- c(
+    "dplyr", "tidyr", "ComplexHeatmap", "circlize", "RColorBrewer",
+    "grid", "openxlsx", "stringr", "purrr"
+  )
+  suppressPackageStartupMessages(lapply(required_libs, library, character.only = TRUE))
+  
+  plot_dir  <- dirname(figure_path)
+  
+  if (!dir.exists(plot_dir)) {
+    dir.create(plot_dir, recursive = TRUE)
+    message(glue::glue("📂 Created Plot output directory: {plot_dir}"))
+  }
+  
+  # ---- Step 1: Load DA data ----
+  df_da_full <- load_differential_analysis(
+    repo_local_dir = repo_local_dir,
+    selected_omes = "all",
+    selected_tissues = "all",
+    single_matrix = TRUE,
+    combine_with_featgene = TRUE,
+    epigen = FALSE
+  ) %>%
+    filter(contrast_type == "exercise_with_controls") %>%
+    mutate(
+      assay = if_else(str_detect(assay, "metab"), "metab", assay),
+      gene_symbol = if_else(assay == "metab", feature_id, gene_symbol)
+    )
+  
+  color_exercise <- MotrpacHumanPreSuspension::HUMAN_EXERCISE_GROUP_COLORS
+  color_resist <- color_exercise[["ADUResist"]]
+  color_endur  <- color_exercise[["ADUEndur"]]
+  color_control <- color_exercise[["ADUControl"]]
+  
+  # ---- Step 2: Split DA data by tissue and assay ----
+  da_fil_data_bp <- df_da_full %>% filter(tissue == "blood", assay == "prot-ol")
+  da_fil_data_br <- df_da_full %>% filter(tissue == "blood", assay == "transcript-rna-seq")
+  da_fil_data_mr <- df_da_full %>% filter(tissue == "muscle", assay == "transcript-rna-seq")
+  da_fil_data_ar <- df_da_full %>% filter(tissue == "adipose", assay == "transcript-rna-seq")
+  da_fil_data_mp <- df_da_full %>% filter(tissue == "muscle", assay == "prot-pr")
+  da_fil_data_ap <- df_da_full %>% filter(tissue == "adipose", assay == "prot-pr",feature_id != "P04233-2") 
+  
+  # ---- Step 3: Select significant secreted proteins ----
+  significant_assays <- da_fil_data_bp %>%
+    filter(Timepoint == timepoint, adj_p_value < 0.05) %>%
+    dplyr::select(gene_symbol) %>%
+    dplyr::rename(Genes = gene_symbol) %>%
+    distinct()
+  
+  gene_data <- drop_na(data.frame(Genes = as.character(significant_assays$Genes)))
+  
+  # ---- Helper function to extract DA ----
+  extract_and_process <- function(data, gene_column, tissue_label, gene_data) {
+    if (is.null(data) || nrow(data) == 0) return(NULL)
+    
+    if (is.data.frame(gene_data)) {
+      genes <- gene_data$Genes
+    } else {
+      genes <- as.character(gene_data)
+    }
+    
+    data %>%
+      filter(.data[[gene_column]] %in% genes) %>%
+      dplyr::select(all_of(gene_column), adj_p_value, logFC, randomGroupCode, Timepoint) %>%
+      dplyr::rename(feature_id = all_of(gene_column)) %>%
+      mutate(Tissue_ome = tissue_label)
+  }
+  
+  # ---- Step 4: Split genes into halves for divided heatmap ----
+  n_genes <- nrow(gene_data)
+  half <- ceiling(n_genes / 2)
+  genes1 <- gene_data$Genes[1:half]
+  genes2 <- gene_data$Genes[(half+1):n_genes]
+  
+  motrpactimepoint_colors <- MotrpacHumanPreSuspension::HUMAN_ACUTE_TIMEPOINT_COLORS
+  
+  timepoint_labels <- c(
+    "during_20_min" = "During 20 Min",
+    "during_40_min" = "During 40 Min",
+    "post_10_min" = "Post 10 Min",
+    "post_15_30_45_min" = "Post 15/30/45 Min",
+    "post_3.5_4_hr" = "Post 3.5/4 Hour",
+    "post_24_hr" = "Post 24 Hour"
+  )
+  
+  # Keep only timepoints that exist
+  motrpactimepoint_colors <- motrpactimepoint_colors[names(motrpactimepoint_colors) %in% names(timepoint_labels)]
+  
+  # Global Timepoint → Label → Color map
+  time_colors <- setNames(
+    motrpactimepoint_colors[names(motrpactimepoint_colors)],
+    timepoint_labels[names(motrpactimepoint_colors)]
+  )
+  
+  # ---- Global Tissue Colors ----
+  tissue_palette <- c(
+    "blood_protein"   = "#8dd3c7",
+    "muscle_rna"      = "#bebada",
+    "adipose_rna"     = "#fb8072",
+    "muscle_protein"  = "#80b1d3",
+    "adipose_protein" = "#fdb462"
+  )
+  
+  # You want to keep the full palette globally:
+  tissue_colors <- tissue_palette
+  
+  
+  build_ht <- function(genes_subset, side = "left", show_top_names = TRUE) {
+    da_bp <- extract_and_process(da_fil_data_bp, "gene_symbol", "blood_protein", genes_subset)
+    da_mr <- extract_and_process(da_fil_data_mr, "gene_symbol", "muscle_rna", genes_subset)
+    da_ar <- extract_and_process(da_fil_data_ar, "gene_symbol", "adipose_rna", genes_subset)
+    da_mp <- extract_and_process(da_fil_data_mp, "gene_symbol", "muscle_protein", genes_subset)
+    da_ap <- extract_and_process(da_fil_data_ap, "gene_symbol", "adipose_protein", genes_subset) 
+    
+    df_combined <- bind_rows(da_bp, da_mr, da_ar, da_mp, da_ap)
+    if (nrow(df_combined) == 0) return(NULL)
+    
+    df_combined <- df_combined %>% mutate(row_id = paste(feature_id, Tissue_ome, sep = "|"))
+    
+    all_groups <- unique(df_combined$randomGroupCode)
+    all_timepoints <- unique(df_combined$Timepoint)
+    all_tissue_omes <- unique(df_combined$Tissue_ome)
+    
+    all_combos <- expand.grid(
+      feature_id = genes_subset,
+      Tissue_ome = all_tissue_omes,
+      randomGroupCode = all_groups,
+      Timepoint = all_timepoints,
+      stringsAsFactors = FALSE
+    ) %>% mutate(row_id = paste(feature_id, Tissue_ome, sep = "|"))
+    
+    df_combined <- all_combos %>%
+      left_join(df_combined, by = c("feature_id","Tissue_ome","randomGroupCode","Timepoint","row_id"))
+    
+    df_combined <- df_combined %>%
+      mutate(
+        logFC = as.numeric(logFC),
+        adj_p_value = as.numeric(adj_p_value)
+      )
+    
+    logFC_mat <- df_combined %>%
+      pivot_wider(id_cols = row_id,
+                  names_from = c(randomGroupCode, Timepoint),
+                  values_from = logFC) %>%
+      column_to_rownames("row_id") %>%
+      as.matrix()
+    
+    pval_mat <- df_combined %>%
+      pivot_wider(id_cols = row_id,
+                  names_from = c(randomGroupCode, Timepoint),
+                  values_from = adj_p_value) %>%
+      column_to_rownames("row_id") %>%
+      as.matrix()
+    
+    logFC_mat <- logFC_mat[, colSums(!is.na(logFC_mat)) > 0, drop = FALSE]
+    pval_mat  <- pval_mat[, colSums(!is.na(pval_mat)) > 0, drop = FALSE]
+    
+    # col metadata
+    col_parts <- strsplit(colnames(logFC_mat), "_")
+    col_groups <- sapply(col_parts, `[`, 1)
+    col_timepoints <- sapply(col_parts, function(x) paste(x[-1], collapse = "_"))
+    
+    timepoint_labels <- c(
+      "during_20_min" = "During 20 Min",
+      "during_40_min" = "During 40 Min",
+      "post_10_min" = "Post 10 Min",
+      "post_15_30_45_min" = "Post 15/30/45 Min",
+      "post_3.5_4_hr" = "Post 3.5/4 Hour",
+      "post_24_hr" = "Post 24 Hour"
+    )
+    col_timepoints <- ifelse(col_timepoints %in% names(timepoint_labels),
+                             timepoint_labels[col_timepoints],
+                             col_timepoints)
+    
+    
+    tissue_order <- unique(df_combined$Tissue_ome)
+    tissue_colors_subset <- tissue_colors[tissue_order]
+    
+    feature_order <- unique(gsub("\\|.*", "", rownames(logFC_mat)))
+    feature_colors <- setNames(colorRampPalette(RColorBrewer::brewer.pal(8, "Set2"))(length(feature_order)), feature_order)
+    
+    column_order <- order(col_groups, match(col_timepoints, unname(timepoint_labels), nomatch = length(timepoint_labels) + 1))
+    logFC_mat <- logFC_mat[, column_order, drop = FALSE]
+    pval_mat  <- pval_mat[, column_order, drop = FALSE]
+    col_groups <- col_groups[column_order]
+    col_timepoints <- col_timepoints[column_order]
+    
+    group_display <- c("ADUEndur" = "EE", "ADUResist" = "RE")
+    group_colors <- c("EE" = color_endur, "RE" = color_resist)
+    
+    
+    if (side == "left") {
+      col_annot <- HeatmapAnnotation(
+        Group = factor(group_display[col_groups], levels = c("EE", "RE")),
+        Timepoint = factor(col_timepoints, levels = unname(timepoint_labels)),
+        col = list(Group = group_colors, Timepoint = time_colors),
+        show_annotation_name = FALSE,
+        annotation_name_side = "left",
+        show_legend = FALSE,
+        annotation_name_gp = gpar(fontsize = 16, fontface = "bold")
+      )
+    } else {
+      col_annot <- HeatmapAnnotation(
+        Group = factor(group_display[col_groups], levels = c("EE", "RE")),
+        Timepoint = factor(col_timepoints, levels = unname(timepoint_labels)),
+        col = list(Group = group_colors, Timepoint = time_colors),
+        show_annotation_name = FALSE,
+        annotation_name_side = "left",
+        show_legend = FALSE,
+        annotation_name_gp = gpar(fontsize = 16, fontface = "bold"),
+        annotation_legend_param = list(
+          Group = list(
+            title_gp = gpar(fontsize = 18, fontface = "bold"),
+            labels_gp = gpar(fontsize = 14)
+          ),
+          Timepoint = list(
+            title_gp = gpar(fontsize = 16, fontface = "bold"),
+            labels_gp = gpar(fontsize = 12, fontface = "bold")
+          )
+        )
+      )
+    }
+    
+    
+    if (side == "left") {
+      row_annot <- rowAnnotation(
+        Tissue  = factor(gsub(".*\\|", "", rownames(logFC_mat)), levels = tissue_order),
+        col = list(Tissue = tissue_colors),
+        show_annotation_name = FALSE,
+        show_legend = if (side == "right") FALSE else FALSE,  # legend only once
+        annotation_name_gp = gpar(fontsize = 16, fontface = "bold"),
+        annotation_legend_param = list(
+          Tissue = list(
+            title_gp = gpar(fontsize = 20, fontface = "bold"),
+            labels_gp = gpar(fontsize = 16, fontface = "bold")
+          )
+        )
+      )
+    } else {
+      row_annot <- rowAnnotation(
+        Tissue  = factor(gsub(".*\\|", "", rownames(logFC_mat)), levels = tissue_order),
+        col = list(Tissue = tissue_colors),
+        show_annotation_name = FALSE,
+        show_legend = if (side == "right") FALSE else FALSE,  # legend only once
+        annotation_name_gp = gpar(fontsize = 16, fontface = "bold"),
+        annotation_legend_param = list(
+          Tissue = list(
+            title_gp = gpar(fontsize = 20, fontface = "bold"),
+            labels_gp = gpar(fontsize = 16, fontface = "bold")
+          )
+        )
+      )
+    }
+    
+    all_na_rows <- rowSums(!is.na(logFC_mat)) == 0
+    return(list(
+      heatmap = Heatmap(
+      logFC_mat,
+      col = colorRamp2(
+        c(min(logFC_mat, na.rm = TRUE), 0, max(logFC_mat, na.rm = TRUE)),
+        c("blue", "white", "red")
+      ),
+      column_split = col_groups,
+      cluster_columns = FALSE,
+      column_order = 1:ncol(logFC_mat),
+      column_labels = NULL,
+      column_names_rot = 75,
+      row_split = factor(gsub("\\|.*", "", rownames(logFC_mat))),
+      cluster_rows = FALSE,
+      show_row_names = FALSE,
+      show_column_names = FALSE,
+      row_title_side = "left", 
+      row_labels = gsub("\\|.*", "", rownames(logFC_mat)),
+      top_annotation = col_annot,
+      row_title_rot = 0, 
+      row_title_gp = gpar(fontsize = 24, fontface = "bold"),
+      left_annotation  = row_annot,
+      # right_annotation = if(side == "right") row_annot else NULL,
+      column_title = NULL,
+      column_title_gp = gpar(fontsize = 16, fontface = "bold"),
+      column_names_gp = gpar(fontsize = 18, fontface = "bold"),
+      border = TRUE,
+      show_heatmap_legend = FALSE,
+      heatmap_legend_param = list(
+        title = "logFC",
+        title_gp = gpar(fontsize = 14, fontface = "bold"),
+        labels_gp = gpar(fontsize = 12)),
+      width = unit(8, "in"),
+      cell_fun = function(j, i, x, y, width, height, fill) {
+        if (is.na(logFC_mat[i, j])) {
+          if (all_na_rows[i]) {
+            grid.rect(x, y, width, height, gp = gpar(fill = "#818589", col = NA))
+          } else {
+            grid.rect(x, y, width, height, gp = gpar(fill = "lightgray", col = NA))
+          }
+        }
+        if (!is.na(pval_mat[i, j]) && pval_mat[i, j] < 0.05) {
+          grid.text("*", x, y, gp = gpar(fontsize = 12, col = "black"))
+        }
+      }
+    ),
+  logFC_range = range(logFC_mat, na.rm = TRUE)
+  ))}
+  
+  ht1_obj <- build_ht(genes1, side = "left", show_top_names = TRUE)
+  ht2_obj <- build_ht(genes2, side = "right", show_top_names = FALSE)
+  ht_full <- build_ht(gene_data$Genes, side = "left", show_top_names = TRUE)
+  
+  ht1 <- ht1_obj$heatmap
+  ht2 <- ht2_obj$heatmap
+  
+  logFC_min <- min(ht1_obj$logFC_range[1], ht2_obj$logFC_range[1],ht1_obj$logFC_range[2], ht2_obj$logFC_range[2])
+  logFC_max <- max(ht1_obj$logFC_range[1], ht2_obj$logFC_range[1],ht1_obj$logFC_range[2], ht2_obj$logFC_range[2])
+  
+  # na_legend <- Legend(
+  #   labels = c("Not measured", "Not detected"),
+  #   legend_gp = gpar(fill = c("lightgray", "#818589")),
+  #   title = "Missing Data"
+  # )
+  
+  lgd_group <- Legend(
+    title = "Group",
+    at = c("EE", "RE"),
+    legend_gp = gpar(fill = c(color_endur, color_resist)),
+    title_gp = gpar(fontsize = 20, fontface = "bold"),  # bigger title
+    labels_gp = gpar(fontsize = 16) 
+  )
+  
+  # # Timepoint legend
+  lgd_timepoint <- Legend(
+    title = "Timepoint",
+    at = names(time_colors),
+    legend_gp = gpar(fill = unname(time_colors)),
+    title_gp = gpar(fontsize = 20, fontface = "bold"),  # bigger title
+    labels_gp = gpar(fontsize = 16) 
+  )
+  
+  #Tissue legend
+  lgd_tissue <- Legend(
+    title = "Tissue",
+    at = names(tissue_colors),
+    legend_gp = gpar(fill = unname(tissue_colors)),
+    title_gp = gpar(fontsize = 20, fontface = "bold"),  # bigger title
+    labels_gp = gpar(fontsize = 16) 
+  )
+  
+  # logFC legend
+  lgd_logFC <- Legend(
+    title = "logFC",
+    col_fun = colorRamp2(c(logFC_min, 0, logFC_max), c("blue", "white", "red")),
+    title_gp = gpar(fontsize = 20, fontface = "bold"),  # bigger title
+    labels_gp = gpar(fontsize = 16) 
+  )
+  
+  # Missing data legend
+  lgd_missing <- Legend(
+    title = "Missing Data",
+    labels = c("Not measured", "Not detected"),
+    legend_gp = gpar(fill = c("lightgray", "#818589")),
+    title_gp = gpar(fontsize = 20, fontface = "bold"),  # bigger title
+    labels_gp = gpar(fontsize = 16) 
+  )
+  
+  # Combine in order
+  combined_legends <- packLegend(
+    lgd_group,
+    lgd_timepoint,
+    lgd_tissue,
+    lgd_logFC,
+    lgd_missing,
+    direction = "vertical"
+  )
+  
+  
+  draw_divided <- function() {
+    grid.newpage()
+    # Reduce space between heatmaps
+    pushViewport(viewport(layout=grid.layout(1, 2, widths = unit(c(0.44, 0.44), "npc"))))
+    
+    pushViewport(viewport(layout.pos.col=1))
+    draw(ht1, newpage=FALSE, heatmap_legend_list = NULL)
+    upViewport()
+    
+    pushViewport(viewport(layout.pos.col=2))
+    draw(ht2, newpage=FALSE, annotation_legend_list = list(combined_legends),
+         annotation_legend_side="right", heatmap_legend_list = NULL,
+         merge_legends = TRUE, heatmap_legend_side="right")
+    upViewport()
+  }
+  
+  # ---- Save to PDF ----
+  # pdf(file = figure_path, width = 26, height = 20)  # adjust size as needed
+  # draw_divided()
+  # dev.off()
+  
+  cairo_pdf(file = figure_path, width = 26, height = 20)
+  draw_divided()
+  dev.off()
+}
+
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+
+
+
+generate_heatmap_interactive5(
+  repo_local_dir = repo_local_dir,
+  figure_path = file.path(plot_dir, "Figure_S6" ,"FigS6A.pdf"),
+  timepoint = "post_3.5_4_hr"
+)
+
+```
+

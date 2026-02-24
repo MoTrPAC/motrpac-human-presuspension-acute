@@ -1,0 +1,277 @@
+---
+title: "Blood_Proteomics_Secreted_Summary_Bar_Plot"
+author: "Gaurav Tiwari"
+date: "2025-11-08"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+session_packages = c("dplyr", "ggplot2", "ggrepel", "stringr", "scales","tidyverse", "ComplexUpset","MotrpacHumanPreSuspension", "MotrpacHumanPreSuspensionData","openxlsx")
+for (lib_name in session_packages){
+  tryCatch({library(lib_name,character.only = T)}, error = function(e) {
+    print(paste("Cannot load",lib_name,", please install"))
+  })
+}
+
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+
+theme_set(theme_minimal())
+```
+
+
+```{r session setup}
+# Save date in case output files requiring date version
+date <- Sys.Date()
+date <- gsub("-", "", date)
+
+# setwd(file.path(normalizePath(config$local_path), "precovid-analyses", "integrative"))
+# Load libraries
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/unsupervised_normalization_functions.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/gcp_functions.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/qc_report_aux_functions.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/config_session.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/association_analysis_methods.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/MetabolomicsLibrary.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/metabolomics_data_parsing_functions.R"))
+# source(file.path(normalizePath(config$general_shared_functions_library)))
+# repo_local_dir = file.path(config$precovid_repo_path, "data", "tmp")
+repo_local_dir = NULL
+library(here)
+here::i_am("figures/blood/final_figure_codes/Figure_5/Fig_5C.Rmd")
+data_dir       <- here("figures", "blood", "final_figure_input_data_files")
+plot_dir       <- here("figures", "blood", "final_figures")
+output_data_dir <- here("figures", "blood", "final_output_files")
+
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+
+generate_secreted_protein_summary <- function(
+    repo_local_dir,
+    selected_tissues,
+    GroupCode,
+    secreted_protein_csv_path,
+    output_excel_path,
+    output_plot_path,
+    output_plot_format = "pdf"
+) {
+  # ----------------------------- #
+  #   1️⃣ Validate Inputs
+  # ----------------------------- #
+  valid_groups <- c("Endur", "Resist", "Control")
+  if (!(GroupCode %in% valid_groups)) {
+    message(glue::glue("⚠️ Skipping: '{GroupCode}' is not a valid GroupCode. Must be one of {toString(valid_groups)}."))
+    return(invisible(NULL))
+  }
+  
+  # ----------------------------- #
+  #   2️⃣ Required Packages
+  # ----------------------------- #
+  required_libs <- c(
+    "dplyr", "ggplot2", "ggrepel", "stringr",
+    "tidyverse", "MotrpacHumanPreSuspension", "MotrpacHumanPreSuspensionData",
+    "openxlsx"
+  )
+  
+  excel_dir <- dirname(output_excel_path)
+  plot_dir  <- dirname(output_plot_path)
+  
+  if (!dir.exists(excel_dir)) {
+    dir.create(excel_dir, recursive = TRUE)
+    message(glue::glue("📂 Created Excel output directory: {excel_dir}"))
+  }
+  
+  if (!dir.exists(plot_dir)) {
+    dir.create(plot_dir, recursive = TRUE)
+    message(glue::glue("📂 Created Plot output directory: {plot_dir}"))
+  }
+  
+  missing_libs <- required_libs[!sapply(required_libs, requireNamespace, quietly = TRUE)]
+  if (length(missing_libs) > 0) {
+    stop(paste0("Missing packages: ", paste(missing_libs, collapse = ", "),
+                ". Please install them first."))
+  }
+  suppressPackageStartupMessages(lapply(required_libs, library, character.only = TRUE))
+  
+
+  
+  differential_analysis <- load_differential_analysis(
+    repo_local_dir = repo_local_dir,
+    selected_omes = "all",
+    selected_tissues = selected_tissues,
+    single_matrix = TRUE,
+    combine_with_featgene = TRUE,
+    epigen = FALSE
+  ) %>%
+    dplyr::filter(contrast_type == "exercise_with_controls") %>%
+    dplyr::mutate(
+      assay = dplyr::case_when(
+        stringr::str_detect(assay, "metab") ~ "metab",
+        TRUE ~ assay
+      ),
+      gene_symbol = dplyr::if_else(
+        assay == "metab", feature_id, gene_symbol
+      )
+    )
+  
+  differential_analysis <- differential_analysis %>%
+    dplyr::mutate(
+      gene = dplyr::case_when(is.na(entrez_gene) ~ feature_id, TRUE ~ entrez_gene),
+      assay = dplyr::case_when(
+        assay == "prot-ol" ~ "proteomics",
+        assay == "metab" ~ "metabolomics",
+        assay == "transcript-rna-seq" ~ "transcriptomics",
+        TRUE ~ assay
+      ),
+      randomGroupCode = dplyr::case_when(
+        randomGroupCode == "ADUResist" ~ "RE",
+        randomGroupCode == "ADUEndur" ~ "EE",
+        TRUE ~ randomGroupCode
+      )
+    ) %>%
+    dplyr::rename(Uniprot = uniprot)
+  
+  prot_data <- differential_analysis %>%
+    dplyr::filter(assay == "proteomics")
+  
+  # Secreted proteins reference
+  da_sec_prot <- read.csv(secreted_protein_csv_path, check.names = FALSE) %>%
+    dplyr::select(Gene, "Gene synonym", "Ensembl", "Gene description", "Uniprot",
+           "Chromosome", "Position", "Protein class", "Biological process",
+           "Molecular function", "RNA tissue specificity",
+           "RNA tissue distribution", "RNA tissue specificity score",
+           "RNA tissue specific nTPM", "RNA single cell type specificity",
+           "RNA single cell type distribution",
+           "RNA single cell type specificity score",
+           "RNA single cell type specific nTPM")
+  
+  # Significant proteins
+  da_blood_prot_fil_data_significant <- prot_data %>%
+    filter(adj_p_value < 0.05)
+  
+  da_blood_prot_fil_data_significant$in_sec_prot <- 
+    da_blood_prot_fil_data_significant$Uniprot %in% da_sec_prot$Uniprot
+  
+  da_blood_prot_fil_data_significant_in_sec_prot <- da_blood_prot_fil_data_significant %>%
+    filter(in_sec_prot) %>%
+    left_join(da_sec_prot, by = "Uniprot")
+  
+  wb <- createWorkbook()
+  
+  percentage_results <- data.frame(
+    Group = character(),
+    Timepoint = character(),
+    Total_Significant_Proteins = integer(),
+    Total_in_secreted_prot = integer(),
+    Percentage_in_secreted_prot = numeric(),
+    stringsAsFactors = FALSE
+  )
+  
+  unique_groups_timepoints <- unique(da_blood_prot_fil_data_significant %>%
+                                       dplyr::select(randomGroupCode, Timepoint))
+  
+  for (i in 1:nrow(unique_groups_timepoints)) {
+    group_val <- unique_groups_timepoints$randomGroupCode[i]
+    timepoint_val <- unique_groups_timepoints$Timepoint[i]
+    
+    df_group_timepoint <- da_blood_prot_fil_data_significant %>%
+      filter(randomGroupCode == group_val, Timepoint == timepoint_val)
+    
+    sheet_name <- paste(group_val, timepoint_val, sep = "_")
+    addWorksheet(wb, sheet_name)
+    writeData(wb, sheet_name, df_group_timepoint)
+    
+    df_group_timepoint_in_df2 <- da_blood_prot_fil_data_significant_in_sec_prot %>%
+      filter(randomGroupCode == group_val, Timepoint == timepoint_val)
+    
+    total_significant_proteins <- nrow(df_group_timepoint)
+    total_in_df2 <- nrow(df_group_timepoint_in_df2)
+    percentage_in_df2 <- ifelse(total_significant_proteins > 0,
+                                (total_in_df2 / total_significant_proteins) * 100, 0)
+    
+    percentage_results <- rbind(percentage_results, data.frame(
+      Group = group_val,
+      Timepoint = timepoint_val,
+      Total_Significant_Proteins = total_significant_proteins,
+      Total_in_secreted_prot = total_in_df2,
+      Percentage_in_secreted_prot = percentage_in_df2
+    ))
+    
+    
+    sheet_name_in_df2 <- paste(group_val, timepoint_val, "sp", sep = "_")
+    addWorksheet(wb, sheet_name_in_df2)
+    writeData(wb, sheet_name_in_df2, df_group_timepoint_in_df2)
+  }
+  
+  addWorksheet(wb, "Percentage Results")
+  writeData(wb, "Percentage Results", percentage_results)
+  saveWorkbook(wb, output_excel_path, overwrite = TRUE)
+  
+  
+  timepoint_order <- c("during_20_min", "during_40_min", "post_10_min",
+                       "post_15_30_45_min", "post_3.5_4_hr")
+  timepoint_labels <- c(
+    "during_20_min" = "During 20 Min",
+    "during_40_min" = "During 40 Min",
+    "post_10_min" = "Post 10 Min",
+    "post_15_30_45_min" = "Post 30 Min",
+    "post_3.5_4_hr" = "Post 3.5 Hour"
+  )
+  
+  percentage_results$Timepoint <- factor(percentage_results$Timepoint,
+                                         levels = timepoint_order)
+  
+  color_exercise <- MotrpacHumanPreSuspension::HUMAN_EXERCISE_GROUP_COLORS
+  color_exercise_mapped <- c(
+    "EE" = color_exercise[["ADUEndur"]],
+    "RE" = color_exercise[["ADUResist"]],
+    "Control" = color_exercise[["ADUControl"]]
+  )
+  
+  p <- ggplot(percentage_results, aes(x = Timepoint, y = Percentage_in_secreted_prot, fill = Group)) +
+    geom_bar(stat = "identity", position = position_dodge2(preserve = "single"), color = "black") +
+    geom_text(aes(label = round(Percentage_in_secreted_prot)),
+              position = position_dodge2(width = 0.9, preserve = "single"),
+              vjust = 1.5, size = 7) +
+    theme_minimal() +
+    labs(x = "", y = "Percentage", fill = "Group") +
+    scale_x_discrete(labels = timepoint_labels, drop = FALSE) +
+    scale_y_continuous(limits = c(0, 100)) +
+    scale_fill_manual(values = color_exercise_mapped, labels = names(color_exercise_mapped)) +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1, size = 16, face = "bold"),
+      axis.text.y = element_text(size = 16, face = "bold"),
+      text = element_text(size = 16)
+    )
+  
+  if (tolower(output_plot_format) == "pdf") {
+    ggsave(output_plot_path, plot = p, width = 8, height = 6)
+  } else {
+    ggsave(output_plot_path, plot = p, width = 8, height = 6, dpi = 300)
+  }
+  
+  
+  # return(list(excel = output_excel_path, plot = output_plot_path, plot_object = p))
+}
+
+
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+
+
+generate_secreted_protein_summary(
+  repo_local_dir = repo_local_dir,
+  selected_tissues = c("blood"),
+  GroupCode = "Resist",
+  secreted_protein_csv_path = file.path(data_dir, "sa_location_Secreted.csv"),
+  output_excel_path = file.path(output_data_dir, "Secreted_proteins_summary.xlsx"),
+  output_plot_path = file.path(plot_dir,"Figure_5" ,"Figure_5C.pdf"),
+  output_plot_format = "pdf"
+)
+
+```
+

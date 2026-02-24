@@ -1,0 +1,239 @@
+---
+title: "Blood_Proteomics_Secreted_Tissue_Summary_Bar_Plot"
+author: "Gaurav Tiwari"
+date: "2025-11-08"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+session_packages = c("dplyr", "tidyr", "ComplexHeatmap", "circlize", "RColorBrewer", "grid","openxlsx", "stringr", "purrr", "MotrpacHumanPreSuspensionData", "MotrpacHumanPreSuspension","ggplot2", "forcats", "scales", "ggnewscale", "geomtextpath")
+for (lib_name in session_packages){
+  tryCatch({library(lib_name,character.only = T)}, error = function(e) {
+    print(paste("Cannot load",lib_name,", please install"))
+  })
+}
+
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+
+theme_set(theme_minimal())
+```
+
+
+```{r session setup}
+# Save date in case output files requiring date version
+date <- Sys.Date()
+date <- gsub("-", "", date)
+
+# setwd(file.path(normalizePath(config$local_path), "precovid-analyses", "integrative"))
+# Load libraries
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/unsupervised_normalization_functions.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/gcp_functions.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/qc_report_aux_functions.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/config_session.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/association_analysis_methods.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/MetabolomicsLibrary.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/metabolomics_data_parsing_functions.R"))
+# source(file.path(normalizePath(config$general_shared_functions_library)))
+# 
+# repo_local_dir = file.path(config$precovid_repo_path, "data", "tmp")
+repo_local_dir = NULL
+library(here)
+here::i_am("figures/blood/final_figure_codes/Figure_6/Fig_6A.Rmd")
+data_dir       <- here("figures", "blood", "final_figure_input_data_files")
+plot_dir       <- here("figures", "blood", "final_figures")
+output_data_dir <- here("figures", "blood", "final_output_files")
+
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+
+generate_secreted_protein_report <- function(
+    sec_prot_file,
+    repo_local_dir,
+    pdf_output_path,
+    csv_output_path,
+    gsutil_cmd = "gsutil"
+) {
+  required_libs <- c(
+    "dplyr", "tidyr", "ComplexHeatmap", "circlize", "RColorBrewer", "grid",
+    "openxlsx", "stringr", "purrr", "MotrpacHumanPreSuspensionData",
+     "MotrpacHumanPreSuspension",
+    "ggplot2", "forcats", "scales", "ggnewscale", "geomtextpath"
+  )
+  suppressPackageStartupMessages(lapply(required_libs, library, character.only = TRUE))
+  
+  csv_dir <- dirname(csv_output_path)
+  plot_dir  <- dirname(pdf_output_path)
+  
+  if (!dir.exists(csv_dir)) {
+    dir.create(csv_dir, recursive = TRUE)
+    message(glue::glue("📂 Created csv output directory: {csv_dir}"))
+  }
+  
+  if (!dir.exists(plot_dir)) {
+    dir.create(plot_dir, recursive = TRUE)
+    message(glue::glue("📂 Created Plot output directory: {plot_dir}"))
+  }
+  
+  # --- Step 1: Load secreted protein cell data
+  secprotcell <- read.csv(sec_prot_file, check.names = FALSE)
+  
+  # --- Step 2: Load DA data
+  df_da_full <- load_differential_analysis(
+    repo_local_dir = repo_local_dir,
+    selected_omes = "prot-ol",
+    selected_tissues = "blood",
+    single_matrix = TRUE,
+    combine_with_featgene = TRUE,
+    epigen = FALSE,
+    gsutil = gsutil_cmd
+  ) %>%
+    filter(contrast_type == "exercise_with_controls")
+  
+  # --- Step 3: Select relevant columns
+  da_sec_prot <- secprotcell %>% dplyr::select(name, "tissue label", "uniprot")
+  
+  # --- Step 4: Filter for significant proteins
+  da_sig <- df_da_full %>%
+    mutate(adj_p_value = as.numeric(adj_p_value)) %>%
+    filter(adj_p_value < 0.05)
+  
+  # --- Step 5: Match with secreted proteins
+  da_sig$in_sec_prot <- da_sig$uniprot %in% da_sec_prot$uniprot
+  
+  da_sig_in_sec <- da_sig %>%
+    filter(in_sec_prot) %>%
+    left_join(da_sec_prot, by = "uniprot")
+  
+  # --- Step 6: Subset mapping
+  mapping <- MotrpacHumanPreSuspensionData::HUMAN_FEATURE_TO_GENE %>%
+    dplyr::filter(assay == "prot-ol") %>%
+    dplyr::select(feature_id, uniprot, gene_symbol) %>%
+    mutate(across(everything(), as.character))
+  
+  da_sec_prot_sub_da <- merge(mapping, secprotcell, by = "uniprot") %>%
+    filter(uniprot %in% da_sig$uniprot)
+  
+  # --- Save CSV subset
+  write.csv(da_sec_prot_sub_da, csv_output_path, row.names = FALSE)
+  
+  # --- Step 7: Prepare data for plotting
+  df_long <- da_sec_prot_sub_da %>%
+    dplyr::select(gene_symbol, `Global label`) %>%
+    mutate(`Global label` = as.character(`Global label`)) %>%
+    separate_rows(`Global label`, sep = "\\.") %>%
+    mutate(`Global label` = str_trim(`Global label`)) %>%
+    dplyr::filter(`Global label` != "") %>%
+    mutate(present = 1)
+  
+  df_wide <- df_long %>%
+    pivot_wider(
+      id_cols = gene_symbol,
+      names_from = `Global label`,
+      values_from = present,
+      values_fill = 0
+    )
+  
+  gls_data <- da_sec_prot_sub_da %>%
+    dplyr::select(gene_symbol, `Gobal label score (GLS)`) %>%
+    distinct(gene_symbol, .keep_all = TRUE)
+  
+  df_final <- left_join(df_wide, gls_data, by = "gene_symbol")
+  
+
+  
+  df_long_plot <- df_final %>%
+    pivot_longer(cols = -c(gene_symbol, `Gobal label score (GLS)`),
+                 names_to = "Tissue", values_to = "Present") %>%
+    filter(Present == 1) %>%
+    mutate(GLS_group = paste0("GLS_", round(`Gobal label score (GLS)`))) %>%
+    arrange(Tissue, desc(`Gobal label score (GLS)`)) %>%
+    mutate(Gene_ID = row_number())
+  
+  
+  
+  # --- Step 8: Summarize counts per tissue
+  df_prep <- df_long_plot %>%
+    dplyr::rename(
+      gls_score = `Gobal label score (GLS)`,
+      tissue = Tissue,
+      gls_group = GLS_group
+    ) %>%
+    mutate(tissue = factor(tissue), gls_group = factor(gls_group))
+
+  tissue_counts <- df_prep %>%
+    group_by(tissue) %>%
+    summarise(assay_count = n(), .groups = "drop") %>%
+    arrange(desc(assay_count))
+  
+  tissue_counts$tissue <- factor(tissue_counts$tissue, levels = tissue_counts$tissue)
+  
+  tissue_counts <- tissue_counts %>%
+    mutate(
+      tissue = dplyr::recode(
+        tissue,
+        "adiposetissue" = "adipose tissue",
+        "bonemarrow" = "bone marrow",
+        "adrenalgland" = "adrenal gland",
+        "bcell" = "b-cell",
+        "tcellcd8" = "t-cell CD8+",
+        "tcellcd4" = "t-cell CD4+"
+      )
+    )
+  
+    
+  n_tissues <- nlevels(df_prep$tissue)
+  tissue_palette <- scales::hue_pal()(n_tissues)
+  tissue_colors <- setNames(tissue_palette, levels(df_prep$tissue))
+  
+  # --- Step 9: Create bar plot
+  p_tissue_bar <- ggplot(tissue_counts, aes(x = tissue, y = assay_count, fill = tissue)) +
+    geom_col() +
+    geom_text(aes(label = assay_count), vjust = -0.15, size = 4, fontface = "bold") +  # ← Count labels
+    scale_fill_manual(values = tissue_colors, guide = "none") +  # Use your existing color scheme
+    theme_minimal() +
+    labs(
+      x = NULL,
+      y = "Number of Assays",
+      title = "Tissue Annotations for DA Proteins"
+    ) +
+    theme(
+      # axis.text.x = element_text(angle = 45, hjust = 1),
+      # plot.title = element_text(hjust = 0.5)
+      axis.text.x = element_text(angle = 45, hjust = 1, size = 14, face = "bold"),
+      axis.text.y = element_text(size = 12, face = "bold"),
+      axis.title.x = element_text(size = 12, face = "bold"),
+      axis.title.y = element_text(size = 12, face = "bold"),
+      plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+    )
+  
+  # --- Step 10: Save PDF plot
+  ggsave(pdf_output_path, plot = p_tissue_bar, width = 10, height = 6, dpi = 300,units = "in",limitsize = FALSE,device = cairo_pdf,bg = "white")
+  
+  message("✅ Report generated and saved successfully!")
+  return(list(
+    plot = p_tissue_bar,
+    csv = da_sec_prot_sub_da,
+    counts = tissue_counts
+  ))
+}
+
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+
+
+
+generate_secreted_protein_report(
+  sec_prot_file = file.path(data_dir, "sec_prot_cell.csv"),
+  repo_local_dir = repo_local_dir,
+  pdf_output_path = file.path(plot_dir, "Figure_6" ,"Figure_6A.pdf"),
+  csv_output_path = file.path(output_data_dir, "Figure_6A.csv")
+)
+
+
+```
+

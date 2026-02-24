@@ -9,6 +9,9 @@ This repository also contains some of the quality control steps that visualize d
 
 ## Reviewer/Public Note:
 
+The code used to generate the figures described in the biorxiv preprints corresponds to the code on this github repository as of: Feb 25th, 2026. 
+This code may change depending on additional analysis or reviewer requests. Please refer to the commit history if you'd like the exact code for the preprint. This also uses version 0.1.0 of the package `MotrpacHumanPreSuspensionAnalysis`.
+
 To protect participant privacy and comply with data-use governance policies, individual-level (subject-level) molecular or phenotypic data are available only through formal data access requests to the MoTrPAC consortium. This means that some of the figures generated will not be directly replicate-able until that access is granted. 
 
 For any public member evaluating the code for any of the MoTrPAC PreSuspension phase:

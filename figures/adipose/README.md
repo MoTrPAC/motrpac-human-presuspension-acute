@@ -24,7 +24,7 @@ The `sex_difference_analysis/` subfolder contains sensitivity analyses for basel
 
 ## Files/
 
-External reference data from the literature. Each file's source and usage is documented in the R script that loads it.
+External reference data from the literature. Each file's source and usage is documented in the R script that loads it. Note: 
 
 | File | Source | Used in |
 |------|--------|---------|

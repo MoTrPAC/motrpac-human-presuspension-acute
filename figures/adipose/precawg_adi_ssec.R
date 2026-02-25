@@ -14,6 +14,7 @@ library(ComplexHeatmap)
 
 files_path = file.path(here(), "figures", "adipose", "Files")
 wat_combined_all <- readRDS(file.path(files_path, "wat_ssec_sexadj.RDS")) # data from PMCID: PMC12340562
+#this file size is too large to store in the github repository, please refer to the manuscript to get access to this data.
 
 wat_combined_all <- wat_combined_all %>%
   mutate(Facet_Label = paste0("WATSC → ", Target_Tissue))

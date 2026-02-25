@@ -116,7 +116,6 @@ filter_metabolite_matrix <- function(matrix, metadata,
 
 #update: Feb 25, 2026. The clinical analytes are also now available through `MotrpacHumanPreSuspensionData` (still only available via request).
 #this implementation needs to be revamped.
-# setwd("/Users/ahn/Library/CloudStorage/OneDrive-AdventHealth/Desktop/2 - PROJECTS/6 - MoTrPAC Pre cawg/R/Files/clinical_metab/")
 # 1. insulin
 precawg_ins <- read.delim(
   "human-precovid-sed-adu_t02-plasma_metab-t-imm-ins_qc-norm_log2_v1.2.txt",

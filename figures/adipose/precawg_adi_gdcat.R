@@ -157,7 +157,7 @@ generate_fgsea_heatmap <- function(Direction, target_gene, manual = NULL) {
   )
 
   # Define the output file path with direction and target gene in the file name
-  output_file <- paste0("/Users/ahn/Library/CloudStorage/OneDrive-AdventHealth/Desktop/2 - PROJECTS/6 - MoTrPAC Pre cawg/", deparse(substitute(Direction)), "_", target_gene, ".pdf")
+  output_file <- paste0(output_folder, deparse(substitute(Direction)), "_", target_gene, ".pdf")
 
   # Create the heatmap
   all_fgsea_results %>%

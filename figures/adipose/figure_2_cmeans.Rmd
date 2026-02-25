@@ -6,13 +6,10 @@ date: "2025-02-12"
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-library(MotrpacHumanPreSuspension)
+library(MotrpacHumanPreSuspensionAnalysis)
 library(MotrpacHumanPreSuspensionData)
 
-config = jsonlite::fromJSON("~/config.json")
-repo_local_dir = config$precovid_repo_path
-
-devtools::load_all(config$r_package_path)
+repo_local_dir = ""
 ```
 
 So here want to do c-means results by modality, plot them, and do enrichment on all
@@ -21,7 +18,7 @@ for(modality in c("Resist", "Endur")){
   outdir = file.path(repo_local_dir, "data/tmp/c_means_adipose", modality)
   dir.create(outdir, recursive = TRUE, showWarnings = FALSE)
   
-  DA_list = MotrpacHumanPreSuspensionData::load_differential_analysis(
+  DA_list = MotrpacHumanPreSuspensionAnalysis::load_differential_analysis(
     selected_omes = c("transcript-rna-seq", "metab"),
     selected_tissues = "adipose")
   DA_list <- unlist(DA_list, recursive = FALSE)

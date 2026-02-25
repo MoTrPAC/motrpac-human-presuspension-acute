@@ -1,0 +1,386 @@
+---
+title: "Process AS Pre-processing Pipeline Output into Standard Data Formats"
+output: html_document
+---
+
+```{r}
+library(data.table)
+```
+
+# Data MoTrPAC
+
+```{r}
+# Run in `data_load.Rmd`
+```
+
+```{r}
+# samples by tissue in the RNA sequence data
+
+temp_colnames <- Reduce("intersect", lapply(qcdat, function(x){colnames(x$`transcript-rna-seq`$sample_metadata)}))
+sample_metadata_df <- do.call("rbind", lapply(qcdat, function(x){x$`transcript-rna-seq`$sample_metadata[, temp_colnames]}))
+```
+
+```{r}
+print(table(sample_metadata_df$Tissue))
+```
+
+
+
+# Data - AS
+
+## Tissues
+
+```{r}
+# New run was separated into 3 tissues
+tissue_data_dir_vec <- setNames(file.path("../data/AS_new_run_2025-7/", paste0("PreCOVID_", toupper(substr(tissues_all, 1, 1)), substr(tissues_all, 2, nchar(tissues_all)))), 
+                                tissues_all)
+```
+
+## AS type rename
+
+```{r}
+AS_types <- c("SE", "A5", "A3", "RI")
+AS_type_renaming_vector <- setNames(c("SE", "A5SS", "A3SS", "RI"), c("SE", "A5", "A3", "RI"))
+```
+
+
+## Isoform data tables
+
+```{r}
+temp_AS_methods_select <- c("SUPPA", "rMATS")
+
+splicing_preprocess_method_name_mapping <- unlist(list(rMATS = "jct",
+                                                       SUPPA = "txr"))
+```
+
+```{r}
+# An list following the qcdat object
+AS_object_qcdat <- list()
+```
+
+
+### AS event IDs
+
+```{r}
+# Currently the SUPPA gene annotation file is kept unchanged, every other coordinates are changed to match the SUPPA annotation file
+# Consider: keep the original rMATs and SUPPA system, only change the coordinates in the SUPPA gene annotation file?
+```
+
+
+### Gene mapping info from SUPPA
+
+```{r}
+# Splicing events annotations
+gene_info_dir <- "/sc/arion/projects/sealfs01a/german/refdata/AS/suppa/Ensembl_v96flt"
+gene_info_df_list <- list()
+
+AS_types <- c("SE", "A5", "A3", "RI")
+
+for (AS_type_select in AS_types){
+    gene_info_df_list[[AS_type_select]] <- read.table(file.path(gene_info_dir, paste0("Ensembl_v96flt_", AS_type_select, "_strict.ioe")), sep = "\t", header = T)
+}
+
+gene_info_df <- do.call("rbind", gene_info_df_list)
+gene_info_df$event_id <- sapply(strsplit(gene_info_df$event_id, ";", fixed = T), "[", 2)
+
+gene_info_df <- data.table(gene_info_df)
+
+# The "alternative_transcripts" column should actually be "inclusion_transcripts", (checked with SUPPA documentation, and also some example transcripts), rename the data table and the list of data tables
+gene_info_df_list <- lapply(gene_info_df_list,
+                            function(x){
+                                colnames(x)[colnames(x) == "alternative_transcripts"] <- "inclusion_transcripts"
+                                return(x)
+                            })
+colnames(gene_info_df)[colnames(gene_info_df) == "alternative_transcripts"] <- "inclusion_transcripts"
+```
+
+
+### SUPPA
+
+```{r}
+splicing_preprocess_method_select <- "SUPPA"
+
+# AS_psi_table_tissue_list <- list()
+
+for (tissue_select in names(tissue_data_dir_vec)){
+
+    # Read AS PSI table by AS type -----
+
+    AS_psi_table_list <- list()
+
+    for (AS_type_select in AS_types){
+        temp_mtx <- read.table(file.path(tissue_data_dir_vec[tissue_select], "compiled/psi", paste0("txr_", AS_type_select, ".PSItable.txt")),
+                               sep = "\t", header = T, check.names = F, row.names = 1)
+        row.names(temp_mtx) <- paste0(row.names(temp_mtx), "__", AS_type_select)
+        AS_psi_table_list[[AS_type_select]] <- temp_mtx
+    }
+
+    AS_psi_table <- do.call("rbind", AS_psi_table_list)
+    row.names(AS_psi_table) <- unlist(lapply(AS_psi_table_list, row.names))
+
+
+    # Read AS Supporting Matrix -----
+
+    AS_inc_table_list <- list()
+    AS_exc_table_list <- list()
+
+    for (AS_type_select in AS_types){
+        temp_mtx <- read.table(file.path(tissue_data_dir_vec[tissue_select], "compiled/includes/", paste0("txr_", AS_type_select, ".Includes.txt")),
+                               sep = "\t", header = T, check.names = F, row.names = 1)
+        row.names(temp_mtx) <- paste0(row.names(temp_mtx), "__", AS_type_select)
+        AS_inc_table_list[[AS_type_select]] <- temp_mtx
+
+        temp_mtx <- read.table(file.path(tissue_data_dir_vec[tissue_select], "compiled/skips/", paste0("txr_", AS_type_select, ".Skips.txt")),
+                               sep = "\t", header = T, check.names = F, row.names = 1)
+        row.names(temp_mtx) <- paste0(row.names(temp_mtx), "__", AS_type_select)
+        AS_exc_table_list[[AS_type_select]] <- temp_mtx
+    }
+
+    AS_inc_table <- do.call("rbind", AS_inc_table_list)
+    AS_exc_table <- do.call("rbind", AS_exc_table_list)
+
+    row.names(AS_inc_table) <- unlist(lapply(AS_inc_table_list, row.names))
+    row.names(AS_exc_table) <- unlist(lapply(AS_exc_table_list, row.names))
+
+
+
+    # Process AS feature IDs -----
+
+    # check row names consistency betwen PSI, INC and EXC tables
+    print(paste("Row names consistent:",
+                sum(row.names(AS_psi_table) == row.names(AS_inc_table)) == nrow(AS_psi_table) &
+                    sum(row.names(AS_psi_table) == row.names(AS_exc_table)) == nrow(AS_psi_table)))
+
+    # convert feature names in the PSI table to the feature names in the annotation file
+    temp_feature_original <- row.names(AS_psi_table)
+
+    temp_AS_type <- sapply(strsplit(temp_feature_original, "__"), "[", 2)
+    temp_feature <- sapply(strsplit(temp_feature_original, "__"), "[", 1)
+
+    # feature encoding conversion is different between RI and other AS type
+    temp_feature_annot_1 <- sapply(strsplit(temp_feature, ":", fixed = T),
+                                   function(x){paste0(x[1], ":", x[3],"-",as.numeric(x[4])+1, ":", x[5],"-",as.numeric(x[6])+1, ":", x[2])})
+    temp_feature_annot_2 <- sapply(strsplit(temp_feature, ":", fixed = T),
+                                   function(x){paste0(x[1], ":", as.numeric(x[3])+1,":",x[4], "-", as.numeric(x[5])+1,":",x[6], ":", x[2])})
+
+    temp_feature_annot <- ifelse(temp_AS_type %in% c("SE", "A5", "A3"),
+                                 yes = temp_feature_annot_1,
+                                 no = temp_feature_annot_2)
+    temp_feature_annot <- paste0(temp_AS_type, ":", temp_feature_annot)
+
+    gplots::venn(list(annot = gene_info_df$event_id, data = temp_feature_annot))
+
+    # Change AS table feature names to new names that match gene annotation table
+    row.names(AS_psi_table) <- temp_feature_annot
+    row.names(AS_inc_table) <- temp_feature_annot
+    row.names(AS_exc_table) <- temp_feature_annot
+
+
+
+    # Filter samples: Only keep samples available in RNAseq -----
+
+    samples_in_RNA_seq <- qcdat[[tissue_select]]$`transcript-rna-seq`$sample_metadata$vialLabel
+
+    # Check overlap with RNAseq metadata
+    gplots::venn(list(AS_samples_psi = colnames(AS_psi_table), RNAseq_samples = samples_in_RNA_seq))
+    gplots::venn(list(AS_samples_inc = colnames(AS_inc_table), RNAseq_samples = samples_in_RNA_seq))
+    gplots::venn(list(AS_samples_exc = colnames(AS_exc_table), RNAseq_samples = samples_in_RNA_seq))
+
+    # Only keep samples available in RNAseq
+    AS_psi_table <- AS_psi_table[, colnames(AS_psi_table) %in% samples_in_RNA_seq]
+    AS_inc_table <- AS_inc_table[, colnames(AS_inc_table) %in% samples_in_RNA_seq]
+    AS_exc_table <- AS_exc_table[, colnames(AS_exc_table) %in% samples_in_RNA_seq]
+
+
+    # AS_psi_table_tissue_list[[tissue_select]] <- AS_psi_table
+
+
+    # Add processed data into the AS objects list in MoTrPAC qcdat format -----
+
+    gene_info_df$feature_id <- gene_info_df$event_id
+
+    AS_object_qcdat[[tissue_select]][[paste0("AS-", splicing_preprocess_method_select)]] <-
+        list(feature_metadata = gene_info_df,
+             sample_metadata = qcdat[[tissue_select]]$`transcript-rna-seq`$sample_metadata,
+             AS_psi_table = AS_psi_table,
+             AS_inc_table = AS_inc_table,
+             AS_exc_table = AS_exc_table)
+}
+```
+
+
+### rMATS
+
+```{r}
+splicing_preprocess_method_select <- "rMATS"
+
+AS_psi_table_tissue_list <- list()
+
+for (tissue_select in names(tissue_data_dir_vec)){
+
+    # Read AS PSI, INC and EXC table by AS type -----
+
+    AS_psi_table_list <- list()
+    AS_inc_table_list <- list()
+    AS_exc_table_list <- list()
+
+    for (AS_type_select in AS_types){
+
+        AS_type_filename <- ifelse(splicing_preprocess_method_select == "rMATS" & AS_type_select %in% c("A5", "A3"),
+                                   yes = paste0(AS_type_select, "SS"), no = AS_type_select)
+
+        AS_psi_table_list[[AS_type_select]] <- read.table(file.path(tissue_data_dir_vec[tissue_select], "compiled/psi",
+                                                                    paste0(splicing_preprocess_method_name_mapping[splicing_preprocess_method_select], "_",
+                                                                           AS_type_filename, ".PSItable.txt")),
+                                                          sep = "\t", header = T, check.names = F, row.names = 1)
+
+        AS_inc_table_list[[AS_type_select]] <- read.table(file.path(tissue_data_dir_vec[tissue_select], "compiled/includes",
+                                                                    paste0(splicing_preprocess_method_name_mapping[splicing_preprocess_method_select], "_",
+                                                                           AS_type_filename, ".Includes.txt")),
+                                                          sep = "\t", header = T, check.names = F, row.names = 1)
+
+        AS_exc_table_list[[AS_type_select]] <- read.table(file.path(tissue_data_dir_vec[tissue_select], "compiled/skips",
+                                                                    paste0(splicing_preprocess_method_name_mapping[splicing_preprocess_method_select], "_",
+                                                                           AS_type_filename, ".Skips.txt")),
+                                                          sep = "\t", header = T, check.names = F, row.names = 1)
+
+        print(paste("Row names consistent:",
+                sum(row.names(AS_psi_table_list[[AS_type_select]]) == row.names(AS_inc_table_list[[AS_type_select]])) == nrow(AS_psi_table_list[[AS_type_select]]) &
+                    sum(row.names(AS_psi_table_list[[AS_type_select]]) == row.names(AS_exc_table_list[[AS_type_select]])) == nrow(AS_psi_table_list[[AS_type_select]])))
+    }
+
+
+    # Process AS feature IDs -----
+
+    # Change the AS feature coordinate encoding to match with the event_id in SUPPA annotation file
+
+    AS_feature_id_rMATs_list <- list()  # AS feature IDs to be used as new row names for the AS PSI (and INC, EXC) tables, to be consistent with the IDs from SUPPA
+    gene_info_df_rMATs_list <- list() # Full AS feature annotations directly from rMATs, separated by AS type, because each AS type have different columns in the annotation table
+
+
+    AS_type_select <- "SE"
+    AS_type_filename <- "SE"
+
+    temp_feature_original <- row.names(AS_psi_table_list[[AS_type_select]])
+    temp_feature_annot <- paste0(AS_type_select, ":", sapply(strsplit(temp_feature_original, ":", fixed = T), function(x){paste0(gsub("chr", "", x[1]), ":", x[3],"-",as.numeric(x[4])+1, ":", x[5],"-",as.numeric(x[6])+1, ":", x[2])}))
+
+    temp_annot <- read.table(file.path(tissue_data_dir_vec[tissue_select], "rmats", paste0("fromGTF.", AS_type_filename, ".txt")), sep = "\t", header = T)
+    temp_annot$AS_event_id <- paste0(AS_type_select, ":", gsub("chr", "", temp_annot$chr), ":", temp_annot$upstreamEE, "-", temp_annot$exonStart_0base+1, ":", temp_annot$exonEnd, "-", temp_annot$downstreamES+1, ":", temp_annot$strand)
+    gplots::venn(list(annot_rMATs = temp_annot$AS_event_id, data = temp_feature_annot))
+
+    AS_feature_id_rMATs_list[[AS_type_select]] <- temp_feature_annot
+    gene_info_df_rMATs_list[[AS_type_select]] <- data.table(temp_annot)
+
+
+    AS_type_select <- "A5"
+    AS_type_filename <- "A5SS"
+
+    temp_feature_original <- row.names(AS_psi_table_list[[AS_type_select]])
+    temp_feature_annot <- paste0(AS_type_select, ":", sapply(strsplit(temp_feature_original, ":", fixed = T), function(x){paste0(gsub("chr", "", x[1]), ":", x[3],"-",as.numeric(x[4])+1, ":", x[5],"-",as.numeric(x[6])+1, ":", x[2])}))
+
+    temp_annot <- read.table(file.path(tissue_data_dir_vec[tissue_select], "rmats", paste0("fromGTF.", AS_type_filename, ".txt")), sep = "\t", header = T)
+    temp_annot$AS_event_id <- ifelse(temp_annot$strand == "+",
+                                     yes = paste0(AS_type_select, ":", gsub("chr", "", temp_annot$chr), ":", temp_annot$longExonEnd, "-", temp_annot$flankingES+1, ":", temp_annot$shortEE, "-", temp_annot$flankingES+1, ":", temp_annot$strand),
+                                     no = paste0(AS_type_select, ":", gsub("chr", "", temp_annot$chr), ":", temp_annot$flankingEE, "-", temp_annot$longExonStart_0base+1, ":", temp_annot$flankingEE, "-", temp_annot$shortES+1, ":", temp_annot$strand))
+    gplots::venn(list(annot_rMATs = temp_annot$AS_event_id, data = temp_feature_annot))
+
+    AS_feature_id_rMATs_list[[AS_type_select]] <- temp_feature_annot
+    gene_info_df_rMATs_list[[AS_type_select]] <- data.table(temp_annot)
+
+
+    AS_type_select <- "A3"
+    AS_type_filename <- "A3SS"
+
+    temp_feature_original <- row.names(AS_psi_table_list[[AS_type_select]])
+    temp_feature_annot <- paste0(AS_type_select, ":", sapply(strsplit(temp_feature_original, ":", fixed = T), function(x){paste0(gsub("chr", "", x[1]), ":", x[3],"-",as.numeric(x[4])+1, ":", x[5],"-",as.numeric(x[6])+1, ":", x[2])}))
+
+    temp_annot <- read.table(file.path(tissue_data_dir_vec[tissue_select], "rmats", paste0("fromGTF.", AS_type_filename, ".txt")), sep = "\t", header = T)
+    temp_annot$AS_event_id <- ifelse(temp_annot$strand == "+",
+                                     yes = paste0(AS_type_select, ":", gsub("chr", "", temp_annot$chr), ":", temp_annot$flankingEE, "-", temp_annot$longExonStart_0base+1, ":", temp_annot$flankingEE, "-", temp_annot$shortES+1, ":", temp_annot$strand),
+                                     no = paste0(AS_type_select, ":", gsub("chr", "", temp_annot$chr), ":", temp_annot$longExonEnd, "-", temp_annot$flankingES+1, ":", temp_annot$shortEE, "-", temp_annot$flankingES+1, ":", temp_annot$strand))
+    gplots::venn(list(annot_rMATs = temp_annot$AS_event_id, data = temp_feature_annot))
+
+    AS_feature_id_rMATs_list[[AS_type_select]] <- temp_feature_annot
+    gene_info_df_rMATs_list[[AS_type_select]] <- data.table(temp_annot)
+
+
+    AS_type_select <- "RI"
+    AS_type_filename <- "RI"
+
+    temp_feature_original <- row.names(AS_psi_table_list[[AS_type_select]])
+    temp_feature_annot <- paste0(AS_type_select, ":", sapply(strsplit(temp_feature_original, ":", fixed = T), function(x){paste0(gsub("chr", "", x[1]), ":", as.numeric(x[3])+1,":",x[4], "-", as.numeric(x[5])+1,":",x[6], ":", x[2])}))
+
+    temp_annot <- read.table(file.path(tissue_data_dir_vec[tissue_select], "rmats", paste0("fromGTF.", AS_type_filename, ".txt")), sep = "\t", header = T)
+    temp_annot$AS_event_id <- paste0(AS_type_select, ":", gsub("chr", "", temp_annot$chr), ":", temp_annot$upstreamES+1, ":", temp_annot$upstreamEE, "-", temp_annot$downstreamES+1, ":", temp_annot$downstreamEE, ":", temp_annot$strand)
+    gplots::venn(list(annot_rMATs = temp_annot$AS_event_id, data = temp_feature_annot))
+
+    AS_feature_id_rMATs_list[[AS_type_select]] <- temp_feature_annot
+    gene_info_df_rMATs_list[[AS_type_select]] <- data.table(temp_annot)
+
+
+
+    # Final AS PSI table with row names processed -----
+
+    AS_psi_table_list <- mapply(function(x,y){row.names(x) <- y; return(x)}, AS_psi_table_list, AS_feature_id_rMATs_list[names(AS_psi_table_list)], SIMPLIFY = F)
+    AS_inc_table_list <- mapply(function(x,y){row.names(x) <- y; return(x)}, AS_inc_table_list, AS_feature_id_rMATs_list[names(AS_inc_table_list)], SIMPLIFY = F)
+    AS_exc_table_list <- mapply(function(x,y){row.names(x) <- y; return(x)}, AS_exc_table_list, AS_feature_id_rMATs_list[names(AS_exc_table_list)], SIMPLIFY = F)
+    for (x in names(AS_psi_table_list)){
+        gplots::venn(list(annot_rMATs = gene_info_df_rMATs_list[[x]]$AS_event_id, data = row.names(AS_psi_table_list[[x]])))
+    }
+
+    AS_psi_table <- do.call("rbind", AS_psi_table_list)
+    row.names(AS_psi_table) <- unlist(lapply(AS_psi_table_list, row.names))
+
+    AS_inc_table <- do.call("rbind", AS_inc_table_list)
+    row.names(AS_inc_table) <- unlist(lapply(AS_inc_table_list, row.names))
+
+    AS_exc_table <- do.call("rbind", AS_exc_table_list)
+    row.names(AS_exc_table) <- unlist(lapply(AS_exc_table_list, row.names))
+
+
+    # Final AS feature annotation table -----
+    gene_info_df_rMATs <- rbindlist(gene_info_df_rMATs_list, fill = T)
+
+    # Add columns to be consistent with previous pipelines
+    gene_info_df_rMATs$event_id <- gene_info_df_rMATs$AS_event_id
+    gene_info_df_rMATs$gene_id <- gsub("\\.[0-9]+$", "", gene_info_df_rMATs$GeneID)
+    gene_info_df_rMATs$seqname <- gsub("chr", "", gene_info_df_rMATs$chr)
+
+    gene_info_df_rMATs$feature_id <- gene_info_df_rMATs$event_id
+
+    gplots::venn(list(data = row.names(AS_psi_table), annot = gene_info_df_rMATs$feature_id))
+
+
+    # Filter samples: Only keep samples available in RNAseq -----
+
+    samples_in_RNA_seq <- qcdat[[tissue_select]]$`transcript-rna-seq`$sample_metadata$vialLabel
+
+    # Check overlap with RNAseq metadata
+    gplots::venn(list(AS_samples_psi = colnames(AS_psi_table), RNAseq_samples = samples_in_RNA_seq))
+    gplots::venn(list(AS_samples_inc = colnames(AS_inc_table), RNAseq_samples = samples_in_RNA_seq))
+    gplots::venn(list(AS_samples_exc = colnames(AS_exc_table), RNAseq_samples = samples_in_RNA_seq))
+
+    # Only keep samples available in RNAseq
+    AS_psi_table <- AS_psi_table[, colnames(AS_psi_table) %in% samples_in_RNA_seq]
+    AS_inc_table <- AS_inc_table[, colnames(AS_inc_table) %in% samples_in_RNA_seq]
+    AS_exc_table <- AS_exc_table[, colnames(AS_exc_table) %in% samples_in_RNA_seq]
+
+
+
+    # Add processed data into the AS objects list in MoTrPAC qcdat format -----
+    AS_object_qcdat[[tissue_select]][[paste0("AS-", splicing_preprocess_method_select)]] <-
+        list(feature_metadata = gene_info_df_rMATs,
+             sample_metadata = qcdat[[tissue_select]]$`transcript-rna-seq`$sample_metadata,
+             AS_psi_table = AS_psi_table,
+             AS_inc_table = AS_inc_table,
+             AS_exc_table = AS_exc_table)
+
+}
+```
+
+
+### Save
+
+```{r}
+saveRDS(AS_object_qcdat, "../data_processed_objects/AS-objects_qcdat_format.rds")
+```

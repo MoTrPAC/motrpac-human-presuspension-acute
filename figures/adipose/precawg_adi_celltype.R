@@ -1,4 +1,4 @@
-library(MotrpacHumanPreSuspension)
+library(MotrpacHumanPreSuspensionAnalysis)
 library(dplyr)
 library(ComplexHeatmap)
 library(circlize)
@@ -7,7 +7,7 @@ library(TMSig)
 celltype_camera <- run_cameraPR(selected_omes = "transcript-rna-seq",
                                 selected_tissues = "adipose",
                                 path_to_gmt = "path/cell_marker_genes.gmt",
-                                overlap_cutoff = 0) 
+                                overlap_cutoff = 0)
 
 # Define the contrast order (only Control comparisons)
 contrast_order <- c(
@@ -71,7 +71,7 @@ group_labels <- ifelse(
 )
 
 # Figure 4A
-celltype_camera_filtered %>% 
+celltype_camera_filtered %>%
   enrichmap(
     n_top = Inf,
     plot_sig_only = FALSE,

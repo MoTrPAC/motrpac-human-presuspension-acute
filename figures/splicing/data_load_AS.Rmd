@@ -1,0 +1,200 @@
+---
+title: "Load Processed AS Data into Workspace"
+output: html_document
+---
+
+```{r}
+library(data.table)
+```
+
+# Data MoTrPAC
+
+```{r}
+# Run in `data_load.Rmd`
+```
+
+```{r}
+# samples by tissue in the RNA sequence data
+
+temp_colnames <- Reduce("intersect", lapply(qcdat, function(x){colnames(x$`transcript-rna-seq`$sample_metadata)}))
+sample_metadata_df <- do.call("rbind", lapply(qcdat, function(x){x$`transcript-rna-seq`$sample_metadata[, temp_colnames]}))
+```
+
+```{r}
+print(table(sample_metadata_df$Tissue))
+```
+
+
+
+# Data - AS
+
+## Tissues
+
+```{r}
+# New run was separated into 3 tissues
+tissue_data_dir_vec <- setNames(file.path("../data/AS_new_run_2025-7/", paste0("PreCOVID_", toupper(substr(tissues_all, 1, 1)), substr(tissues_all, 2, nchar(tissues_all)))), 
+                                tissues_all)
+```
+
+## AS type rename
+
+```{r}
+AS_types <- c("SE", "A5", "A3", "RI")
+AS_type_renaming_vector <- setNames(c("SE", "A5SS", "A3SS", "RI"), c("SE", "A5", "A3", "RI"))
+```
+
+
+## Isoform data tables
+
+### Load
+
+```{r}
+AS_object_qcdat <- readRDS("../data_processed_objects/AS-objects_qcdat_format.rds")
+```
+
+
+## AS Feature annotation
+
+```{r}
+# SUPPA -----
+# SUPPA annotations are the same for all tissues, use any of them
+gene_info_df_SUPPA <- AS_object_qcdat$muscle$`AS-SUPPA`$feature_metadata
+
+
+# rMATS -----
+# rMATS annotations are different for each tissue
+# Construct an annotation for all tissues
+
+gplots::venn(lapply(AS_object_qcdat, function(x){row.names(x[["AS-rMATS"]]$AS_psi_table)}))
+gplots::venn(lapply(AS_object_qcdat, function(x){x[["AS-rMATS"]]$feature_metadata$feature_id}))
+
+temp_AS_feature_annot_tissue_list <- lapply(AS_object_qcdat, function(x){x[["AS-rMATS"]]$feature_metadata[, .(event_id, gene_id)]})
+temp_AS_feature_annot_tissue_list <- sapply(names(temp_AS_feature_annot_tissue_list),
+                                            function(x){
+                                                setNames(temp_AS_feature_annot_tissue_list[[x]], c("event_id", paste0("gene_id_annot_in_", x)))
+                                            }, USE.NAMES = T, simplify = F)
+temp_AS_feature_annot_tissue_df <- merge(merge(temp_AS_feature_annot_tissue_list$adipose, temp_AS_feature_annot_tissue_list$blood, by = "event_id", all = T), 
+                                         temp_AS_feature_annot_tissue_list$muscle, by = "event_id", all = T)
+temp_AS_feature_annot_tissue_df <- temp_AS_feature_annot_tissue_df[, .(gene_id = unique(setdiff(c(gene_id_annot_in_adipose, gene_id_annot_in_blood, gene_id_annot_in_muscle), NA))), by = .(event_id)]
+
+# Check if gene_id annots agree across all tissues
+print(paste("Gene id annotation agree across all three tissues: ", all(sapply(temp_AS_feature_annot_tissue_df$gene_id, length) == 1)))
+
+gene_info_df_rMATS <- temp_AS_feature_annot_tissue_df
+
+
+# All -----
+gene_info_df_allMethods_list <- list(SUPPA = gene_info_df_SUPPA,
+                                     rMATS = gene_info_df_rMATS)
+```
+
+
+## Features - union
+
+```{r}
+features_test_union_tissue_list <- list()
+
+for (tissue_select in tissues_all){
+    
+    samples_tissue_select <- sample_metadata_df$vialLabel[sample_metadata_df$sampleGroupCode == tissue_name_mapping[tissue_select]]
+    
+    temp_supporting_mtx <- as.matrix(AS_object_qcdat[[tissue_select]]$`AS-SUPPA`$AS_inc_table + AS_object_qcdat[[tissue_select]]$`AS-SUPPA`$AS_exc_table)
+    temp_mean_exp <- matrixStats::rowQuantiles(temp_supporting_mtx, probs = seq(0, 1, by = 0.1), na.rm = T, useNames = T)[, "80%"]
+    hist(log10(temp_mean_exp+1), breaks = 30, main = "SUPPA supporting transcript abundance, 80% quantile")
+    
+    
+    temp_supporting_mtx <- as.matrix(AS_object_qcdat[[tissue_select]]$`AS-rMATS`$AS_inc_table + AS_object_qcdat[[tissue_select]]$`AS-rMATS`$AS_exc_table)
+    temp_mean_exp <- matrixStats::rowQuantiles(temp_supporting_mtx, probs = seq(0, 1, by = 0.1), na.rm = T, useNames = T)[, "80%"]
+    hist(log10(temp_mean_exp+1), breaks = 30, main = "rMATs supporting transcript abundance, 80% quantile")
+    
+    
+    # Supporting abundance cutoff
+    suppa_supporting_abundance_cutoff <- 0.5
+    rmats_supporting_abundance_cutoff <- 5
+    
+    # Filter for AS features passing supporting abundance cutoff
+    temp_supporting_mtx <- as.matrix(AS_object_qcdat[[tissue_select]]$`AS-SUPPA`$AS_inc_table + AS_object_qcdat[[tissue_select]]$`AS-SUPPA`$AS_exc_table)
+    temp_mean_exp <- matrixStats::rowQuantiles(temp_supporting_mtx, probs = seq(0, 1, by = 0.1), na.rm = T, useNames = T)[, "80%"]
+    features_filtered_SUPPA <- names(temp_mean_exp)[temp_mean_exp >= suppa_supporting_abundance_cutoff]
+    
+    temp_supporting_mtx <- as.matrix(AS_object_qcdat[[tissue_select]]$`AS-rMATS`$AS_inc_table + AS_object_qcdat[[tissue_select]]$`AS-rMATS`$AS_exc_table)
+    temp_mean_exp <- matrixStats::rowQuantiles(temp_supporting_mtx, probs = seq(0, 1, by = 0.1), na.rm = T, useNames = T)[, "80%"]
+    features_filtered_rMATs <- names(temp_mean_exp)[temp_mean_exp >= rmats_supporting_abundance_cutoff]
+    
+    # Also keeping features reported by both methods
+    features_intersect <- Reduce("intersect", lapply(AS_object_qcdat[[tissue_select]], function(x){row.names(x$AS_psi_table)}))
+    
+    features_test_union_tissue_list[[tissue_select]] <- unique(c(features_filtered_SUPPA,
+                                                                 features_filtered_rMATs,
+                                                                 features_intersect))
+}
+```
+
+```{r}
+# features_test_union_tissue_list_new <- features_test_union_tissue_list
+# 
+# # check with old data
+# 
+# for (tissue_select in tissues_all){
+#     gplots::venn(list(old = features_test_union_tissue_list[[tissue_select]],
+#                       new = features_test_union_tissue_list_new[[tissue_select]]))
+# }
+# 
+# gplots::venn(list(DAS = sig_DS_union_df_list$muscle$ADUResist$post_3.5_4_hr$feature, union = features_test_union_tissue_list$muscle))
+# gplots::venn(list(DAS = sig_DS_union_df_list$muscle$ADUResist$post_3.5_4_hr$feature, union = features_test_union_tissue_list_new$muscle))
+```
+
+
+## AS Sample metadata
+
+```{r}
+# sample_metadata_df <- phenodat
+
+temp_colnames <- Reduce("intersect", lapply(qcdat, function(x){colnames(x$`transcript-rna-seq`$sample_metadata)}))
+sample_metadata_df <- do.call("rbind", lapply(qcdat, function(x){x$`transcript-rna-seq`$sample_metadata[, temp_colnames]}))
+
+sample_metadata_df$vialLabel <- as.character(sample_metadata_df$vialLabel)
+print(nrow(sample_metadata_df))
+
+samples_all <- intersect(Reduce("union", lapply(AS_object_qcdat, function(x){union(colnames(x[["AS-SUPPA"]]$AS_psi_table), colnames(x[["AS-rMATS"]]$AS_psi_table))})), 
+                         sample_metadata_df$vialLabel)
+print(length(samples_all))
+
+sample_metadata_df <- sample_metadata_df[sample_metadata_df$vialLabel %in% samples_all, ]
+print(nrow(sample_metadata_df))
+
+row.names(sample_metadata_df) <- sample_metadata_df$vialLabel
+```
+
+```{r}
+temp_df <- data.table(sample_metadata_df)
+
+print(temp_df[order(randomGroupCode, Sex), .(N = length(unique(pid))), by = .(randomGroupCode, Sex)])
+```
+
+### Exact time points
+
+```{r}
+sample_metadata_df <- add_exact_timepoint(sample_metadata_df, tissue_col = "sampleGroupCode", tissue_name_mapping = tissue_name_mapping, timepoint_col = "Timepoint")
+```
+
+```{r}
+print(table(sample_metadata_df$Timepoint_exact, sample_metadata_df$sampleGroupCode))
+```
+
+## Ploting colors for AS
+
+```{r}
+# `annot_colors_use_list` is loaded from `data_load_MoTrPAC_PreCAWG.Rmd`
+
+annot_colors_use_list[["modality"]] <- c(MotrpacHumanPreSuspension::HUMAN_OME_COLORS, setNames(c("#90CCEE"), c("AS")))
+
+annot_colors_use_list[["AS_type"]] <- setNames(c("#405099", "#5080AA", "#6599CC", "#90BBEE"), c("SE", "A5", "A3", "RI"))
+
+annot_colors_use_list$AS_type <- c(annot_colors_use_list$AS_type, setNames(annot_colors_use_list$AS_type[names(AS_type_renaming_vector)], AS_type_renaming_vector))
+```
+
+```{r}
+
+```
+

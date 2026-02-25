@@ -72,7 +72,6 @@ DA_PercentOverlap: `figures/landscape/figure_2/supplemental/figureS2C_upsetPlots
 
 CrossTissue_ORA: `figures/landscape/figure_2/figure2B_upsetPlot_barPlot.R`
 
-Phospho_ORA_PTMsigDB: @@ Ask Hasmik
 
 
 
@@ -86,9 +85,9 @@ S2C: `figures/landscape/figure_2/supplemental/figureS2C_upsetPlots.R`
 
 S2D: `figures/landscape/single_feature_plots_for_manuscript.Rmd`
 
-S2E: @@ Ask Gayatri
+S2E: `figures/landscape/figure_2/supplemental/figureS2E_phospho_ORA_heatmap.R`
 
-S2F: @@ Ask Gayatri
+S2F: `figures/landscape/figure_2/supplemental/figureS2F_upsetPlot_by_ome.R`
 
 ## Figure 3: 
 

@@ -1,0 +1,52 @@
+---
+title: "Download Processed MoTrPAC PreCAWG Data"
+output: html_document
+---
+
+# Install MoTrPAC packages
+
+```{r}
+# renv::install("../repos/MotrpacHumanPreSuspension/")
+```
+
+```{r}
+library(MotrpacHumanPreSuspension)
+```
+
+# Load data from package
+
+These data loading were run on a local windows 11 machine to download the data using `gsutil`. 
+
+```{r}
+qcdat <- load_qc(repo_local_dir = file.path("..\\data_download\\"),
+                 selected_omes = "all", selected_tissues = "all",
+                 # gsutil = file.path("C:/Users/zidong/AppData/Local/Google/Cloud SDK/google-cloud-sdk/bin/gsutil"),
+                 # gsutil = "C:\\Users\\zidong\\AppData\\Local\\Google\\Cloud SDK\\google-cloud-sdk\\bin\\gsutil",
+                 gsutil = "gsutil",
+                 verbose = T)
+```
+
+```{r}
+dadat <- load_differential_analysis(repo_local_dir = file.path("..\\data_download\\"),
+                                    selected_omes = "all", selected_tissues = "all",
+                                    gsutil = "gsutil")
+```
+
+```{r}
+phenodat <- load_pheno(repo_local_dir = file.path("..\\data_download\\"),
+                       gsutil = "gsutil")
+```
+
+```{r}
+clinicdat <- load_clinical_data(repo_local_dir = file.path("..\\data_download\\"),
+                                gsutil = "gsutil")
+```
+
+```{r}
+saveRDS(list(qcdat = qcdat,
+             dadat = dadat,
+             phenodat = phenodat,
+             clinicdat = clinicdat),
+        file.path("../data_download/saved_objects.rds"))
+```
+

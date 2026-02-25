@@ -2,7 +2,7 @@
 library(readxl)
 library(MotrpacRatTraining6mo)
 library(tidyr)
-library(MotrpacHumanPreSuspension)
+library(MotrpacHumanPreSuspensionAnalysis)
 library(TMSig)
 library(dplyr)
 library(patchwork)
@@ -10,11 +10,11 @@ library(ggplot2)
 library(purrr)
 
 ### Incorportate Walejko et al., Nat comm, 2021
-setwd("path")
-wal_phos_up <- read_excel("wlejko_sup2.xlsx", sheet = "Upregulated Phosphosites")
-wal_phos_down <- read_excel("wlejko_sup2.xlsx", sheet = "Downregulated Phosphosites")
+adipose_files_path = file.path(here(), "figures", "adipose", "Files")
+wal_phos_up <- read_excel(file.path(adipose_files_path, "wlejko_sup2.xlsx"), sheet = "Upregulated Phosphosites")
+wal_phos_down <- read_excel(file.path(adipose_files_path, "wlejko_sup2.xlsx"), sheet = "Downregulated Phosphosites")
 
-data("RAT_TO_HUMAN_GENE")
+data("RAT_TO_HUMAN_GENE") #from MotrpacRatTraining6mo
 uniprot_map_clean <- RAT_TO_HUMAN_GENE %>%
   separate_rows(RAT_SYMBOL, sep = ";") %>%
   distinct(RAT_SYMBOL, HUMAN_ORTHOLOG_SYMBOL)
@@ -36,7 +36,7 @@ wal_phos_down_prot <- wal_phos_down_annotated %>%
 precawg_phos_da_wal_up <- ph_vol %>% # ph_vol is from precawg_adi_da.R
   filter(gene_symbol %in% wal_phos_up_prot) %>%
   filter(adj_p_value<0.1)
-setdiff(wal_phos_up_prot, unique(precawg_phos_da_wal_up$gene_symbol)) 
+setdiff(wal_phos_up_prot, unique(precawg_phos_da_wal_up$gene_symbol))
 intersect(wal_phos_up_prot, unique(precawg_phos_da_wal_up$gene_symbol))
 length(intersect(wal_phos_up_prot, unique(precawg_phos_da_wal_up$gene_symbol))) / length(wal_phos_up_prot)
 # 15/28 DA phospho (51%)
@@ -44,7 +44,7 @@ length(intersect(wal_phos_up_prot, unique(precawg_phos_da_wal_up$gene_symbol))) 
 precawg_phos_da_wal_down <- ph_vol %>%
   filter(gene_symbol %in% wal_phos_down_prot) %>%
   filter(adj_p_value<0.1)
-setdiff(wal_phos_down_prot, unique(precawg_phos_da_wal_down$gene_symbol)) 
+setdiff(wal_phos_down_prot, unique(precawg_phos_da_wal_down$gene_symbol))
 intersect(wal_phos_down_prot, unique(precawg_phos_da_wal_down$gene_symbol))
 length(intersect(wal_phos_down_prot, unique(precawg_phos_da_wal_down$gene_symbol))) / length(wal_phos_down_prot)
 
@@ -58,7 +58,7 @@ precawg_phos_da_wal <- ph_vol %>%
   filter(adj_p_value<0.1)
 length(unique(precawg_phos_da_wal$gene_symbol)) #47. 47/102. 46$ being DA
 
-#### ORA 
+#### ORA
 wal_phos_signatures <- list(
   wal_phos_up = intersect(wal_phos_up_prot, unique(precawg_phos_da_wal_up$gene_symbol)),
   wal_phos_down = intersect(wal_phos_down_prot, unique(precawg_phos_da_wal_down$gene_symbol))
@@ -69,15 +69,15 @@ ora_precawg_wal <- lapply(wal_phos_signatures, function(input_i) {
   run_ORA(input = as.character(input_i),
           background = bckg_ph,
           overlap_cutoff = 0)
-}) %>% 
-  bind_rows(.id = "Direction") %>% 
+}) %>%
+  bind_rows(.id = "Direction") %>%
   mutate(log10p = -log10(p_value),
          Direction = factor(Direction, levels = unique(Direction)))
 
 top_terms <- ora_precawg_wal %>%
   group_by(Direction) %>%  # Group by Module to apply slice_min() within each group
   pull(set_short) %>%  # Extract the set_short column
-  unique() 
+  unique()
 
 length(top_terms)
 log10p_colors <- circlize::colorRamp2(c(0, max(ora_precawg_wal$log10p)), c("white", "#543483"))
@@ -90,7 +90,7 @@ ora_precawg_wal <- ora_precawg_wal %>%
     log10p = -log10(p_value)
   )
 # Figure 5H
-ora_precawg_wal %>% 
+ora_precawg_wal %>%
   enrichmap(n_top = Inf,
             set_column = "set_short",
             statistic_column = "log10p",
@@ -156,7 +156,7 @@ col_anno <- columnAnnotation(
   )
 )
 # Figure 5G
-protsyn_t_plot <- protsyn_t %>% 
+protsyn_t_plot <- protsyn_t %>%
   enrichmap(
     n_top = Inf,
     plot_sig_only = TRUE,
@@ -171,5 +171,5 @@ protsyn_t_plot <- protsyn_t %>%
       column_split = rep(c("EE", "RE"), each = 3),
       show_column_names = FALSE
     )
-  ) 
+  )
 

@@ -1,0 +1,611 @@
+---
+title: "blood_precawg_compainion_da_features"
+author: "Samuel Montalvo, Ph.D., blood precawg group, and MoTrPAC study group"
+output:
+  html_document:
+    code_folding: hide
+date: "2025-04-28"
+---
+
+
+
+```{r setup, include=FALSE}
+
+# Core package set for data loading, wrangling, modeling, and plotting.
+session_packages <- c(
+  "data.table", "tidyverse", "factoextra", "patchwork", "DT", "future", "furrr",
+  "ggbeeswarm", "broom", "knitr", "gtsummary", "viridis", "ggpubr",
+  "MotrpacHumanPreSuspensionAnalysis", "purrr", "conflicted",
+  "lme4", "forcats", "latex2exp", "ggpattern", "scales"
+)
+for (lib_name in session_packages){
+  tryCatch({library(lib_name,character.only = T)}, error = function(e) {
+    print(paste("Cannot load",lib_name,", please install"))
+  })
+}
+
+# Show code in the HTML; users can click "Code" to fold/unfold blocks.
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
+theme_set(theme_minimal())
+
+conflict_prefer("map", "purrr",)
+conflict_prefer("filter", "dplyr")
+conflict_prefer("load_differential_analysis", "MotrpacHumanPreSuspensionAnalysis")
+```
+
+
+
+```{r}
+# Load blood DA table using MotrpacHumanPreSuspensionAnalysis API.
+# epigen = FALSE avoids remote epigen pulls and matches filtering logic below.
+blood_da_df <- MotrpacHumanPreSuspensionAnalysis::load_differential_analysis(
+  selected_omes = "all",
+  selected_tissues = "blood",
+  single_matrix = TRUE,
+  epigen = FALSE,
+  combine_with_featgene = TRUE
+)
+
+blood_da_df
+```
+
+```{r}
+# --- Timepoints: harmonize, order, and pretty labels (Figure 2 style) ---
+tp_levels <- c(
+  "during_20_min",
+  "during_40_min",
+  "post_10_min",
+  "post_30_min",
+  "post_3.5_hours",
+  "post_24_hr"
+)
+
+tp_labels <- c(
+  during_20_min  = "During 20 Min",
+  during_40_min  = "During 40 Min",
+  post_10_min    = "Post 10 Min",
+  post_30_min    = "Post 30 Min",
+  post_3.5_hours = "Post 3.5 Hour",
+  post_24_hr     = "Post 24 Hour"
+)
+
+blood_da_df <- blood_da_df %>% 
+  # Drop pre-exercise and unwanted assays
+  filter(
+    Timepoint != "pre_exercise",
+    !assay %in% c("epigen-methylcap-seq", "epigen-atac-seq")
+  ) %>% 
+  # Normalize legacy timepoint names into canonical keys used in tp_levels
+  mutate(
+    Timepoint = recode(
+      Timepoint,
+      "post_15_30_45_min" = "post_30_min",
+      "Post_30 min"       = "post_30_min",
+      "post_3.5_4_hr"     = "post_3.5_hours",
+      "Post_3.5 hours"    = "post_3.5_hours"
+    ),
+    Timepoint = factor(Timepoint, levels = tp_levels)
+  ) %>% 
+  droplevels() %>%
+  # Assay display names & facet order
+  mutate(
+    assay = recode(
+      assay,
+      "metab"               = "Metabolites",
+      "prot-ol"             = "Proteins",
+      "transcript-rna-seq"  = "Transcripts"
+    ),
+    assay = factor(assay, levels = c("Transcripts", "Proteins", "Metabolites"))
+  )
+
+# Colors for assays (from MotrpacHumanPreSuspension)
+assay_colors <- c(
+  "Metabolites" = unname(MotrpacHumanPreSuspension::HUMAN_OME_COLORS["Metabolomics"]),
+  "Proteins"    = unname(MotrpacHumanPreSuspension::HUMAN_OME_COLORS["Proteomics"]),
+  "Transcripts" = unname(MotrpacHumanPreSuspension::HUMAN_OME_COLORS["Transcriptomics"])
+)
+
+# Ready-to-add axis scale & theme for clean x labels
+x_axis_ready <- scale_x_discrete(drop = FALSE, labels = tp_labels)
+x_axis_theme <- theme(
+  axis.text.x = element_text(size = 11, margin = margin(t = 6)),
+  strip.text  = element_text(face = "bold")
+)
+
+# --- Usage in your plot ---
+# p + x_axis_ready + x_axis_theme
+
+```
+
+
+```{r}
+
+# 1) your per‐assay counts
+total_changes <- blood_da_df %>%
+  filter(adj_p_value < 0.05,
+         contrast_category %in% c("EE-CON","RE-CON")) %>%
+  group_by(assay) %>%
+  summarise(total_changed = n(), .groups = "drop")
+
+# 2) now sum across assays to get the grand totals
+overall_changes <- total_changes %>%
+  #group_by(contrast_category) %>%
+  summarise(overall_changed = sum(total_changed), .groups = "drop")
+
+# 3) view
+total_changes
+overall_changes
+
+
+```
+
+
+Helper function for sum up down
+```{r}
+make_logfc_summary <- function(data,
+                               contrasts,
+                               id_col  = NULL,
+                               p_col   = "adj_p_value",
+                               alpha   = 0.05) {
+  
+  tp_order <- levels(data$Timepoint)          # preserve factor order
+  
+  data %>% 
+    filter(
+      contrast_category %in% contrasts,       # chosen contrasts
+      .data[[p_col]] < alpha                  # **only significant rows**
+    ) %>% 
+    group_by(contrast_category, assay, Timepoint) %>% 
+    summarise(
+      n_up   = if (is.null(id_col))
+                 sum(logFC >  0, na.rm = TRUE)
+               else
+                 n_distinct(.data[[id_col]][logFC >  0]),
+      n_down = if (is.null(id_col))
+                 sum(logFC <  0, na.rm = TRUE)
+               else
+                 n_distinct(.data[[id_col]][logFC <  0]),
+      .groups = "drop"
+    ) %>% 
+    pivot_longer(
+      c(n_down, n_up),
+      names_to  = "direction",
+      values_to = "feature_count"
+    ) %>% 
+    mutate(
+      feature_count = if_else(direction == "n_down",
+                              -feature_count,   # make “down” negative
+                               feature_count),
+      direction     = if_else(direction == "n_up", "up", "down"),
+      Timepoint     = factor(Timepoint,
+                             levels = tp_order,
+                             ordered = TRUE)
+    )
+}
+
+
+
+```
+
+
+```{r, fig.width=9,fig.height=7}
+keep_contrasts <- c("EE-CON", "RE-CON", "CON-CON")
+
+sum_df <- make_logfc_summary(blood_da_df, contrasts = keep_contrasts) %>% 
+  mutate(contrast_category = str_remove(contrast_category, "-.*"))  # EE-EE → EE
+
+ggplot(sum_df, aes(Timepoint, feature_count, fill = assay)) +
+  geom_col(width = 0.7) +
+  facet_grid(assay ~ contrast_category, scales = "free_y") +
+  scale_fill_manual(values = assay_colors) +
+    scale_x_discrete(drop = FALSE, labels = tp_labels) +  # <- new labels here
+  scale_y_continuous(expand = expansion(mult = 0.05)) +
+  labs(
+    x    = "Timepoint",
+    y    = TeX("Sum of log$_2$FC features below FDR < 0.05"),
+    fill = "Assay"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    axis.text.x        = element_text(angle = 45, hjust = 1, size = 14, face = "bold"),
+    axis.text.y        = element_text(size = 14, face = "bold"),
+    axis.title.x       = element_text(size = 16, face = "bold"),
+    axis.title.y       = element_text(size = 16, face = "bold"),
+    strip.text         = element_text(size = 14, face = "bold"),
+    panel.grid.major.x = element_blank(),
+    strip.background   = element_rect(fill = "grey95", color = NA),
+    legend.position    = "none"  # Remove the legend as it's redundant with facets
+  )
+
+ggsave(
+  "blood_DA_feature_counts_EE_RE_CON.png",
+   dpi = 320,
+)
+
+```
+
+
+
+```{r, fig.width=9,fig.height=7}
+keep_contrasts <- c("EE-CON", "RE-CON")
+
+sum_df <- make_logfc_summary(blood_da_df, contrasts = keep_contrasts) %>% 
+  mutate(
+    contrast_category = str_remove(contrast_category, "-.*")  # "EE-EE" → "EE"
+  )
+
+ggplot(sum_df, aes(Timepoint, feature_count, fill = assay)) +
+  geom_col(width = 0.7) +
+  facet_grid(assay ~ contrast_category, scales = "free_y") +
+  scale_fill_manual(values = assay_colors) +
+    scale_x_discrete(drop = FALSE, labels = tp_labels) +  # <- new labels here
+
+  scale_y_continuous(expand = expansion(mult = 0.05)) +
+  labs(
+    x    = "Timepoint",
+    y    = TeX("Sum of log$_2$FC features below FDR < 0.05"),
+    fill = "Assay"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    axis.text.x        = element_text(angle = 45, hjust = 1, size = 14, face = "bold"),
+    axis.text.y        = element_text(size = 14, face = "bold"),
+    axis.title.x       = element_text(size = 16, face = "bold"),
+    axis.title.y       = element_text(size = 16, face = "bold"),
+    strip.text         = element_text(size = 14, face = "bold"),
+    panel.grid.major.x = element_blank(),
+    strip.background   = element_rect(fill = "grey95", color = NA),
+    legend.position    = "none"  # Remove the legend as it's redundant with facets
+  )
+
+ggsave("blood_DA_feature_counts_EE_RE.png", dpi = 320)
+
+
+```
+
+```{r}
+keep_contrasts <- c("EE-CON", "RE-CON")
+
+sum_df <- make_logfc_summary(blood_da_df, contrasts = keep_contrasts) %>% 
+  mutate(
+    contrast_category = str_remove(contrast_category, "-.*"),   # "EE-EE" → "EE"
+    pattern_flag      = if_else(feature_count < 0, "stripe", "none")  # negative = hatched
+  )
+
+sum_df <- make_logfc_summary(blood_da_df, contrasts = c("EE-CON","RE-CON")) %>% 
+  mutate(
+    contrast_category = str_remove(contrast_category, "-.*"),
+    pattern_flag      = if_else(feature_count < 0, "stripe", "none")  # NEG -> stripe, POS -> none
+  )
+
+p <- ggplot(sum_df, aes(Timepoint, feature_count)) +
+  geom_hline(yintercept = 0, linewidth = 0.7, color = "black") +
+  ggpattern::geom_col_pattern(
+    aes(
+      fill           = assay,
+      pattern        = pattern_flag,              # <- mapped (no fixed pattern param!)
+      pattern_fill   = after_scale(alpha(fill, 0.40))  # stripes use same color family
+    ),
+    width = 0.72,
+    color = NA,
+    pattern_angle    = 45,
+    pattern_spacing  = 0.05,
+    pattern_size     = 0.7,
+    pattern_density  = 0.35,
+    pattern_key_scale_factor = 0.5
+  ) +
+  facet_grid(assay ~ contrast_category, scales = "free_y") +
+  scale_fill_manual(values = assay_colors) +
+  scale_pattern_manual(values = c(none = "none", stripe = "stripe"), guide = "none") +
+  scale_y_continuous(
+    limits = function(x) c(min(0, x[1]), max(0, x[2])),
+    expand = expansion(mult = 0.05)
+  ) +
+  scale_x_discrete(drop = FALSE, labels = tp_labels) +
+  labs(x = "Timepoint", y = "Differentially abundant features") +
+  theme_minimal(base_size = 13) +
+  theme(
+    legend.position    = "none",
+    axis.text.x        = element_text(angle = 45, hjust = 1, size = 14, face = "bold"),
+    axis.text.y        = element_text(size = 14, face = "bold"),
+    axis.title.x       = element_text(size = 16, face = "bold"),
+    axis.title.y       = element_text(size = 16, face = "bold"),
+    strip.text         = element_text(size = 14, face = "bold"),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor   = element_blank(),
+    strip.background   = element_rect(fill = "grey95", color = NA)
+  )
+
+p
+
+```
+
+```{r}
+sum_df %>% filter(assay == "prot-ol")
+```
+
+
+```{r, fig.width=9,fig.height=7}
+# contrasts you care about
+keep_contrasts <- c("CON-CON")
+
+sum_df <- make_logfc_summary(blood_da_df, contrasts = keep_contrasts) %>%
+  mutate(
+    contrast_category = str_remove(contrast_category, "-.*"),     # "CON-CON" → "CON"
+    pattern_flag      = if_else(feature_count < 0, "stripe", "none")
+  )
+
+p <- ggplot(sum_df, aes(Timepoint, feature_count)) +
+  # visible zero baseline
+  geom_hline(yintercept = 0, linewidth = 0.7, color = "black") +
+  # solid positives, hatched negatives
+  ggpattern::geom_col_pattern(
+    aes(
+      fill          = assay,
+      pattern       = pattern_flag,
+      pattern_fill  = after_scale(alpha(fill, 0.40))   # stripes in same color family
+    ),
+    width = 0.7,
+    color = NA,
+    pattern_angle    = 45,
+    pattern_spacing  = 0.05,
+    pattern_size     = 0.7,
+    pattern_density  = 0.35,
+    pattern_key_scale_factor = 0.5
+  ) +
+  facet_grid(assay ~ contrast_category, scales = "free_y") +
+  scale_fill_manual(values = assay_colors) +
+  scale_pattern_manual(values = c(none = "none", stripe = "stripe"), guide = "none") +
+  scale_x_discrete(drop = FALSE, labels = tp_labels) +
+  scale_y_continuous(
+    limits = function(x) c(min(0, x[1]), max(0, x[2])),  # ensure 0 is included
+    expand = expansion(mult = 0.05)
+  ) +
+  labs(
+    x    = "Timepoint",
+    y    = TeX("Differentially abundant features")
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    legend.position    = "none",              # remove guides
+    axis.text.x        = element_text(angle = 45, hjust = 1, size = 14, face = "bold"),
+    axis.text.y        = element_text(size = 14, face = "bold"),
+    axis.title.x       = element_text(size = 16, face = "bold"),
+    axis.title.y       = element_text(size = 16, face = "bold"),
+    strip.text         = element_text(size = 14, face = "bold"),
+    strip.background   = element_rect(fill = "grey95", color = NA),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor   = element_blank()
+  )
+
+p
+
+ggsave("blood_DA_feature_counts_CON.png", p, dpi = 320)
+
+```
+
+
+
+# Combined
+```{r}
+# First, define your function to combine timepoints by assay
+make_logfc_summary_by_assay_combined_contrasts <- function(data,
+                                                          contrasts,
+                                                          id_col = NULL,
+                                                          p_col = "adj_p_value",
+                                                          alpha = 0.05) {
+  
+  data %>% 
+    filter(
+      contrast_category %in% contrasts,       # chosen contrasts
+      .data[[p_col]] < alpha                  # only significant rows
+    ) %>% 
+    # Apply the string removal transformation here
+    mutate(
+      contrast_category = str_remove(contrast_category, "-.*")  # "EE-CON" → "EE"
+    ) %>%
+    # Now group by the simplified contrast and assay
+    group_by(contrast_category, assay) %>%    
+    summarise(
+      n_up   = if (is.null(id_col))
+                 sum(logFC >  0, na.rm = TRUE)
+               else
+                 n_distinct(.data[[id_col]][logFC >  0]),
+      n_down = if (is.null(id_col))
+                 sum(logFC <  0, na.rm = TRUE)
+               else
+                 n_distinct(.data[[id_col]][logFC <  0]),
+      .groups = "drop"
+    ) %>% 
+    pivot_longer(
+      c(n_down, n_up),
+      names_to  = "direction",
+      values_to = "feature_count"
+    ) %>% 
+    mutate(
+      Timepoint = "All Timepoints",  # Add this line to explicitly label as combined
+      feature_count = if_else(direction == "n_down",
+                              -feature_count,   # make "down" negative
+                               feature_count),
+      direction     = if_else(direction == "n_up", "up", "down")
+    )
+}
+```
+
+```{r}
+# contrasts you care about
+keep_contrasts <- c("EE-CON", "RE-CON")
+
+# Apply the function that combines timepoints and merges contrasts
+make_logfc_summary_by_assay_combined_contrasts(blood_da_df, contrasts = keep_contrasts)
+```
+
+```{r}
+make_logfc_summary_summed_contrasts <- function(data,
+                                               contrasts,
+                                               id_col = NULL,
+                                               p_col = "adj_p_value",
+                                               alpha = 0.05,
+                                               combined_name = "Combined RE and EE -Control") {
+  
+  data %>% 
+    filter(
+      contrast_category %in% contrasts,       # chosen contrasts
+      .data[[p_col]] < alpha                  # only significant rows
+    ) %>% 
+    # Replace all contrast names with a single label
+    mutate(
+      contrast_category = combined_name  # Combine all contrasts under one name
+    ) %>%
+    # Group by the common contrast name and assay
+    group_by(contrast_category, assay) %>%    
+    summarise(
+      n_up   = if (is.null(id_col))
+                 sum(logFC >  0, na.rm = TRUE)
+               else
+                 n_distinct(.data[[id_col]][logFC >  0]),
+      n_down = if (is.null(id_col))
+                 sum(logFC <  0, na.rm = TRUE)
+               else
+                 n_distinct(.data[[id_col]][logFC <  0]),
+      .groups = "drop"
+    ) %>% 
+    pivot_longer(
+      c(n_down, n_up),
+      names_to  = "direction",
+      values_to = "feature_count"
+    ) %>% 
+    mutate(
+      Timepoint = "All Timepoints",  # Add this line to explicitly label as combined
+      feature_count = if_else(direction == "n_down",
+                              -feature_count,   # make "down" negative
+                               feature_count),
+      direction     = if_else(direction == "n_up", "up", "down")
+    )
+}
+```
+
+```{r}
+# contrasts you care about
+keep_contrasts <- c("EE-CON", "RE-CON")
+
+# Apply the function to sum both contrasts together
+make_logfc_summary_summed_contrasts(blood_da_df, contrasts = keep_contrasts)
+```
+
+
+
+```{r}
+make_logfc_summary_absolute_counts <- function(data,
+                                              contrasts,
+                                              id_col = NULL,
+                                              p_col = "adj_p_value",
+                                              alpha = 0.05,
+                                              combined_name = "Combined RE and EE-Control") {
+  
+  data %>% 
+    filter(
+      contrast_category %in% contrasts,       # chosen contrasts
+      .data[[p_col]] < alpha                  # only significant rows
+    ) %>% 
+    # Replace all contrast names with a single label
+    mutate(
+      contrast_category = combined_name  # Combine all contrasts under one name
+    ) %>%
+    # Group by the common contrast name and assay
+    group_by(contrast_category, assay) %>%    
+    summarise(
+      total_changed = if (is.null(id_col))
+                        sum(logFC != 0, na.rm = TRUE)
+                      else
+                        n_distinct(.data[[id_col]]),
+      .groups = "drop"
+    ) %>% 
+    mutate(
+      Timepoint = "All Timepoints"  # Add this line to explicitly label as combined
+    )
+}
+```
+
+```{r}
+# contrasts you care about
+keep_contrasts <- c("EE-CON", "RE-CON")
+
+# Apply the function to sum total changing features across both contrasts
+make_logfc_summary_absolute_counts(blood_da_df, contrasts = keep_contrasts)
+```
+
+Metabolites
+Proteins
+Transcripts
+
+```{r}
+make_logfc_summary_total_count <- function(data,
+                                          contrasts,
+                                          id_col = NULL,
+                                          p_col = "adj_p_value",
+                                          alpha = 0.05,
+                                          combined_name = "Combined RE and EE-Control") {
+  
+  # First, get counts by assay
+  by_assay <- data %>% 
+    filter(
+      contrast_category %in% contrasts,       # chosen contrasts
+      .data[[p_col]] < alpha                  # only significant rows
+    ) %>% 
+    # Replace all contrast names with a single label
+    mutate(
+      contrast_category = combined_name  # Combine all contrasts under one name
+    ) %>%
+    # Group by the common contrast name and assay
+    group_by(contrast_category, assay) %>%    
+    summarise(
+      total_changed = if (is.null(id_col))
+                        sum(logFC != 0, na.rm = TRUE)
+                      else
+                        n_distinct(.data[[id_col]]),
+      .groups = "drop"
+    ) %>% 
+    mutate(
+      Timepoint = "All Timepoints"  # Add this line to explicitly label as combined
+    )
+  
+  # Add a row with the grand total across all assays
+  by_assay %>%
+    bind_rows(
+      by_assay %>%
+        group_by(contrast_category, Timepoint) %>%
+        summarise(
+          total_changed = sum(total_changed),
+          .groups = "drop"
+        ) %>%
+        mutate(
+          assay = "All Assays Combined"
+        )
+    )
+}
+
+get_total_changing_features <- function(data,
+                                       contrasts,
+                                       id_col = NULL,
+                                       p_col = "adj_p_value",
+                                       alpha = 0.05) {
+  
+  data %>% 
+    filter(
+      contrast_category %in% contrasts,       # chosen contrasts
+      .data[[p_col]] < alpha                  # only significant rows
+    ) %>% 
+    summarise(
+      total_changed = if (is.null(id_col))
+                        sum(logFC != 0, na.rm = TRUE)
+                      else
+                        n_distinct(.data[[id_col]])
+    ) %>%
+    pull(total_changed)
+}
+
+# Get just the single total number
+get_total_changing_features(blood_da_df, contrasts = keep_contrasts)
+```

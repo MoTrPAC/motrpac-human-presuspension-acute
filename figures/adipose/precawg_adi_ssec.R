@@ -1,19 +1,20 @@
-library(MotrpacHumanPreSuspension)
+library(MotrpacHumanPreSuspensionAnalysis)
 library(ggtext)
 library(dplyr)
 library(tidyr)
 library(ggplot2)
 library(purrr)
-library(ggtext)       
-library(patchwork)   
-library(RColorBrewer) 
-library(stats)  
+library(ggtext)
+library(patchwork)
+library(RColorBrewer)
+library(stats)
 library(tibble)
 library(circlize)
 library(ComplexHeatmap)
 
-setwd("path")
-wat_combined_all <- readRDS("wat_ssec_sexadj.RDS") # data from PMCID: PMC12340562
+files_path = file.path(here(), "figures", "adipose", "Files")
+wat_combined_all <- readRDS(file.path(files_path, "wat_ssec_sexadj.RDS")) # data from PMCID: PMC12340562
+#this file size is too large to store in the github repository, please refer to the manuscript to get access to this data.
 
 wat_combined_all <- wat_combined_all %>%
   mutate(Facet_Label = paste0("WATSC → ", Target_Tissue))
@@ -31,10 +32,10 @@ d_facet <- ggplot(
   wat_combined_all,
   aes(x = Ssec, fill = Condition, color = Condition)
 ) +
-  geom_density(alpha = 0.4, size = 1) +     
+  geom_density(alpha = 0.4, size = 1) +
   scale_color_manual(values = condition_colors) +
   scale_fill_manual(values = condition_colors) +
-  facet_wrap(~ Facet_Label, ncol = 4, scales = "free") +  
+  facet_wrap(~ Facet_Label, ncol = 4, scales = "free") +
   theme_minimal() +
   theme(
     legend.position = "none",
@@ -46,8 +47,8 @@ d_facet <- ggplot(
     y = "Density"
   )
 
-# Perform wilcoxon test to compare CON and TR9W focusing on 60 secretome candidate genes. 
-# blood_protein_genes is obtained from precawg_adi_secretome.R. 
+# Perform wilcoxon test to compare CON and TR9W focusing on 60 secretome candidate genes.
+# blood_protein_genes is obtained from precawg_adi_secretome.R.
 #str(blood_protein_genes)
 #tibble [63 × 3] (S3: tbl_df/tbl/data.frame)
 #$ assay      : Factor w/ 2 levels "transcript-rna-seq",..: 1 1 1 1 1 1 1 1 1 1 ...
@@ -59,31 +60,31 @@ wat_filtered <- wat_combined_all %>%
   rename(Tissue = Facet_Label)
 
 wilcoxon_test_ssec <- function(df) {
-  
+
   df_filtered <- df %>%
     filter(Condition %in% c("CON", "TR8W"))
-  
+
   # If either group is missing → return NA
   if (!all(c("CON", "TR8W") %in% unique(df_filtered$Condition))) {
     return(data.frame(Tissue = unique(df$Tissue), P_Value = NA))
   }
-  
+
   # Require paired genes (each gene appearing in both CON & TR8W)
   wide_df <- df_filtered %>%
     select(Human_Gene, Condition, Ssec) %>%
     pivot_wider(names_from = Condition, values_from = Ssec)
-  
+
   # Remove incomplete pairs
   wide_df <- wide_df %>% drop_na()
-  
+
   if (nrow(wide_df) < 3) {
     return(data.frame(Tissue = unique(df$Tissue), P_Value = NA))
   }
-  
+
   test_result <- wilcox.test(wide_df$CON,
                              wide_df$TR8W,
                              paired = TRUE)
-  
+
   data.frame(Tissue = unique(df$Tissue),
              P_Value = test_result$p.value)
 }
@@ -122,33 +123,33 @@ ggplot(wilcoxon_results,
 
 # Function for paired t-test
 paired_t_test_ssec <- function(df) {
-  
+
   df_filtered <- df %>%
     filter(Condition %in% c("CON", "TR8W"))
-  
+
   # Ensure both groups exist
   if (!all(c("CON", "TR8W") %in% unique(df_filtered$Condition))) {
     return(data.frame(Tissue = unique(df$Tissue), P_Value = NA))
   }
-  
+
   # Paired genes (must appear once in CON & once in TR8W)
   wide_df <- df_filtered %>%
     select(Human_Gene, Condition, Ssec) %>%
     pivot_wider(names_from = Condition, values_from = Ssec) %>%
     drop_na()
-  
+
   if (nrow(wide_df) < 3) {
     return(data.frame(Tissue = unique(df$Tissue), P_Value = NA))
   }
-  
+
   # Paired t-test
   test_result <- t.test(wide_df$CON, wide_df$TR8W, paired = TRUE)
-  
+
   data.frame(Tissue = unique(df$Tissue),
              P_Value = test_result$p.value)
 }
 t_test_results <- wat_combined_all %>%
-  filter(Human_Gene %in% unique(blood_protein_genes$gene_symbol)) %>% 
+  filter(Human_Gene %in% unique(blood_protein_genes$gene_symbol)) %>%
   rename(Tissue = Facet_Label) %>%
   group_by(Tissue) %>%
   group_split() %>%
@@ -195,18 +196,18 @@ ggplot(ssec_combined, aes(x = Condition, y = Ssec, fill = Condition)) +
   )
 
 
-# Custom function to plot top 15 different features with largest Ssec difference between CON and TR8W. 
+# Custom function to plot top 15 different features with largest Ssec difference between CON and TR8W.
 plot_top_rank_change <- function(origin_tissue, target_tissue) {
   # Step 1: Subset and rank
   con_data <- wat_combined_all %>%
     filter(Condition == "CON", Origin_Tissue == origin_tissue, Target_Tissue == target_tissue) %>%
     mutate(Rank_control = rank(-Ssec, na.last = "keep"))
-  
+
   tr8w_data <- wat_combined_all %>%
     filter(Condition == "TR8W", Origin_Tissue == origin_tissue, Target_Tissue == target_tissue) %>%
     mutate(Rank_tr8 = rank(-Ssec, na.last = "keep")) %>%
     select(RAT_SYMBOL, Rank_tr8, Ssec, score, Human_Gene)
-  
+
   # Step 2: Merge
   ranked_genes <- merge(
     con_data,
@@ -216,7 +217,7 @@ plot_top_rank_change <- function(origin_tissue, target_tissue) {
     mutate(
       Rank_change = abs(Rank_tr8 - Rank_control)
     )
-  
+
   # Step 3: Top 15 genes
   top_10_genes <- ranked_genes %>%
     filter(Human_Gene_tr8 %in% unique(blood_protein_genes$gene_symbol)) %>%
@@ -225,7 +226,7 @@ plot_top_rank_change <- function(origin_tissue, target_tissue) {
     mutate(
       display_label = factor(RAT_SYMBOL, levels = .$RAT_SYMBOL)
     )
-  
+
   # Step 4: Main Rank Plot (with arrow, flipped Y)
   p1 <- ggplot(top_10_genes, aes(x = display_label)) +
     geom_segment(
@@ -251,7 +252,7 @@ plot_top_rank_change <- function(origin_tissue, target_tissue) {
       axis.text.y = element_text(size = 10),
       legend.position = "none"
     )
-  
+
   # Step 5: Horizontal bar plot for score
   p2 <- ggplot(top_10_genes, aes(x = display_label, y = score_tr8, fill = score_tr8)) +
     geom_col(width = 0.6, color = "black") +
@@ -264,7 +265,7 @@ plot_top_rank_change <- function(origin_tissue, target_tissue) {
       legend.position = "none",
       axis.title.y = element_text(size = 9)  # Smaller font for Y-axis title
     )
-  
+
   # Combine plots with patchwork
   p1 / p2 + plot_layout(heights = c(3, 1))
 }
@@ -275,7 +276,7 @@ plot_top_rank_change("WAT-SC", "LIVER")
 plot_top_rank_change("WAT-SC", "KIDNEY")
 
 
-## Show Ssec changes for 60 secretome candidates in all tissue. 
+## Show Ssec changes for 60 secretome candidates in all tissue.
 wat_combined_all2 <- wat_combined_all %>%
   filter(Human_Gene %in% blood_protein_genes$gene_symbol)
 

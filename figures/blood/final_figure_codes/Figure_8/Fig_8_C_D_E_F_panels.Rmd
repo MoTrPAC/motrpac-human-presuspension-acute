@@ -1,0 +1,353 @@
+---
+title: "Greg Code for Figure Panel 8"
+author: "Gaurav Tiwari"
+date: "2025-11-08"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+session_packages = c("dplyr", "ggplot2", "ggrepel", "stringr", "scales","tidyverse", "ComplexUpset","MotrpacHumanPreSuspension", "MotrpacHumanPreSuspensionData","openxlsx","ggpubr","pheatmap","bubbleHeatmap","TMSig","gplots")
+for (lib_name in session_packages){
+  tryCatch({library(lib_name,character.only = T)}, error = function(e) {
+    print(paste("Cannot load",lib_name,", please install"))
+  })
+}
+
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+
+theme_set(theme_minimal())
+```
+
+
+```{r session setup}
+# Save date in case output files requiring date version
+date <- Sys.Date()
+date <- gsub("-", "", date)
+
+# setwd(file.path(normalizePath(config$local_path), "precovid-analyses", "integrative"))
+# Load libraries
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/unsupervised_normalization_functions.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/gcp_functions.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/qc_report_aux_functions.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/config_session.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/association_analysis_methods.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/MetabolomicsLibrary.R"))
+# source(file.path(normalizePath(config$motrpac_bic_norm_qc_repo_path),"tools/metabolomics_data_parsing_functions.R"))
+# source(file.path(normalizePath(config$general_shared_functions_library)))
+# repo_local_dir = file.path(config$precovid_repo_path, "data", "tmp")
+repo_local_dir = NULL
+library(here)
+here::i_am("figures/blood/final_figure_codes/Figure_8/Fig_8_C_D_E_F_panels.Rmd")
+data_dir       <- here("figures", "blood", "final_figure_input_data_files")
+plot_dir       <- here("figures", "blood", "final_figures")
+output_data_dir <- here("figures", "blood", "final_output_files")
+
+```
+
+### Figure 8F
+
+```{r, message=FALSE, warning=FALSE}
+
+
+precawg_ann_cols <- list("Tissue" = MotrpacHumanPreSuspension::HUMAN_TISSUE_COLORS[c("adipose","blood","muscle")],
+                         "Sex" = MotrpacHumanPreSuspension::HUMAN_SEX_COLORS[c("Female","Male")],
+                         "Timepoint" = MotrpacHumanPreSuspension::HUMAN_ACUTE_TIMEPOINT_COLORS[c("Pre_exercise","during_20_min","during_40_min","post_10_min","post_15_30_45_min","post_3.5_4_hr","post_24_hr")],
+                         "Modality" = MotrpacHumanPreSuspension::HUMAN_EXERCISE_GROUP_COLORS[c("ADUControl","ADUEndur","ADUResist")])
+names(precawg_ann_cols$Tissue) <- c("Adipose","Blood","Muscle")
+names(precawg_ann_cols$Timepoint) <- c("Pre","D20M","D40M","P10M","P15-45M","P3.5/4H","P24H")
+names(precawg_ann_cols$Modality) <- c("CON","EE","RE")
+
+bloodrnanorm <- cbind(MotrpacHumanPreSuspensionData::blood_transcript_1$qc_norm,MotrpacHumanPreSuspensionData::blood_transcript_2$qc_norm)
+
+bloodrnafeaturetogene <- as.data.frame(HUMAN_FEATURE_TO_GENE[HUMAN_FEATURE_TO_GENE$feature_id %in% rownames(bloodrnanorm),c("feature_id","gene_symbol")])
+rownames(bloodrnafeaturetogene) <- bloodrnafeaturetogene$feature_id
+
+bloodrnafeaturetogene <- bloodrnafeaturetogene[!is.na(bloodrnafeaturetogene$gene_symbol),]
+bloodrnafeaturetogene <- bloodrnafeaturetogene[!duplicated(bloodrnafeaturetogene$gene_symbol),]
+bloodrnanorm <- bloodrnanorm[rownames(bloodrnafeaturetogene),]
+rownames(bloodrnanorm) <- bloodrnafeaturetogene$gene_symbol
+
+
+
+
+#####
+# Cibersort Result Analysis
+####
+
+ciberout <- read.csv(file = file.path(data_dir, "CIBERSORTx_PrecovidBlood_RNADecon_Results.csv"),header = T,row.names = 1)
+
+bloodrnasamplemeta <- MotrpacHumanPreSuspensionData::blood_transcript_1$sample_metadata
+rownames(bloodrnasamplemeta) <- bloodrnasamplemeta$vialLabel
+bloodrnasamplemetatrim <- bloodrnasamplemeta[,c("Sex","Timepoint","randomGroupCode","pid")]
+bloodrnasamplemetatrim$B.cells.naive <- ciberout[rownames(bloodrnasamplemeta),"B.cells.naive"]
+bloodrnasamplemetatrim$B.cells.memory <- ciberout[rownames(bloodrnasamplemeta),"B.cells.memory"]
+bloodrnasamplemetatrim$Plasma.cells <- ciberout[rownames(bloodrnasamplemeta),"Plasma.cells"]
+bloodrnasamplemetatrim$T.cells.CD8 <- ciberout[rownames(bloodrnasamplemeta),"T.cells.CD8"]
+bloodrnasamplemetatrim$T.cells.CD4.naive <- ciberout[rownames(bloodrnasamplemeta),"T.cells.CD4.naive"]
+bloodrnasamplemetatrim$T.cells.CD4.memory.resting <- ciberout[rownames(bloodrnasamplemeta),"T.cells.CD4.memory.resting"]
+bloodrnasamplemetatrim$T.cells.CD4.memory.activated <- ciberout[rownames(bloodrnasamplemeta),"T.cells.CD4.memory.activated"]
+bloodrnasamplemetatrim$T.cells.follicular.helper <- ciberout[rownames(bloodrnasamplemeta),"T.cells.follicular.helper"]
+bloodrnasamplemetatrim$T.cells.regulatory..Tregs. <- ciberout[rownames(bloodrnasamplemeta),"T.cells.regulatory..Tregs."]
+bloodrnasamplemetatrim$T.cells.gamma.delta <- ciberout[rownames(bloodrnasamplemeta),"T.cells.gamma.delta"]
+bloodrnasamplemetatrim$NK.cells.resting <- ciberout[rownames(bloodrnasamplemeta),"NK.cells.resting"]
+bloodrnasamplemetatrim$NK.cells.activated <- ciberout[rownames(bloodrnasamplemeta),"NK.cells.activated"]
+bloodrnasamplemetatrim$Monocytes <- ciberout[rownames(bloodrnasamplemeta),"Monocytes"]
+bloodrnasamplemetatrim$Macrophages.M0 <- ciberout[rownames(bloodrnasamplemeta),"Macrophages.M0"]
+bloodrnasamplemetatrim$Macrophages.M1 <- ciberout[rownames(bloodrnasamplemeta),"Macrophages.M1"]
+bloodrnasamplemetatrim$Macrophages.M2 <- ciberout[rownames(bloodrnasamplemeta),"Macrophages.M2"]
+bloodrnasamplemetatrim$Dendritic.cells.resting <- ciberout[rownames(bloodrnasamplemeta),"Dendritic.cells.resting"]
+bloodrnasamplemetatrim$Dendritic.cells.activated <- ciberout[rownames(bloodrnasamplemeta),"Dendritic.cells.activated"]
+bloodrnasamplemetatrim$Mast.cells.resting <- ciberout[rownames(bloodrnasamplemeta),"Mast.cells.resting"]
+bloodrnasamplemetatrim$Mast.cells.activated <- ciberout[rownames(bloodrnasamplemeta),"Mast.cells.activated"]
+bloodrnasamplemetatrim$Eosinophils <- ciberout[rownames(bloodrnasamplemeta),"Eosinophils"]
+bloodrnasamplemetatrim$Neutrophils <- ciberout[rownames(bloodrnasamplemeta),"Neutrophils"]
+
+bloodrnasamplemetatrim[bloodrnasamplemetatrim$randomGroupCode %in% "ADUControl","randomGroupCode"] <- "CON"
+bloodrnasamplemetatrim[bloodrnasamplemetatrim$randomGroupCode %in% "ADUResist","randomGroupCode"] <- "RE"
+bloodrnasamplemetatrim[bloodrnasamplemetatrim$randomGroupCode %in% "ADUEndur","randomGroupCode"] <- "EE"
+
+bloodrnasamplemetatrim$Timepoint <- as.character(bloodrnasamplemetatrim$Timepoint)
+
+bloodrnasamplemetatrim[bloodrnasamplemetatrim$Timepoint %in% "pre_exercise","Timepoint"] <- "Pre"
+bloodrnasamplemetatrim[bloodrnasamplemetatrim$Timepoint %in% "during_20_min","Timepoint"] <- "D20M"
+bloodrnasamplemetatrim[bloodrnasamplemetatrim$Timepoint %in% "during_40_min","Timepoint"] <- "D40M"
+bloodrnasamplemetatrim[bloodrnasamplemetatrim$Timepoint %in% "post_10_min","Timepoint"] <- "P10M"
+bloodrnasamplemetatrim[bloodrnasamplemetatrim$Timepoint %in% "post_15_30_45_min","Timepoint"] <- "P15-45M"
+bloodrnasamplemetatrim[bloodrnasamplemetatrim$Timepoint %in% "post_3.5_4_hr","Timepoint"] <- "P3.5/4H"
+bloodrnasamplemetatrim[bloodrnasamplemetatrim$Timepoint %in% "post_24_hr","Timepoint"] <- "P24H"
+
+bloodrnasamplemetatrim$Timepoint <- factor(bloodrnasamplemetatrim$Timepoint,levels = c("Pre","D20M","D40M","P10M",
+                                                                                       "P15-45M","P3.5/4H","P24H"))
+colnames(bloodrnasamplemetatrim)[3] <- "Modality"
+
+
+testcomp <- compare_means(formula = Monocytes ~ Timepoint,data = bloodrnasamplemetatrim,group.by = "Modality",ref.group = "Pre",method = "t.test")
+testcomp[testcomp$p.adj > 0.05,"p.signif"] <- "ns"
+testcomp[testcomp$p.adj <= 0.05 & testcomp$p.adj > 0.005,"p.signif"] <- "*"
+testcomp[testcomp$p.adj <= 0.005 & testcomp$p.adj > 0.0005,"p.signif"] <- "**"
+testcomp[testcomp$p.adj <= 0.0005 & testcomp$p.adj > 0.00005,"p.signif"] <- "***"
+testcomp[testcomp$p.adj <= 0.00005 & testcomp$p.adj > 0.000005,"p.signif"] <- "****"
+
+pdf(file = file.path(plot_dir,"Figure_8" ,"BloodFigure8F_Cibersort_Monocytes_111425.pdf") ,width = 6,height = 5)
+ggpaired(bloodrnasamplemetatrim,x = "Timepoint",y = "Monocytes",fill = "Timepoint",facet.by = "Modality",id = "pid",line.color = "gray", line.size = 0.4) + scale_fill_manual(values = precawg_ann_cols$Timepoint) + stat_pvalue_manual(data = testcomp,x = "group2",label = "p.signif",y.position = max(bloodrnasamplemetatrim$Monocytes*1.05)) + theme(axis.text.x = element_text(angle = 45,vjust = 1,hjust = 1),legend.position = "none") + ggtitle("Blood Monocytes") + ylim(0,max(bloodrnasamplemetatrim$Monocytes)*1.1)
+dev.off()
+
+testcomp <- compare_means(formula = Macrophages.M0 ~ Timepoint,data = bloodrnasamplemetatrim,group.by = "Modality",ref.group = "Pre",method = "t.test")
+testcomp[testcomp$p.adj > 0.05,"p.signif"] <- "ns"
+testcomp[testcomp$p.adj <= 0.05 & testcomp$p.adj > 0.005,"p.signif"] <- "*"
+testcomp[testcomp$p.adj <= 0.005 & testcomp$p.adj > 0.0005,"p.signif"] <- "**"
+testcomp[testcomp$p.adj <= 0.0005 & testcomp$p.adj > 0.00005,"p.signif"] <- "***"
+testcomp[testcomp$p.adj <= 0.00005 & testcomp$p.adj > 0.000005,"p.signif"] <- "****"
+
+pdf(file = file.path(plot_dir,"Figure_8" ,"BloodFigure8F_Cibersort_Macrophages.M0_111425.pdf"),width = 6,height = 5)
+ggpaired(bloodrnasamplemetatrim,x = "Timepoint",y = "Macrophages.M0",fill = "Timepoint",facet.by = "Modality",id = "pid",line.color = "gray", line.size = 0.4) + scale_fill_manual(values = precawg_ann_cols$Timepoint) + stat_pvalue_manual(data = testcomp,x = "group2",label = "p.signif",y.position = max(bloodrnasamplemetatrim$Macrophages.M0*1.05)) + theme(axis.text.x = element_text(angle = 45,vjust = 1,hjust = 1),legend.position = "none") + ggtitle("Blood Macrophages.M0") + ylim(0,max(bloodrnasamplemetatrim$Macrophages.M0)*1.1)
+dev.off()
+
+testcomp <- compare_means(formula = Macrophages.M1 ~ Timepoint,data = bloodrnasamplemetatrim,group.by = "Modality",ref.group = "Pre",method = "t.test")
+testcomp[testcomp$p.adj > 0.05,"p.signif"] <- "ns"
+testcomp[testcomp$p.adj <= 0.05 & testcomp$p.adj > 0.005,"p.signif"] <- "*"
+testcomp[testcomp$p.adj <= 0.005 & testcomp$p.adj > 0.0005,"p.signif"] <- "**"
+testcomp[testcomp$p.adj <= 0.0005 & testcomp$p.adj > 0.00005,"p.signif"] <- "***"
+testcomp[testcomp$p.adj <= 0.00005 & testcomp$p.adj > 0.000005,"p.signif"] <- "****"
+
+pdf(file = file.path(plot_dir,"Figure_8" ,"BloodFigure8F_Cibersort_Macrophages.M1_111425.pdf"),width = 6,height = 5)
+ggpaired(bloodrnasamplemetatrim,x = "Timepoint",y = "Macrophages.M1",fill = "Timepoint",facet.by = "Modality",id = "pid",line.color = "gray", line.size = 0.4) + scale_fill_manual(values = precawg_ann_cols$Timepoint) + stat_pvalue_manual(data = testcomp,x = "group2",label = "p.signif",y.position = max(bloodrnasamplemetatrim$Macrophages.M1*1.05)) + theme(axis.text.x = element_text(angle = 45,vjust = 1,hjust = 1),legend.position = "none") + ggtitle("Blood Macrophages.M1") + ylim(0,max(bloodrnasamplemetatrim$Macrophages.M1)*1.1)
+dev.off()
+
+testcomp <- compare_means(formula = Neutrophils ~ Timepoint,data = bloodrnasamplemetatrim,group.by = "Modality",ref.group = "Pre",method = "t.test")
+testcomp[testcomp$p.adj > 0.05,"p.signif"] <- "ns"
+testcomp[testcomp$p.adj <= 0.05 & testcomp$p.adj > 0.005,"p.signif"] <- "*"
+testcomp[testcomp$p.adj <= 0.005 & testcomp$p.adj > 0.0005,"p.signif"] <- "**"
+testcomp[testcomp$p.adj <= 0.0005 & testcomp$p.adj > 0.00005,"p.signif"] <- "***"
+testcomp[testcomp$p.adj <= 0.00005 & testcomp$p.adj > 0.000005,"p.signif"] <- "****"
+
+pdf(file = file.path(plot_dir,"Figure_8" ,"BloodFigure8F_Cibersort_Neutrophils_111425.pdf"),width = 6,height = 5)
+ggpaired(bloodrnasamplemetatrim,x = "Timepoint",y = "Neutrophils",fill = "Timepoint",facet.by = "Modality",id = "pid",line.color = "gray", line.size = 0.4) + scale_fill_manual(values = precawg_ann_cols$Timepoint) + stat_pvalue_manual(data = testcomp,x = "group2",label = "p.signif",y.position = max(bloodrnasamplemetatrim$Neutrophils*1.05)) + theme(axis.text.x = element_text(angle = 45,vjust = 1,hjust = 1),legend.position = "none") + ggtitle("Blood Neutrophils") + ylim(0,max(bloodrnasamplemetatrim$Neutrophils)*1.1)
+dev.off()
+
+
+bloodrnasamplemetatrim <- bloodrnasamplemetatrim[order(bloodrnasamplemetatrim$Modality,bloodrnasamplemetatrim$Timepoint,bloodrnasamplemetatrim$Sex),]
+
+
+```
+
+### Plot 8E
+
+```{r, message=FALSE, warning=FALSE}
+
+
+#####
+# We want a bubble plot showing significant changes for each cell type at each time point
+####
+
+comparison_testmatrix <- matrix(1L,nrow = 22,ncol = 16)
+rownames(comparison_testmatrix) <- colnames(bloodrnasamplemetatrim)[5:dim(bloodrnasamplemetatrim)[2]]
+colnames(comparison_testmatrix) <- c("ADUControl_during_20_min","ADUControl_during_40_min","ADUControl_post_10_min",
+                                     "ADUControl_post_15_30_45_min","ADUControl_post_3.5_4_hr","ADUControl_post_24_hr",
+                                     "ADUEndur_during_20_min","ADUEndur_during_40_min","ADUEndur_post_10_min",
+                                     "ADUEndur_post_15_30_45_min","ADUEndur_post_3.5_4_hr","ADUEndur_post_24_hr",
+                                     "ADUResist_post_10_min",
+                                     "ADUResist_post_15_30_45_min","ADUResist_post_3.5_4_hr","ADUResist_post_24_hr")
+
+testcomp <- compare_means(formula = B.cells.naive ~ Timepoint,data = bloodrnasamplemetatrim,group.by = "Modality",ref.group = "Pre",method = "t.test")
+comparison_testmatrix[1,] <- testcomp$p.adj
+testcomp <- compare_means(formula = B.cells.memory ~ Timepoint,data = bloodrnasamplemetatrim,group.by = "Modality",ref.group = "Pre",method = "t.test")
+comparison_testmatrix[2,] <- testcomp$p.adj
+testcomp <- compare_means(formula = Plasma.cells ~ Timepoint,data = bloodrnasamplemetatrim,group.by = "Modality",ref.group = "Pre",method = "t.test")
+comparison_testmatrix[3,] <- testcomp$p.adj
+testcomp <- compare_means(formula = T.cells.CD8 ~ Timepoint,data = bloodrnasamplemetatrim,group.by = "Modality",ref.group = "Pre",method = "t.test")
+comparison_testmatrix[4,] <- testcomp$p.adj
+testcomp <- compare_means(formula = T.cells.CD4.naive ~ Timepoint,data = bloodrnasamplemetatrim,group.by = "Modality",ref.group = "Pre",method = "t.test")
+comparison_testmatrix[5,] <- testcomp$p.adj
+testcomp <- compare_means(formula = T.cells.CD4.memory.resting ~ Timepoint,data = bloodrnasamplemetatrim,group.by = "Modality",ref.group = "Pre",method = "t.test")
+comparison_testmatrix[6,] <- testcomp$p.adj
+testcomp <- compare_means(formula = T.cells.CD4.memory.activated ~ Timepoint,data = bloodrnasamplemetatrim,group.by = "Modality",ref.group = "Pre",method = "t.test")
+comparison_testmatrix[7,] <- testcomp$p.adj
+testcomp <- compare_means(formula = T.cells.follicular.helper ~ Timepoint,data = bloodrnasamplemetatrim,group.by = "Modality",ref.group = "Pre",method = "t.test")
+comparison_testmatrix[8,] <- testcomp$p.adj
+testcomp <- compare_means(formula = T.cells.regulatory..Tregs. ~ Timepoint,data = bloodrnasamplemetatrim,group.by = "Modality",ref.group = "Pre",method = "t.test")
+comparison_testmatrix[9,] <- testcomp$p.adj
+testcomp <- compare_means(formula = T.cells.gamma.delta ~ Timepoint,data = bloodrnasamplemetatrim,group.by = "Modality",ref.group = "Pre",method = "t.test")
+comparison_testmatrix[10,] <- testcomp$p.adj
+testcomp <- compare_means(formula = NK.cells.resting ~ Timepoint,data = bloodrnasamplemetatrim,group.by = "Modality",ref.group = "Pre",method = "t.test")
+comparison_testmatrix[11,] <- testcomp$p.adj
+testcomp <- compare_means(formula = NK.cells.activated ~ Timepoint,data = bloodrnasamplemetatrim,group.by = "Modality",ref.group = "Pre",method = "t.test")
+comparison_testmatrix[12,] <- testcomp$p.adj
+testcomp <- compare_means(formula = Monocytes ~ Timepoint,data = bloodrnasamplemetatrim,group.by = "Modality",ref.group = "Pre",method = "t.test")
+comparison_testmatrix[13,] <- testcomp$p.adj
+testcomp <- compare_means(formula = Macrophages.M0 ~ Timepoint,data = bloodrnasamplemetatrim,group.by = "Modality",ref.group = "Pre",method = "t.test")
+comparison_testmatrix[14,] <- testcomp$p.adj
+testcomp <- compare_means(formula = Macrophages.M1 ~ Timepoint,data = bloodrnasamplemetatrim,group.by = "Modality",ref.group = "Pre",method = "t.test")
+comparison_testmatrix[15,] <- testcomp$p.adj
+testcomp <- compare_means(formula = Macrophages.M2 ~ Timepoint,data = bloodrnasamplemetatrim,group.by = "Modality",ref.group = "Pre",method = "t.test")
+comparison_testmatrix[16,] <- testcomp$p.adj
+testcomp <- compare_means(formula = Dendritic.cells.resting ~ Timepoint,data = bloodrnasamplemetatrim,group.by = "Modality",ref.group = "Pre",method = "t.test")
+comparison_testmatrix[17,] <- testcomp$p.adj
+testcomp <- compare_means(formula = Dendritic.cells.activated ~ Timepoint,data = bloodrnasamplemetatrim,group.by = "Modality",ref.group = "Pre",method = "t.test")
+comparison_testmatrix[18,] <- testcomp$p.adj
+testcomp <- compare_means(formula = Mast.cells.resting ~ Timepoint,data = bloodrnasamplemetatrim,group.by = "Modality",ref.group = "Pre",method = "t.test")
+comparison_testmatrix[19,] <- testcomp$p.adj
+testcomp <- compare_means(formula = Mast.cells.activated ~ Timepoint,data = bloodrnasamplemetatrim,group.by = "Modality",ref.group = "Pre",method = "t.test")
+comparison_testmatrix[20,] <- testcomp$p.adj
+#testcomp <- compare_means(formula = Eosinophils ~ Timepoint,data = bloodrnasamplemetatrim,group.by = "Modality",ref.group = "Pre",method = "t.test")
+#comparison_testmatrix[21,] <- testcomp$p.adj
+testcomp <- compare_means(formula = Neutrophils ~ Timepoint,data = bloodrnasamplemetatrim,group.by = "Modality",ref.group = "Pre",method = "t.test")
+comparison_testmatrix[22,] <- testcomp$p.adj
+
+
+# Now we want to calculate the l2fc for each cell type pre vs post, per group
+
+comparison_l2fcmatrix <- matrix(0L,nrow = 22,ncol = 16)
+rownames(comparison_l2fcmatrix) <- colnames(bloodrnasamplemetatrim)[5:dim(bloodrnasamplemetatrim)[2]]
+colnames(comparison_l2fcmatrix) <- c("ADUControl_during_20_min","ADUControl_during_40_min","ADUControl_post_10_min",
+                                     "ADUControl_post_15_30_45_min","ADUControl_post_3.5_4_hr","ADUControl_post_24_hr",
+                                     "ADUEndur_during_20_min","ADUEndur_during_40_min","ADUEndur_post_10_min",
+                                     "ADUEndur_post_15_30_45_min","ADUEndur_post_3.5_4_hr","ADUEndur_post_24_hr",
+                                     "ADUResist_post_10_min",
+                                     "ADUResist_post_15_30_45_min","ADUResist_post_3.5_4_hr","ADUResist_post_24_hr")
+for(i in 1:dim(comparison_l2fcmatrix)[1]){
+  ourcelltype <- rownames(comparison_l2fcmatrix)[i]
+  bloodrnasamplemetatrimjustcell <- bloodrnasamplemetatrim[,c("Timepoint","Modality",ourcelltype)]
+  
+  comparison_l2fcmatrix[i,"ADUControl_during_20_min"] <- log2(0.0001+mean(bloodrnasamplemetatrimjustcell[bloodrnasamplemetatrimjustcell$Modality %in% "CON" & bloodrnasamplemetatrimjustcell$Timepoint %in% "D20M",ourcelltype])) -
+    log2(0.0001+mean(bloodrnasamplemetatrimjustcell[bloodrnasamplemetatrimjustcell$Modality %in% "CON" & bloodrnasamplemetatrimjustcell$Timepoint %in% "Pre",ourcelltype]))
+  comparison_l2fcmatrix[i,"ADUControl_during_40_min"] <- log2(0.0001+mean(bloodrnasamplemetatrimjustcell[bloodrnasamplemetatrimjustcell$Modality %in% "CON" & bloodrnasamplemetatrimjustcell$Timepoint %in% "D40M",ourcelltype])) -
+    log2(0.0001+mean(bloodrnasamplemetatrimjustcell[bloodrnasamplemetatrimjustcell$Modality %in% "CON" & bloodrnasamplemetatrimjustcell$Timepoint %in% "Pre",ourcelltype]))
+  comparison_l2fcmatrix[i,"ADUControl_post_10_min"] <- log2(0.0001+mean(bloodrnasamplemetatrimjustcell[bloodrnasamplemetatrimjustcell$Modality %in% "CON" & bloodrnasamplemetatrimjustcell$Timepoint %in% "P10M",ourcelltype])) -
+    log2(0.0001+mean(bloodrnasamplemetatrimjustcell[bloodrnasamplemetatrimjustcell$Modality %in% "CON" & bloodrnasamplemetatrimjustcell$Timepoint %in% "Pre",ourcelltype]))
+  comparison_l2fcmatrix[i,"ADUControl_post_15_30_45_min"] <- log2(0.0001+mean(bloodrnasamplemetatrimjustcell[bloodrnasamplemetatrimjustcell$Modality %in% "CON" & bloodrnasamplemetatrimjustcell$Timepoint %in% "P15-45M",ourcelltype])) -
+    log2(0.0001+mean(bloodrnasamplemetatrimjustcell[bloodrnasamplemetatrimjustcell$Modality %in% "CON" & bloodrnasamplemetatrimjustcell$Timepoint %in% "Pre",ourcelltype]))
+  comparison_l2fcmatrix[i,"ADUControl_post_3.5_4_hr"] <- log2(0.0001+mean(bloodrnasamplemetatrimjustcell[bloodrnasamplemetatrimjustcell$Modality %in% "CON" & bloodrnasamplemetatrimjustcell$Timepoint %in% "P3.5/4H",ourcelltype])) -
+    log2(0.0001+mean(bloodrnasamplemetatrimjustcell[bloodrnasamplemetatrimjustcell$Modality %in% "CON" & bloodrnasamplemetatrimjustcell$Timepoint %in% "Pre",ourcelltype]))
+  comparison_l2fcmatrix[i,"ADUControl_post_24_hr"] <- log2(0.0001+mean(bloodrnasamplemetatrimjustcell[bloodrnasamplemetatrimjustcell$Modality %in% "CON" & bloodrnasamplemetatrimjustcell$Timepoint %in% "P24H",ourcelltype])) -
+    log2(0.0001+mean(bloodrnasamplemetatrimjustcell[bloodrnasamplemetatrimjustcell$Modality %in% "CON" & bloodrnasamplemetatrimjustcell$Timepoint %in% "Pre",ourcelltype]))
+  comparison_l2fcmatrix[i,"ADUEndur_during_20_min"] <- log2(0.0001+mean(bloodrnasamplemetatrimjustcell[bloodrnasamplemetatrimjustcell$Modality %in% "EE" & bloodrnasamplemetatrimjustcell$Timepoint %in% "D20M",ourcelltype])) -
+    log2(0.0001+mean(bloodrnasamplemetatrimjustcell[bloodrnasamplemetatrimjustcell$Modality %in% "EE" & bloodrnasamplemetatrimjustcell$Timepoint %in% "Pre",ourcelltype]))
+  comparison_l2fcmatrix[i,"ADUEndur_during_40_min"] <- log2(0.0001+mean(bloodrnasamplemetatrimjustcell[bloodrnasamplemetatrimjustcell$Modality %in% "EE" & bloodrnasamplemetatrimjustcell$Timepoint %in% "D40M",ourcelltype])) -
+    log2(0.0001+mean(bloodrnasamplemetatrimjustcell[bloodrnasamplemetatrimjustcell$Modality %in% "EE" & bloodrnasamplemetatrimjustcell$Timepoint %in% "Pre",ourcelltype]))
+  comparison_l2fcmatrix[i,"ADUEndur_post_10_min"] <- log2(0.0001+mean(bloodrnasamplemetatrimjustcell[bloodrnasamplemetatrimjustcell$Modality %in% "EE" & bloodrnasamplemetatrimjustcell$Timepoint %in% "P10M",ourcelltype])) -
+    log2(0.0001+mean(bloodrnasamplemetatrimjustcell[bloodrnasamplemetatrimjustcell$Modality %in% "EE" & bloodrnasamplemetatrimjustcell$Timepoint %in% "Pre",ourcelltype]))
+  comparison_l2fcmatrix[i,"ADUEndur_post_15_30_45_min"] <- log2(0.0001+mean(bloodrnasamplemetatrimjustcell[bloodrnasamplemetatrimjustcell$Modality %in% "EE" & bloodrnasamplemetatrimjustcell$Timepoint %in% "P15-45M",ourcelltype])) -
+    log2(0.0001+mean(bloodrnasamplemetatrimjustcell[bloodrnasamplemetatrimjustcell$Modality %in% "EE" & bloodrnasamplemetatrimjustcell$Timepoint %in% "Pre",ourcelltype]))
+  comparison_l2fcmatrix[i,"ADUEndur_post_3.5_4_hr"] <- log2(0.0001+mean(bloodrnasamplemetatrimjustcell[bloodrnasamplemetatrimjustcell$Modality %in% "EE" & bloodrnasamplemetatrimjustcell$Timepoint %in% "P3.5/4H",ourcelltype])) -
+    log2(0.0001+mean(bloodrnasamplemetatrimjustcell[bloodrnasamplemetatrimjustcell$Modality %in% "EE" & bloodrnasamplemetatrimjustcell$Timepoint %in% "Pre",ourcelltype]))
+  comparison_l2fcmatrix[i,"ADUEndur_post_24_hr"] <- log2(0.0001+mean(bloodrnasamplemetatrimjustcell[bloodrnasamplemetatrimjustcell$Modality %in% "EE" & bloodrnasamplemetatrimjustcell$Timepoint %in% "P24H",ourcelltype])) -
+    log2(0.0001+mean(bloodrnasamplemetatrimjustcell[bloodrnasamplemetatrimjustcell$Modality %in% "EE" & bloodrnasamplemetatrimjustcell$Timepoint %in% "Pre",ourcelltype]))
+  comparison_l2fcmatrix[i,"ADUResist_post_10_min"] <- log2(0.0001+mean(bloodrnasamplemetatrimjustcell[bloodrnasamplemetatrimjustcell$Modality %in% "RE" & bloodrnasamplemetatrimjustcell$Timepoint %in% "P10M",ourcelltype])) -
+    log2(0.0001+mean(bloodrnasamplemetatrimjustcell[bloodrnasamplemetatrimjustcell$Modality %in% "RE" & bloodrnasamplemetatrimjustcell$Timepoint %in% "Pre",ourcelltype]))
+  comparison_l2fcmatrix[i,"ADUResist_post_15_30_45_min"] <- log2(0.0001+mean(bloodrnasamplemetatrimjustcell[bloodrnasamplemetatrimjustcell$Modality %in% "RE" & bloodrnasamplemetatrimjustcell$Timepoint %in% "P15-45M",ourcelltype])) -
+    log2(0.0001+mean(bloodrnasamplemetatrimjustcell[bloodrnasamplemetatrimjustcell$Modality %in% "RE" & bloodrnasamplemetatrimjustcell$Timepoint %in% "Pre",ourcelltype]))
+  comparison_l2fcmatrix[i,"ADUResist_post_3.5_4_hr"] <- log2(0.0001+mean(bloodrnasamplemetatrimjustcell[bloodrnasamplemetatrimjustcell$Modality %in% "RE" & bloodrnasamplemetatrimjustcell$Timepoint %in% "P3.5/4H",ourcelltype])) -
+    log2(0.0001+mean(bloodrnasamplemetatrimjustcell[bloodrnasamplemetatrimjustcell$Modality %in% "RE" & bloodrnasamplemetatrimjustcell$Timepoint %in% "Pre",ourcelltype]))
+  comparison_l2fcmatrix[i,"ADUResist_post_24_hr"] <- log2(0.0001+mean(bloodrnasamplemetatrimjustcell[bloodrnasamplemetatrimjustcell$Modality %in% "RE" & bloodrnasamplemetatrimjustcell$Timepoint %in% "P24H",ourcelltype])) -
+    log2(0.0001+mean(bloodrnasamplemetatrimjustcell[bloodrnasamplemetatrimjustcell$Modality %in% "RE" & bloodrnasamplemetatrimjustcell$Timepoint %in% "Pre",ourcelltype]))
+}
+
+heatmapcolannodf <- data.frame(row.names = colnames(comparison_l2fcmatrix),
+                               "Modality" = c(rep("CON",6),
+                                              rep("EE",6),
+                                              rep("RE",4)),
+                               "Timepoint" = c("D20M","D40M","P10M",
+                                               "P15-45M","P3.5/4H","P24H",
+                                               "D20M","D40M","P10M",
+                                               "P15-45M","P3.5/4H","P24H",
+                                               "P10M",
+                                               "P15-45M","P3.5/4H","P24H"))
+
+ourbubbleheatmapinput <- data.frame(Contrast = rep(colnames(comparison_l2fcmatrix),each = dim(comparison_l2fcmatrix)[1]),
+                                    Features = rep(rownames(comparison_l2fcmatrix),dim(comparison_l2fcmatrix)[2]),
+                                    L2FC = as.vector(comparison_l2fcmatrix),
+                                    padj = as.vector(comparison_testmatrix))
+ourbubbleheatmapinput$Contrast <- factor(ourbubbleheatmapinput$Contrast,levels = colnames(comparison_l2fcmatrix))
+
+
+
+pdf(file = file.path(plot_dir,"Figure_8" ,"BloodFigure8E_precovid_blood_deconvolution_bubbleHeatmap_111425.pdf"),width = 7.5,height = 5.5)
+enrichmap(x = ourbubbleheatmapinput,
+          set_column = "Features",
+          statistic_column = "L2FC",
+          contrast_column = "Contrast",
+          padj_column = "padj",
+          padj_cutoff = 0.05,
+          n_top = dim(comparison_l2fcmatrix)[1],
+          plot_sig_only = F,
+          scale_by = "max",
+          heatmap_args = list(cluster_rows = F,
+                              show_column_names = F,
+                              top_annotation = ComplexHeatmap::HeatmapAnnotation(df = heatmapcolannodf[,c("Modality","Timepoint")],
+                                                                                 col = precawg_ann_cols)))
+dev.off()
+
+
+
+pdf(file = file.path(plot_dir,"Figure_8" ,"BloodFigure8E_celltype_comp_averagecelltypeproportion_justbaseline_111425.pdf"),width = 7,height = 3)
+plot(apply(bloodrnasamplemetatrim[bloodrnasamplemetatrim$Timepoint %in% "Pre",c(5:26)],2,mean)[order(names(apply(bloodrnasamplemetatrim[bloodrnasamplemetatrim$Timepoint %in% "Pre",c(5:26)],2,mean)))],ylab = "Mean Frequency",xaxt='n')
+lines(apply(bloodrnasamplemetatrim[bloodrnasamplemetatrim$Timepoint %in% "Pre",c(5:26)],2,mean)[order(names(apply(bloodrnasamplemetatrim[bloodrnasamplemetatrim$Timepoint %in% "Pre",c(5:26)],2,mean)))])
+dev.off()
+
+
+```
+
+### Plot 8C
+
+```{r, message=FALSE, warning=FALSE}
+
+plot_object1 <- MotrpacHumanPreSuspension::plot_single_feature(feature = "ENSG00000145649.8",repo_local_dir = NULL,selected_tissues = "blood",selected_omes = "transcript-rna-seq",output_file = file.path(plot_dir,"Figure_8" ,"Figure8C_gzma_blood_rna_plot_111425.pdf"))
+plot_object2 <- MotrpacHumanPreSuspension::plot_single_feature(feature = "ENSG00000100453.14",repo_local_dir = NULL,selected_tissues = "blood",selected_omes = "transcript-rna-seq",output_file = file.path(plot_dir,"Figure_8" ,"Figure8C_gzmb_blood_rna_plot_111425.pdf"))
+plot_object3 <- MotrpacHumanPreSuspension::plot_single_feature(feature = "ENSG00000100450.13",repo_local_dir = NULL,selected_tissues = "blood",selected_omes = "transcript-rna-seq",output_file = file.path(plot_dir,"Figure_8" ,"Figure8C_gzmh_blood_rna_plot_111425.pdf"))
+
+```
+
+### Plot 8D
+
+```{r, message=FALSE, warning=FALSE}
+
+
+plot_object4 <- MotrpacHumanPreSuspension::plot_single_feature(feature = "ENSG00000134545.14",repo_local_dir = NULL,selected_tissues = "blood",selected_omes = "transcript-rna-seq",output_file = file.path(plot_dir,"Figure_8" ,"Figure8D_klrc1_blood_rna_plot_111425.pdf"))
+plot_object5 <- MotrpacHumanPreSuspension::plot_single_feature(feature = "ENSG00000134539.17",repo_local_dir = NULL,selected_tissues = "blood",selected_omes = "transcript-rna-seq",output_file = file.path(plot_dir,"Figure_8" ,"Figure8D_klrd1_blood_rna_plot_111425.pdf"))
+plot_object6 <- MotrpacHumanPreSuspension::plot_single_feature(feature = "ENSG00000213809.9",repo_local_dir = NULL,selected_tissues = "blood",selected_omes = "transcript-rna-seq",output_file = file.path(plot_dir,"Figure_8" ,"Figure8D_klrk1_blood_rna_plot_111425.pdf"))
+plot_object7 <- MotrpacHumanPreSuspension::plot_single_feature(feature = "ENSG00000120217.14",repo_local_dir = NULL,selected_tissues = "blood",selected_omes = "transcript-rna-seq",output_file = file.path(plot_dir,"Figure_8" ,"Figure8D_cd274_blood_rna_plot_111425.pdf"))
+plot_object8 <- MotrpacHumanPreSuspension::plot_single_feature(feature = "ENSG00000139187.10",repo_local_dir = NULL,selected_tissues = "blood",selected_omes = "transcript-rna-seq",output_file = file.path(plot_dir,"Figure_8" ,"Figure8D_klrg1_blood_rna_plot_111425.pdf"))
+
+```

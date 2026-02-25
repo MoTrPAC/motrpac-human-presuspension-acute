@@ -1,5 +1,5 @@
 # load packages
-library(MotrpacHumanPreSuspension)
+library(MotrpacHumanPreSuspensionAnalysis)
 library(ComplexHeatmap)
 library(patchwork)
 library(ggrepel)
@@ -11,9 +11,9 @@ library(stringr)
 library(tidyr)
 library(purrr)
 
-data("CAMERA_RESULTS") 
+data("CAMERA_RESULTS")
 ################### Enrichment related to Figure 2 ###################
-### Transcriptomics - Figure 2D 
+### Transcriptomics - Figure 2D
 selected_contrasts <- c(
   "Endur.post_15_30_45_min - Control.post_15_30_45_min (delta-delta)",
   "Endur.post_3.5_4_hr - Control.post_3.5_4_hr (delta-delta)",
@@ -73,8 +73,8 @@ col_anno <- columnAnnotation(
     Time = list(title = "Timepoint", at = c("45minPost", "4hrPost", "24hrPost"))
   )
 )
-# Figure S2D 
-camera_res_t_plot <- camera_res_t %>% 
+# Figure S2D
+camera_res_t_plot <- camera_res_t %>%
   enrichmap(
     n_top = Inf,
     plot_sig_only = FALSE,
@@ -89,14 +89,14 @@ camera_res_t_plot <- camera_res_t %>%
       column_split = rep(c("EE", "RE"), each = 3),
       show_column_names = FALSE
     )
-  ) 
+  )
 
 # Proteomics
 selected_set_ids_pr <- c("08383","01614","05448","02037","02232","00457","08753","09356","04103","08528","10260","05317", "10546")
 selected_contrasts_pr <- c(
   "Endur.post_3.5_4_hr - Control.post_3.5_4_hr (delta-delta)",
   "Resist.post_3.5_4_hr - Control.post_3.5_4_hr (delta-delta)"
-)  
+)
 camera_res_pr <- CAMERA_RESULTS %>%
   filter(tissue == 'adipose') %>%
   filter(assay == "prot-pr") %>%
@@ -127,8 +127,8 @@ col_anno <- columnAnnotation(
     Time = list(title = "Timepoint", at = c("45minPost", "4hrPost", "24hrPost"))
   )
 )
-# Figure S2E 
-camera_res_pr_plot <- camera_res_pr %>% 
+# Figure S2E
+camera_res_pr_plot <- camera_res_pr %>%
   enrichmap(
     n_top = Inf,
     plot_sig_only = TRUE,
@@ -143,7 +143,7 @@ camera_res_pr_plot <- camera_res_pr %>%
       column_split = rep(c("EE", "RE"), each = 1),
       show_column_names = FALSE
     )
-  ) 
+  )
 #### Phospho ORA #####
 motrpac_da <- load_differential_analysis()
 precawg_phos_da <- as.data.frame(motrpac_da$adipose$`prot-ph`)
@@ -156,14 +156,14 @@ precawg_phos_da <- precawg_phos_da %>%
   # Process the feature_id after mapping
   mutate(
     # Extract base_feature_id (protein ID) before the first underscore
-    base_feature_id = sub("_.*$", "", feature_id),  
-    
+    base_feature_id = sub("_.*$", "", feature_id),
+
     # Extract phosphosite(s) from everything after the first underscore
     phosphosites = sub("^.*_", "", feature_id) %>%
       gsub("s$", "", .) %>%  # Remove trailing 's'
       gsub("([STY]\\d+)[a-zA-Z]", "\\1;", .) %>%  # Replace any extra letters after phosphosites with ';'
       gsub(";$", "", .),  # Remove trailing semicolon
-    
+
     # Create gene_symbol_with_phosphosite
     gene_symbol_with_phosphosite = ifelse(
       !is.na(gene_symbol),
@@ -203,13 +203,13 @@ ora_phos <- lapply(phos_list, function(input_i) {
   run_ORA(input = as.character(input_i),
           background = bckg,
           overlap_cutoff = 0)
-}) %>% 
-  bind_rows(.id = "contrast") 
+}) %>%
+  bind_rows(.id = "contrast")
 
 top_terms <- ora_phos %>%
   group_by(contrast) %>%
   slice_min(adj_p_value, n = 6, with_ties = FALSE) %>%  # Select top 5 lowest adj_p_value per contrast
-  pull(set_short) %>%  
+  pull(set_short) %>%
   unique()
 ora_phos <- ora_phos %>%
   mutate(
@@ -256,8 +256,8 @@ col_anno <- ComplexHeatmap::columnAnnotation(
   )
 )
 # Figure S2G
-ora_phos_ht <- ora_phos %>% 
-  filter(set_short %in% top_terms) %>% 
+ora_phos_ht <- ora_phos %>%
+  filter(set_short %in% top_terms) %>%
   enrichmap(
     n_top = Inf,
     set_column = "set_short",
@@ -275,7 +275,7 @@ ora_phos_ht <- ora_phos %>%
       column_split = rep(c("EE", "RE"), each = 2),
       column_title = NULL,
       show_column_names = FALSE
-    )) 
+    ))
 
 # Metabolomics
 camera_res_m <- CAMERA_RESULTS %>%
@@ -312,7 +312,7 @@ col_anno <- columnAnnotation(
   )
 )
 # Figure S2F
-camera_res_m_plot <- camera_res_m %>% 
+camera_res_m_plot <- camera_res_m %>%
   enrichmap(
     n_top = Inf,
     plot_sig_only = TRUE,
@@ -327,7 +327,7 @@ camera_res_m_plot <- camera_res_m %>%
       column_split = rep(c("EE", "RE"), each = 3),
       show_column_names = FALSE
     )
-  ) 
+  )
 
 
 #### compare enriched terms between with CON vs. withot CON
@@ -403,14 +403,14 @@ plot_camera_scatter <- function(
       timepoint = factor(timepoint, levels = c("45min", "4hr", "24hr")),
       opposing = sign(z_no) != sign(z_with)
     )
-  
+
   # Label manually specified + top 2 opposing terms per facet
   opposing_df <- df %>%
     filter(opposing) %>%
     group_by(timepoint, modality) %>%
     slice_max(order_by = abs(z_no - z_with), n = 0, with_ties = FALSE) %>%
     ungroup()
-  
+
   label_df <- bind_rows(
     df %>% filter(set_short %in% manual_labels),
     opposing_df
@@ -526,22 +526,22 @@ trajectory_three_lines <- camera_adipose %>%
   mutate(
     # Extract timepoint substring from contrast_short
     timepoint_raw = str_extract(contrast_short, "post_15_30_45_min|post_3.5_4_hr|post_24_hr"),
-    
+
     # Convert to ordered factor for plotting
     timepoint = factor(timepoint_raw,
                        levels = c("post_15_30_45_min", "post_3.5_4_hr", "post_24_hr"),
                        labels = c("45min", "4hr", "24hr")),
-    
+
     # Significance for point fill
     sig_dot = if_else(adj_p_value < 0.05, "Significant", "Not Significant"),
-    
+
     # Label each contrast type
     contrast_label = case_when(
       str_detect(contrast_short, "Resist.post.* - Resist.pre_exercise") ~ "RE CON-unadjusted",
       str_detect(contrast_short, "Resist.post.* - Control.post.*") ~ "RE CON-adjusted",
       str_detect(contrast_short, "Control.post.* - Control.pre_exercise") ~ "Control"
     ),
-    
+
     # For coloring by modality
     modality_group = case_when(
       str_starts(contrast_label, "RE") ~ "RE",
@@ -611,27 +611,27 @@ trajectory_three_lines2 <- camera_adipose %>%
   mutate(
     # Extract timepoint substring from contrast_short
     timepoint_raw = str_extract(contrast_short, "post_15_30_45_min|post_3.5_4_hr|post_24_hr"),
-    
+
     # Convert to ordered factor for plotting
     timepoint = factor(timepoint_raw,
                        levels = c("post_15_30_45_min", "post_3.5_4_hr", "post_24_hr"),
                        labels = c("45min", "4hr", "24hr")),
-    
+
     # Significance for point fill
     sig_dot = if_else(adj_p_value < 0.05, "Significant", "Not Significant"),
-    
+
     # Label each contrast type
     contrast_label = case_when(
       # EE comparisons
       str_detect(contrast_short, "^Endur\\.post.* - Endur\\.pre_exercise") ~ "EE CON-unadjusted",
       str_detect(contrast_short, "^Endur\\.post.* - Control\\.post.*") ~ "EE CON-adjusted",
-      
+
       # Control comparisons
       str_detect(contrast_short, "^Control\\.post.* - Control\\.pre_exercise") ~ "Control",
-      
+
       TRUE ~ NA_character_
     ),
-    
+
     # For coloring by modality
     modality_group = case_when(
       str_starts(contrast_label, "EE") ~ "EE",
@@ -740,7 +740,7 @@ col_anno <- columnAnnotation(
   )
 )
 # Figure 3D
-camera_eere_t_plot <- camera_eere_t_filtered %>% 
+camera_eere_t_plot <- camera_eere_t_filtered %>%
   enrichmap(
     n_top = Inf,
     plot_sig_only = FALSE,
@@ -757,7 +757,7 @@ camera_eere_t_plot <- camera_eere_t_filtered %>%
     )
   )
 
-# Proteomics 
+# Proteomics
 camera_eere_pr <- CAMERA_RESULTS %>%
   filter(tissue == "adipose",
          contrast_type == "Endur_vs_Resist",
@@ -805,7 +805,7 @@ col_anno <- columnAnnotation(
 )
 
 # Figure 3E
-camera_eere_pr_plot <- camera_eere_pr %>% 
+camera_eere_pr_plot <- camera_eere_pr %>%
   enrichmap(
     n_top = Inf,
     plot_sig_only = TRUE,
@@ -856,7 +856,7 @@ col_anno <- columnAnnotation(
   )
 )
 # Figure 3F
-camera_eere_m_plot <- camera_eere_m %>% 
+camera_eere_m_plot <- camera_eere_m %>%
   enrichmap(
     n_top = Inf,
     plot_sig_only = TRUE,
@@ -875,7 +875,7 @@ camera_eere_m_plot <- camera_eere_m %>%
   )
 
 
-# Scatter plots to compare logFC between EE-CON vs. RE-CON per omic, per time point. 
+# Scatter plots to compare logFC between EE-CON vs. RE-CON per omic, per time point.
 # Run through line ~373 in precawg_adi_da.R to obtain all_vol
 logfc_wide <- all_vol %>%
   filter(contrast_category %in% c("EE-CON", "RE-CON")) %>%
@@ -914,7 +914,7 @@ for (a in unique_assays) {
       TRUE ~ "NS"
     )) %>%
     mutate(sig_group = factor(sig_group, levels = c("NS", "RE-only", "EE-only", "Both")))
-  
+
   plot <- ggplot(assay_df, aes(x = logFC_EE, y = logFC_RE)) +
     geom_point(data = subset(assay_df, sig_group == "NS"), aes(color = sig_group),
                alpha = 0.5, size = 1.5) +
@@ -939,7 +939,7 @@ for (a in unique_assays) {
       strip.text = element_text(size = 12, face = "bold"),
       legend.position = "none"
     )
-  
+
   # Save as EPS using cairo_ps
   ggsave(
     filename = paste0("logFC_EE_vs_RE_", gsub("[^A-Za-z0-9]", "_", a), ".eps"),
@@ -949,7 +949,7 @@ for (a in unique_assays) {
 }
 
 ###Export PTM-SEA results for Figure 2D
-ptmsea_pai <- read.delim("n3_ptm-sea-results-combined.gct", skip = 2) 
+ptmsea_pai <- read.delim("n3_ptm-sea-results-combined.gct", skip = 2)
 
 contrast_map <- tibble(
   contrast = c(
@@ -1012,7 +1012,7 @@ ptm_wide <- ptm_wide %>%
 
 
 ## cytoskeleton story
-sig_features <- ph_vol %>% # if all_vol was obtained, ph_vol should have been obtained as well. 
+sig_features <- ph_vol %>% # if all_vol was obtained, ph_vol should have been obtained as well.
   filter(contrast_type == "exercise_with_controls",
          adj_p_value < 0.05) %>%
   pull(gene_symbol_with_phosphosite) %>%
@@ -1030,7 +1030,7 @@ cytoske_sets3 <- list(
 )
 gene_set_membership3 <- lapply(cytoske_sets3, function(gset) {
   unique(gset)
-}) %>% 
+}) %>%
   fromList()
 
 upset(gene_set_membership3, order.by = "freq")
@@ -1086,7 +1086,7 @@ cytoske_labeled3 <- cytoske_wide3 %>%
   group_by(Pathway) %>%
   arrange(desc(abs(`logFC_RE-CON`))) %>%
   mutate(label = if_else(
-    row_number() <= 3 | 
+    row_number() <= 3 |
       gene_symbol_with_phosphosite %in% c("TNS1-T1622", "TNS1-S1307;S1314"),
     gene_symbol_with_phosphosite,
     NA_character_

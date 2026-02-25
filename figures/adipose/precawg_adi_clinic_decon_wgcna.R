@@ -1,7 +1,8 @@
 # PreCWAG-Adipose: Clinical. These codes cover Figures 1C, S1A-B, S4A, 5B, 5C, S5A-C
 # Load library
 library(dplyr)
-library(MotrpacHumanPreSuspension)
+library(MotrpacHumanPreSuspensionAnalysis)
+library(MotrpacHumanPreSuspensionData)
 library(readr)
 library(ggplot2)
 library(tidyverse)
@@ -19,16 +20,19 @@ library(lmerTest)
 library(scales)
 
 # qc data and DA results
+
+#the `load_qc` function requires access to sample level data (via "MotrpacHumanPreSuspensionData"). To repeat this specific analysis, you will
+#need to request access to sample level data via a request to the consortium.
 motrpac_qc <- load_qc()
 motrpac_da <- load_differential_analysis()
 
-# extract pid. 
+# extract pid.
 adi_trans_meta <- motrpac_qc$adipose$`transcript-rna-seq`$sample_metadata #meta
 adi_pre_t <- adi_trans_meta %>%
   filter(Timepoint == "pre_exercise",
          visitcode == "ADU_BAS") %>%
   dplyr::select(pid) %>%
-  pull() # vecctor of 172 PIDs. 
+  pull() # vecctor of 172 PIDs.
 adi_pre_t <- as.character(adi_pre_t)
 # Construct clinical data matrix
 # Age, sex
@@ -41,8 +45,8 @@ cli_pheno <- pheno$data %>%
 cli_vital <- cln_curated_anthropometrics_vitals$data %>%
   filter(pid %in% adi_pre_t & visit_code == "ADU_SCP") %>%
   select(pid, bmi, wccm, sys_bp, dias_bp, hr_avg)
-  
-# daily total steps, vector magnitude, energy expenditure  
+
+# daily total steps, vector magnitude, energy expenditure
 cli_accel <- cln_curated_accel_derived_variables_baseline$data %>%
   filter(pid %in% adi_pre_t) %>%
   select(pid, daily_total_steps, daily_total_vm, daily_total_eneg_exp)
@@ -69,47 +73,49 @@ cli_all <- reduce(
   by = "pid"
 )
 
-## Blood metab data 
-filter_metabolite_matrix <- function(matrix, metadata, 
-                                     timepoint = "pre_exercise", 
+## Blood metab data
+filter_metabolite_matrix <- function(matrix, metadata,
+                                     timepoint = "pre_exercise",
                                      visitcode = "ADU_BAS",
                                      pid_filter = NULL) {
   # Filter metadata
   filtered_meta <- metadata %>%
     dplyr::filter(Timepoint == timepoint, visitcode == visitcode)
-  
+
   # Vial labels to keep (must exist in matrix colnames)
   keep_vials <- intersect(filtered_meta$vialLabel, colnames(matrix))
-  
+
   if (length(keep_vials) == 0) {
     stop("No matching vialLabels found in matrix for given filters.")
   }
-  
+
   # Subset matrix
   filtered_matrix <- matrix[, keep_vials, drop = FALSE]
-  
+
   # Map vialLabel → pid
   vial_to_pid <- filtered_meta %>%
     dplyr::filter(vialLabel %in% keep_vials) %>%
     dplyr::select(vialLabel, pid) %>%
     dplyr::distinct()
-  
+
   # Reorder pids to match columns
   pid_ordered <- vial_to_pid$pid[match(colnames(filtered_matrix), vial_to_pid$vialLabel)]
-  
+
   # Replace colnames with pid
   colnames(filtered_matrix) <- pid_ordered
-  
+
   # Optional: filter by pid_filter
   if (!is.null(pid_filter)) {
     pid_filter <- as.character(pid_filter)  # ensure character
     keep_pids <- intersect(colnames(filtered_matrix), pid_filter)
     filtered_matrix <- filtered_matrix[, keep_pids, drop = FALSE]
   }
-  
+
   return(filtered_matrix)
 }
-setwd("/Users/ahn/Library/CloudStorage/OneDrive-AdventHealth/Desktop/2 - PROJECTS/6 - MoTrPAC Pre cawg/R/Files/clinical_metab/")
+
+#update: Feb 25, 2026. The clinical analytes are also now available through `MotrpacHumanPreSuspensionData` (still only available via request).
+#this implementation needs to be revamped.
 # 1. insulin
 precawg_ins <- read.delim(
   "human-precovid-sed-adu_t02-plasma_metab-t-imm-ins_qc-norm_log2_v1.2.txt",
@@ -244,7 +250,7 @@ cli_full <- cli_full %>%
     Steps = daily_total_steps,
     Movement = daily_total_vm,
     Energy_exp = daily_total_eneg_exp
-  ) 
+  )
 
 # Convert metabolite data back to original
 metab_vars <- c(
@@ -284,7 +290,7 @@ cli_full <- cli_full %>%
 cli_full[] <- lapply(cli_full, function(col) {
   col[is.infinite(col)] <- NA
   col
-}) 
+})
 # z scale
 cli_full_z <- as.data.frame(scale(cli_full))
 
@@ -294,7 +300,7 @@ cc1 = bicorAndPvalue(cli_full_z, cli_full_z, use = 'p')
 dim(cc1$p) <- dim(cc1$bicor)
 dimnames(cc1$p) <- dimnames(cc1$bicor)
 
-ht_colors <- brewer.pal(3, "RdBu")  
+ht_colors <- brewer.pal(3, "RdBu")
 
 cor_mat <- cc1$bicor
 p_mat <- cc1$p
@@ -398,7 +404,7 @@ Heatmap(
 
 #dev.off()
 
-## Correlation of Deconvolution outcome and clinical variables 
+## Correlation of Deconvolution outcome and clinical variables
 decon_pre <- read.csv("../precawg_adi_baseline_decon.csv", row.names = 1)
 
 decon_pre_z <- decon_pre %>%
@@ -419,7 +425,7 @@ new_order <- c(
   "Steps", "Movement", "Energy_exp",
   "VO2max_rel", "VO2max", "O2_Pulse",
   "Grip_strength", "Knee_torque",
-  "HOMA_IR", "Adipo_IR", 
+  "HOMA_IR", "Adipo_IR",
   "HbA1c", "Insulin", "Glucose", "Lactate", "Glycerol", "NEFA", "Trig", "Cholesterol", "HDL", "LDL", "KET", "Glucagon", "Cortisol",
   "Isoleucine", "Leucine", "Valine"
 )
@@ -429,7 +435,7 @@ cor_decon_clin = bicorAndPvalue(decon_pre_z2, cli_full_z2) # alternative biweigh
 df_decon_clin = melt(cor_decon_clin$bicor) %>% dplyr::rename(bicor = value)
 df_decon_clin$pval = melt(cor_decon_clin$p)$value
 df_decon_clin$obs = melt(cor_decon_clin$nObs)$value
-df_decon_clin <- df_decon_clin %>% 
+df_decon_clin <- df_decon_clin %>%
   mutate(sig = ifelse(pval < 0.001, '***',
                       ifelse(pval < 0.01, '**',
                              ifelse(pval < 0.05, '*', ''))))
@@ -461,7 +467,7 @@ column_annotation <- HeatmapAnnotation(
 Heatmap(
   as.matrix(deconXclin),
   name = "Correlation",
-  col = col_fun, 
+  col = col_fun,
   top_annotation = column_annotation,
   cluster_rows = TRUE,
   cluster_columns = FALSE,
@@ -470,16 +476,16 @@ Heatmap(
   column_names_gp = gpar(fontsize = 10, col = "black"),
   column_names_side = "top",
   show_heatmap_legend = TRUE,
-  
+
   cell_fun = function(j, i, x, y, width, height, fill) {
     sig_marker <- sig_table_decon_clin[i, j]
-    
+
     if (!is.na(sig_marker) && sig_marker != "") {
       # Compute luminance to choose text color
       fill_rgb <- col2rgb(fill)
       luminance <- (0.299 * fill_rgb[1] + 0.587 * fill_rgb[2] + 0.114 * fill_rgb[3]) / 255
       text_color <- if (luminance < 0.5) "white" else "black"
-      
+
       grid.text(sig_marker, x, y, gp = gpar(fontsize = 10, col = text_color))
     }
   }
@@ -487,8 +493,8 @@ Heatmap(
 #dev.off()
 
 ### Additional deconvolution-related figures: Figure S1B and S4A
-# S1B is baseline sex comparison. S4A is deconvolution in all acute exercise time points. 
-# Import expanded deconvolution outcome that includes data from all time points. 
+# S1B is baseline sex comparison. S4A is deconvolution in all acute exercise time points.
+# Import expanded deconvolution outcome that includes data from all time points.
 dtangle_props <- read.csv("../precawg_decon_BA_6000hvg.csv", row.names = 1)
 
 #Adding meta data
@@ -528,14 +534,14 @@ dtangle_filtered <- dtangle_filtered %>%
       Timepoint == "post_24_hr"            ~ "Post 24hr",
       TRUE ~ NA_character_
     ),
-    
+
     # 2) Clean group labels
     grp_label = case_when(
       randomGroupCode == "ADUEndur"  ~ "EE",
       randomGroupCode == "ADUResist" ~ "RE",
       TRUE ~ randomGroupCode
     ),
-    
+
     # 3) Combine them
     group_time = factor(
       paste(grp_label, tp_label),
@@ -547,9 +553,9 @@ dtangle_filtered <- dtangle_filtered %>%
   )
 # Figure S4A
 ggplot(dtangle_filtered, aes(x = group_time, y = Proportion, fill = randomGroupCode)) +
-  geom_bar(stat = "summary", fun = "mean", position = position_dodge(width = 0.8), 
+  geom_bar(stat = "summary", fun = "mean", position = position_dodge(width = 0.8),
            width = 0.7, color = "black") +  # Bar plot with mean and black outline
-  stat_summary(fun = "mean", fun.min = function(x) mean(x), fun.max = function(x) mean(x) + sd(x), 
+  stat_summary(fun = "mean", fun.min = function(x) mean(x), fun.max = function(x) mean(x) + sd(x),
                geom = "errorbar", position = position_dodge(width = 0.8), width = 0.3) +  # Error bars only on top
   geom_jitter(width = 0.2, size = 0.8, alpha = 0.3, color = "black") +  # Overlay individual points
   facet_wrap(~ CellType, scales = "free_y", nrow = 1) +  # One row of plots
@@ -584,25 +590,25 @@ dtangle_long <- pre_exercise_data %>%
 
 # Figure S1B
 ggplot(dtangle_long, aes(x = Sex, y = Value, fill = Sex)) +
-  geom_bar(stat = "summary", fun = "mean", position = position_dodge(width = 0.8), 
+  geom_bar(stat = "summary", fun = "mean", position = position_dodge(width = 0.8),
            width = 0.7, color = "black") +
-  stat_summary(fun = "mean", fun.min = function(x) mean(x), fun.max = function(x) mean(x) + sd(x), 
+  stat_summary(fun = "mean", fun.min = function(x) mean(x), fun.max = function(x) mean(x) + sd(x),
                geom = "errorbar", position = position_dodge(width = 0.8), width = 0.3) +
-  geom_jitter(width = 0.2, size = 0.8, alpha = 0.3, color = "black") + 
-  facet_wrap(~ Cell_Type, scales = "free", nrow = 1) + 
+  geom_jitter(width = 0.2, size = 0.8, alpha = 0.3, color = "black") +
+  facet_wrap(~ Cell_Type, scales = "free", nrow = 1) +
   scale_fill_manual(values = c("#f95c6f", "#5555ff"), labels = c("Female", "Male")) +
   theme_minimal() +
   labs(x = "", y = "Proportion (%)") +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
     strip.text = element_text(size = 12),
-    panel.grid = element_blank() 
+    panel.grid = element_blank()
   )
 
-#### WGCNA 
+#### WGCNA
 # Build networks
-# Transcriptomics 
-trans_qc <- motrpac_qc$adipose$`transcript-rna-seq`$qc_norm 
+# Transcriptomics
+trans_qc <- motrpac_qc$adipose$`transcript-rna-seq`$qc_norm
 trans_meta <- motrpac_qc$adipose$`transcript-rna-seq`$sample_metadata #meta
 adi_pre_t <- trans_meta %>%
   filter(Timepoint == "pre_exercise",
@@ -610,7 +616,7 @@ adi_pre_t <- trans_meta %>%
   dplyr::select(vialLabel)
 adi_pre_t_id <- adi_pre_t$vialLabel
 
-trans_qc_pre <- trans_qc[, colnames(trans_qc) %in% adi_pre_t_id] 
+trans_qc_pre <- trans_qc[, colnames(trans_qc) %in% adi_pre_t_id]
 trans_qc_pre <- trans_qc_pre %>%
   rownames_to_column(var = "feature_id") %>%
   left_join(HUMAN_FEATURE_TO_GENE %>% select(feature_id, gene_symbol), by = "feature_id") %>%
@@ -625,7 +631,7 @@ vial_to_pid <- trans_meta %>%
   select(vialLabel, pid) %>%
   drop_na() %>%
   distinct() %>%
-  deframe() 
+  deframe()
 colnames(trans_qc_pre) <- vial_to_pid[colnames(trans_qc_pre)]
 
 #### filter for ENTS detected in >25% of samples and prepare counts matrix for WGCNA ####
@@ -636,13 +642,13 @@ filtered_matrix_trans1 = trans_qc_pre[trans_qc_pre$Zero_count<0.25*172,] # filte
 wgcna_input_trans <- filtered_matrix_trans1 %>%
   dplyr::select(-Zero_count)### 2.0 - Check for outlier/bad genes and samples ####
 
-datExpr0 = data.frame(t(wgcna_input_trans)) 
+datExpr0 = data.frame(t(wgcna_input_trans))
 
 # The following setting is important, do not omit.
 options(stringsAsFactors = FALSE)
 
 # check if all genes/samples are good
-gsg = goodSamplesGenes(datExpr0, verbose = 3) 
+gsg = goodSamplesGenes(datExpr0, verbose = 3)
 gsg$allOK #[1] TRUE
 
 # Soft thresholding and network topology analysis ####
@@ -651,7 +657,7 @@ powers = c(c(1:10), seq(from = 12, to=20, by=2))
 sft = pickSoftThreshold(datExpr0, powerVector = powers, verbose = 5)
 
 
-# Module Generation 
+# Module Generation
 pwr = 6
 ngenes = 100
 
@@ -671,7 +677,7 @@ net = blockwiseModules(datExpr0,
 
 MEs = net$MEs
 
-# ME0 is error module, but not removing for now. 
+# ME0 is error module, but not removing for now.
 module_membership = as.data.frame(net$colors)
 colnames(module_membership) = 'module'
 module_membership$ID = row.names(module_membership)
@@ -700,14 +706,14 @@ prot_qc_long <- prot_qc_long %>%
 
 prot_pre <- prot_qc_long %>%
   filter(timepointDescription %in% c("Rest 1", "Pre ex", "")) %>%
-  
+
   # Summarize duplicates by averaging expression values
   group_by(uniprot, pid) %>%
   summarise(expression = mean(expression, na.rm = TRUE), .groups = "drop") %>%
-  
+
   # Pivot to wide format with uniprot as rows and pid as columns
   pivot_wider(names_from = pid, values_from = expression) %>%
-  
+
   # Set uniprot as row names
   column_to_rownames("uniprot")
 
@@ -718,12 +724,12 @@ prot_pre1 = prot_pre[prot_pre$Zero_count<0.25*22,] # filtered out low count gene
 wgcna_input_prot <- prot_pre1 %>%
   dplyr::select(-Zero_count)### 2.0 - Check for outlier/bad genes and samples ####
 
-datExpr1 = data.frame(t(wgcna_input_prot)) 
+datExpr1 = data.frame(t(wgcna_input_prot))
 
 options(stringsAsFactors = FALSE)
 
 # check if all genes/samples are good
-gsg = goodSamplesGenes(datExpr1, verbose = 3) 
+gsg = goodSamplesGenes(datExpr1, verbose = 3)
 gsg$allOK #[1] TRUE
 
 # Soft thresholding and network topology analysis ####
@@ -771,18 +777,18 @@ phos_meta <- phos_meta %>%
   mutate(vialLabel = as.character(vialLabel))
 phos_qc_long <- phos_qc_long %>%
   left_join(phos_meta %>% select(vialLabel, pid, timepointDescription), by = "vialLabel")
-unique(phos_qc_long$timepointDescription) #"4 hr post"   "Rest 1"      "Pre ex"      "4 hr Rest 3" ""    
+unique(phos_qc_long$timepointDescription) #"4 hr post"   "Rest 1"      "Pre ex"      "4 hr Rest 3" ""
 
 phos_pre <- phos_qc_long %>%
   filter(timepointDescription %in% c("Rest 1", "Pre ex", "")) %>%
-  
+
   # Summarize duplicates by averaging expression values
   group_by(uniprot, pid) %>%
   summarise(expression = mean(expression, na.rm = TRUE), .groups = "drop") %>%
-  
+
   # Pivot to wide format with uniphos as rows and pid as columns
   pivot_wider(names_from = pid, values_from = expression) %>%
-  
+
   # Set uniphos as row names
   column_to_rownames("uniprot")
 
@@ -793,13 +799,13 @@ phos_pre1 = phos_pre[phos_pre$Zero_count<0.25*22,] # filtered out low count gene
 wgcna_input_phos <- phos_pre1 %>%
   dplyr::select(-Zero_count)
 
-datExpr2 = data.frame(t(wgcna_input_phos), check.names = FALSE) 
+datExpr2 = data.frame(t(wgcna_input_phos), check.names = FALSE)
 
 # The following setting is important, do not omit.
 options(stringsAsFactors = FALSE)
 
 # check if all genes/samples are good
-gsg = goodSamplesGenes(datExpr2, verbose = 3) 
+gsg = goodSamplesGenes(datExpr2, verbose = 3)
 gsg$allOK #[1] TRUE
 
 #Soft thresholding and network topology analysis ####
@@ -843,17 +849,17 @@ for (metab_name in names(motrpac_qc$adipose)) {
     # Extract qc_norm and sample_metadata for the current metab object
     qc_norm <- motrpac_qc$adipose[[metab_name]]$qc_norm
     sample_metadata <- motrpac_qc$adipose[[metab_name]]$sample_metadata
-    
+
     # Filter sample_metadata to keep only pre-exercise samples
     pre_exercise_samples <- sample_metadata$Timepoint == "pre_exercise" & sample_metadata$visitcode == "ADU_BAS"
     filtered_metadata <- sample_metadata[pre_exercise_samples, ]
-    
+
     # Subset qc_norm to include only pre-exercise vialLabels
     pre_exercise_qc_norm <- qc_norm[, colnames(qc_norm) %in% filtered_metadata$vialLabel, drop = FALSE]
-    
+
     # Rename vialLabels (columns) to their corresponding pid from sample_metadata
     colnames(pre_exercise_qc_norm) <- filtered_metadata$pid[match(colnames(pre_exercise_qc_norm), filtered_metadata$vialLabel)]
-    
+
     # Add the filtered qc_norm to the list
     qc_norm_list[[metab_name]] <- pre_exercise_qc_norm
   }
@@ -879,8 +885,8 @@ final_qc_norm$feature_id <- cleaned_rownames
 final_qc_norm_aggregated <- final_qc_norm %>%
   group_by(feature_id) %>%
   summarise(
-    across(where(is.numeric), mean, na.rm = TRUE),  
-    across(where(negate(is.numeric)), first)  
+    across(where(is.numeric), mean, na.rm = TRUE),
+    across(where(negate(is.numeric)), first)
   ) %>%
   ungroup()
 
@@ -903,7 +909,7 @@ datExpr3 <- data.frame(t(wgcna_input_metab), check.names = FALSE)
 options(stringsAsFactors = FALSE)
 
 # check if all genes/samples are good
-gsg = goodSamplesGenes(datExpr3, verbose = 3) 
+gsg = goodSamplesGenes(datExpr3, verbose = 3)
 gsg$allOK #[1] TRUE
 
 # Soft thresholding and network topology analysis ####
@@ -950,8 +956,8 @@ bckg <- colnames(datExpr0)
 ora_wgcna <- lapply(signatures, function(input_i) {
   run_ORA(input = input_i,
           background = bckg)
-}) %>% 
-  bind_rows(.id = "Module") %>% 
+}) %>%
+  bind_rows(.id = "Module") %>%
   mutate(log10p = -log10(p_value),
          Module = factor(Module, levels = unique(Module)))
 ora_wgcna_fil <- ora_wgcna %>%
@@ -966,7 +972,7 @@ top_pathways_t <- ora_wgcna %>%
 # Filter the original dataset to keep all rows associated with selected pathways
 ora_top_per_module_t <- ora_wgcna %>%
   filter(set_short %in% top_pathways_t) %>%
-  mutate(set_short = str_remove(set_short, "^GOBP_")) 
+  mutate(set_short = str_remove(set_short, "^GOBP_"))
 
 heatmap_mat_ora_t <- ora_top_per_module_t %>%
   select(Module, set_short, log10p) %>%
@@ -979,21 +985,21 @@ adjp_threshold <- 0.05
 
 heat_ora <- Heatmap(
   heatmap_mat_ora_t,
-  name = "-log10(P-value)", 
+  name = "-log10(P-value)",
   col = col_fun_ora,
-  cluster_rows = TRUE,  
-  cluster_columns = TRUE,  
+  cluster_rows = TRUE,
+  cluster_columns = TRUE,
   row_names_side = "left",
-  row_names_gp = gpar(fontsize = 10, fontface = "bold"),  
-  column_names_rot = 45,  
-  column_names_gp = gpar(fontsize = 9),  
+  row_names_gp = gpar(fontsize = 10, fontface = "bold"),
+  column_names_rot = 45,
+  column_names_gp = gpar(fontsize = 9),
   heatmap_legend_param = list(title = "-log10(P-value)"),
   border = TRUE,
-  rect_gp = gpar(col = "black", lwd = 0.5),  
+  rect_gp = gpar(col = "black", lwd = 0.5),
   cell_fun = function(j, i, x, y, width, height, fill) {
-    grid.rect(x, y, width, height, gp = gpar(col = "black", fill = NA, lwd = 0.3))  
+    grid.rect(x, y, width, height, gp = gpar(col = "black", fill = NA, lwd = 0.3))
     if (heatmap_mat_ora_t[i, j] >= -log10(adjp_threshold)) {
-      grid.text("*", x, y, gp = gpar(fontsize = 10, fontface = "bold", col = "black"))  
+      grid.text("*", x, y, gp = gpar(fontsize = 10, fontface = "bold", col = "black"))
     }
   }
 )
@@ -1005,7 +1011,7 @@ MEs <- MEs[, colnames(MEs) != "T0"]             # Remove column T0
 
 # Reorder columns from T1 to T13
 desired_order <- paste0("T", 1:12)              # Generate order from T1 to T12
-MEs <- MEs[, desired_order]  
+MEs <- MEs[, desired_order]
 # make sure clinical and ME rows are aligned
 common_samples <- intersect(rownames(cli_full_z2), rownames(MEs))
 
@@ -1015,11 +1021,11 @@ MEs <- MEs[common_samples, ]
 stopifnot(identical(rownames(cli_full_z2_t), rownames(MEs)))
 
 # correlation
-cor = bicorAndPvalue(cli_full_z2_t, MEs) 
+cor = bicorAndPvalue(cli_full_z2_t, MEs)
 df = melt(cor$bicor) %>% dplyr::rename(bicor = value)
 df$pval = melt(cor$p)$value
 df$obs = melt(cor$nObs)$value
-df <- df %>% 
+df <- df %>%
   mutate(sig = ifelse(pval < 0.001, '***',
                       ifelse(pval < 0.01, '**',
                              ifelse(pval < 0.05, '*', ''))))
@@ -1036,10 +1042,10 @@ sig_table$Var1 = NULL
 sig_table <- sig_table %>%
   select(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12)
 
-traitXmod_mat_t <- t(traitXmod) 
+traitXmod_mat_t <- t(traitXmod)
 sig_table_mat_t <- t(sig_table)
 
-col_fun_t <- colorRamp2(seq(min(traitXmod_mat_t), max(traitXmod_mat_t), length.out = 10), 
+col_fun_t <- colorRamp2(seq(min(traitXmod_mat_t), max(traitXmod_mat_t), length.out = 10),
                         rev(brewer.pal(10, "RdBu")))
 col_group_vec <- column_groups_named[colnames(traitXmod_mat_t)]
 
@@ -1072,36 +1078,36 @@ right_annot_t <- rowAnnotation(
 )
 heat_trait_mod_t <- Heatmap(
   traitXmod_mat_t,
-  name = "Correlation", 
+  name = "Correlation",
   col = col_fun_t,
-  cluster_rows = FALSE,  
-  cluster_columns = FALSE,  
-  row_names_side = "left",  
-  row_names_gp = gpar(fontsize = 10),  
-  column_names_rot = 45, 
-  column_names_gp = gpar(fontsize = 10),  
+  cluster_rows = FALSE,
+  cluster_columns = FALSE,
+  row_names_side = "left",
+  row_names_gp = gpar(fontsize = 10),
+  column_names_rot = 45,
+  column_names_gp = gpar(fontsize = 10),
   heatmap_legend_param = list(title = "Correlation"),
-  border = TRUE,  
-  rect_gp = gpar(col = "black", lwd = 0.5),  
-  top_annotation = column_annotation,  
+  border = TRUE,
+  rect_gp = gpar(col = "black", lwd = 0.5),
+  top_annotation = column_annotation,
   right_annotation = right_annot_t,
   cell_fun = function(j, i, x, y, width, height, fill) {
-    grid.rect(x, y, width, height, gp = gpar(col = "black", fill = NA, lwd = 0.3))  
-    
+    grid.rect(x, y, width, height, gp = gpar(col = "black", fill = NA, lwd = 0.3))
+
     if (!is.na(sig_table_mat_t[i, j])) {
       # Get the fill color and convert it to RGB
       fill_rgb <- col2rgb(fill)
       luminance <- (0.299 * fill_rgb[1] + 0.587 * fill_rgb[2] + 0.114 * fill_rgb[3]) / 255
-      
+
       # Choose black or white based on brightness
       text_color <- if (luminance < 0.5) "white" else "black"
-      
+
       grid.text(sig_table_mat_t[i, j], x, y, gp = gpar(fontsize = 9, col = text_color))
     }
   }
 )
 
-# 3. DA transcripts on modules. 
+# 3. DA transcripts on modules.
 mm_t <- data.frame(ID = names(net$colors), module = net$colors) %>%
   mutate(
     module = factor(paste0("T", module), levels = paste0("T", 0:12))
@@ -1161,13 +1167,13 @@ mm_t_matrix <- mm_t_combined %>%
   filter(module != "T0") %>%  # Exclude "T0", keep T1, T2, ...
   group_by(module, Modality) %>%  # Group by module & Modality
   summarise(yes_count = sum(yes_count), .groups = "drop") %>%  # Ensure unique pairs
-  pivot_wider(names_from = Modality, values_from = yes_count, values_fill = 0) %>% 
-  column_to_rownames("module") %>% 
+  pivot_wider(names_from = Modality, values_from = yes_count, values_fill = 0) %>%
+  column_to_rownames("module") %>%
   as.matrix()
 
 # Define color scale
 col_fun_t_da <- colorRamp2(
-  c(0, max(mm_t_matrix, na.rm = TRUE)), 
+  c(0, max(mm_t_matrix, na.rm = TRUE)),
   c("white", "#377EB8")  # White for low, Blue for high
 )
 colanno_ex <- columnAnnotation(
@@ -1182,11 +1188,11 @@ heat_t_da <- Heatmap(
   col = col_fun_t_da,
   cluster_rows = FALSE,  # Keep module order fixed
   cluster_columns = FALSE,  # Keep EE and RE order
-  row_names_side = "right",  
-  row_names_gp = gpar(fontsize = 10, fontface = "bold"),  
-  column_names_gp = gpar(fontsize = 10),  
+  row_names_side = "right",
+  row_names_gp = gpar(fontsize = 10, fontface = "bold"),
+  column_names_gp = gpar(fontsize = 10),
   heatmap_legend_param = list(title = "DA count"),
-  border = TRUE,  
+  border = TRUE,
   rect_gp = gpar(col = "black", lwd = 0.5),  # Grid lines
   top_annotation = colanno_ex,  # Add column annotation
   cell_fun = function(j, i, x, y, width, height, fill) {
@@ -1202,7 +1208,7 @@ draw(heat_t_da)
 wgcna_figure_t <- heat_ora + heat_trait_mod_t + heat_t_da
 draw(wgcna_figure_t)
 
-## Proteomics 
+## Proteomics
 # 1. ORA
 datExpr1_long <- datExpr1 %>%
   as.data.frame() %>%
@@ -1236,8 +1242,8 @@ bckg_pr <- as.character(unique(datExpr1_long$gene_symbol))
 ora_wgcna_pr <- lapply(signatures1, function(input_i) {
   run_ORA(input = as.character(input_i),
           background = bckg_pr)
-}) %>% 
-  bind_rows(.id = "Module") %>% 
+}) %>%
+  bind_rows(.id = "Module") %>%
   mutate(log10p = -log10(p_value),
          Module = factor(Module, levels = unique(Module)))
 
@@ -1251,7 +1257,7 @@ top_pathways_pr <- ora_wgcna_pr %>%
 # Filter the original dataset to keep all rows associated with selected pathways
 ora_top_per_module_pr <- ora_wgcna_pr %>%
   filter(set_short %in% top_pathways_pr) %>%
-  mutate(set_short = str_remove(set_short, "^GOBP_")) 
+  mutate(set_short = str_remove(set_short, "^GOBP_"))
 
 heatmap_mat_ora_pr <- ora_top_per_module_pr %>%
   select(Module, set_short, log10p) %>%
@@ -1264,21 +1270,21 @@ adjp_threshold <- 0.05
 
 heat_ora_pr <- Heatmap(
   heatmap_mat_ora_pr,
-  name = "-log10(P-value)", 
+  name = "-log10(P-value)",
   col = col_fun_ora_pr,
   cluster_rows = TRUE,  # Cluster modules
   cluster_columns = TRUE,  # Cluster pathways
   row_names_side = "left",
-  row_names_gp = gpar(fontsize = 9, fontface = "bold"),  
+  row_names_gp = gpar(fontsize = 9, fontface = "bold"),
   column_names_rot = 45,  # Ensure text rotates properly
   column_names_gp = gpar(fontsize = 9),  # Keep font size, but remove rotation from here
   heatmap_legend_param = list(title = "-log10(P-value)"),
   border = TRUE,
-  rect_gp = gpar(col = "black", lwd = 0.5),  
+  rect_gp = gpar(col = "black", lwd = 0.5),
   cell_fun = function(j, i, x, y, width, height, fill) {
-    grid.rect(x, y, width, height, gp = gpar(col = "black", fill = NA, lwd = 0.3))  
+    grid.rect(x, y, width, height, gp = gpar(col = "black", fill = NA, lwd = 0.3))
     if (heatmap_mat_ora_pr[i, j] >= -log10(adjp_threshold)) {
-      grid.text("*", x, y, gp = gpar(fontsize = 10, fontface = "bold", col = "black"))  
+      grid.text("*", x, y, gp = gpar(fontsize = 10, fontface = "bold", col = "black"))
     }
   }
 )
@@ -1290,7 +1296,7 @@ MEs1 <- MEs1[, colnames(MEs1) != "Pr0"]             # Remove column T0
 
 # Reorder columns from T1 to T13
 desired_order <- paste0("Pr", 1:14)              # Generate order from T1 to T12
-MEs1 <- MEs1[, desired_order]  
+MEs1 <- MEs1[, desired_order]
 # make sure clinical and ME rows are aligned
 common_samples <- intersect(rownames(cli_full_z2), rownames(MEs1))
 
@@ -1304,7 +1310,7 @@ cor1 = bicorAndPvalue(cli_full_z2_pr, MEs1) # alternative biweight midcor
 df1 = melt(cor1$bicor) %>% dplyr::rename(bicor = value)
 df1$pval = melt(cor1$p)$value
 df1$obs = melt(cor1$nObs)$value
-df1 <- df1 %>% 
+df1 <- df1 %>%
   mutate(sig = ifelse(pval < 0.001, '***',
                       ifelse(pval < 0.01, '**',
                              ifelse(pval < 0.05, '*', ''))))
@@ -1321,10 +1327,10 @@ sig_table_pr$Var1 = NULL
 sig_table_pr <- sig_table_pr %>%
   select(Pr1, Pr2, Pr3, Pr4, Pr5, Pr6, Pr7, Pr8, Pr9, Pr10, Pr11, Pr12,  Pr13,  Pr14)
 
-traitXmod_mat_pr <- t(traitXmod_pr) 
+traitXmod_mat_pr <- t(traitXmod_pr)
 sig_table_mat_pr <- t(sig_table_pr)
 
-col_fun_pr <- colorRamp2(seq(min(traitXmod_mat_pr), max(traitXmod_mat_pr), length.out = 10), 
+col_fun_pr <- colorRamp2(seq(min(traitXmod_mat_pr), max(traitXmod_mat_pr), length.out = 10),
                          rev(brewer.pal(10, "RdBu")))
 
 Pr_count <- module_membership1 %>%
@@ -1350,28 +1356,28 @@ right_annot_pr <- rowAnnotation(
 )
 heat_trait_mod_pr <- Heatmap(
   traitXmod_mat_pr,
-  name = "Correlation", 
+  name = "Correlation",
   col = col_fun_pr,
-  cluster_rows = FALSE,  
-  cluster_columns = FALSE,  
-  row_names_side = "left",  
-  row_names_gp = gpar(fontsize = 10),  
-  column_names_rot = 45, 
-  column_names_gp = gpar(fontsize = 10),  
+  cluster_rows = FALSE,
+  cluster_columns = FALSE,
+  row_names_side = "left",
+  row_names_gp = gpar(fontsize = 10),
+  column_names_rot = 45,
+  column_names_gp = gpar(fontsize = 10),
   heatmap_legend_param = list(title = "Correlation"),
-  border = TRUE,  
-  rect_gp = gpar(col = "black", lwd = 0.5),  
-  top_annotation = column_annotation,  
+  border = TRUE,
+  rect_gp = gpar(col = "black", lwd = 0.5),
+  top_annotation = column_annotation,
   right_annotation = right_annot_pr,  # Attach gene count barplot to the right
   cell_fun = function(j, i, x, y, width, height, fill) {
-    grid.rect(x, y, width, height, gp = gpar(col = "black", fill = NA, lwd = 0.3))  
-    
+    grid.rect(x, y, width, height, gp = gpar(col = "black", fill = NA, lwd = 0.3))
+
     if (!is.na(sig_table_mat_pr[i, j])) {
       fill_rgb <- col2rgb(fill)
       luminance <- (0.299 * fill_rgb[1] + 0.587 * fill_rgb[2] + 0.114 * fill_rgb[3]) / 255
       text_color <- if (luminance < 0.5) "white" else "black"
-      
-      grid.text(sig_table_mat_pr[i, j], x, y, gp = gpar(fontsize = 9, col = text_color))  
+
+      grid.text(sig_table_mat_pr[i, j], x, y, gp = gpar(fontsize = 9, col = text_color))
     }
   }
 )
@@ -1444,13 +1450,13 @@ mm_pr_matrix <- mm_pr_combined %>% #This is from wgcna_downstream.R
   filter(module != "Pr0") %>%  # Exclude "T0", keep T1, T2, ...
   group_by(module, Modality) %>%  # Group by module & Modality
   summarise(yes_count = sum(yes_count), .groups = "drop") %>%  # Ensure unique pairs
-  pivot_wider(names_from = Modality, values_from = yes_count, values_fill = 0) %>% 
-  column_to_rownames("module") %>% 
+  pivot_wider(names_from = Modality, values_from = yes_count, values_fill = 0) %>%
+  column_to_rownames("module") %>%
   as.matrix()
 
 # Define color scale
 col_fun_pr_da <- colorRamp2(
-  c(0, max(mm_pr_matrix, na.rm = TRUE)), 
+  c(0, max(mm_pr_matrix, na.rm = TRUE)),
   c("white", "#228833")  # White for low, Blue for high
 )
 colanno_ex <- columnAnnotation(
@@ -1465,11 +1471,11 @@ heat_pr_da <- Heatmap(
   col = col_fun_pr_da,
   cluster_rows = FALSE,  # Keep module order fixed
   cluster_columns = FALSE,  # Keep EE and RE order
-  row_names_side = "right",  
-  row_names_gp = gpar(fontsize = 10, fontface = "bold"),  
-  column_names_gp = gpar(fontsize = 10),  
+  row_names_side = "right",
+  row_names_gp = gpar(fontsize = 10, fontface = "bold"),
+  column_names_gp = gpar(fontsize = 10),
   heatmap_legend_param = list(title = "DA count"),
-  border = TRUE,  
+  border = TRUE,
   rect_gp = gpar(col = "black", lwd = 0.5),  # Grid lines
   top_annotation = colanno_ex,  # Add column annotation
   cell_fun = function(j, i, x, y, width, height, fill) {
@@ -1485,10 +1491,10 @@ draw(heat_pr_da)
 wgcna_figure_pr <- heat_ora_pr + heat_trait_mod_pr + heat_pr_da
 draw(wgcna_figure_pr)
 
-###Phospho 
+###Phospho
 # ORA
 module_membership2 <- module_membership2 %>%
-  left_join(HUMAN_FEATURE_TO_GENE %>% select(feature_id, gene_symbol), 
+  left_join(HUMAN_FEATURE_TO_GENE %>% select(feature_id, gene_symbol),
             by = c("ID" = "feature_id"))
 mm2 = module_membership2 %>%
   filter(module != "Ph0" ) %>%
@@ -1501,8 +1507,8 @@ ora_wgcna_ph <- lapply(signatures2, function(input_i) {
   run_ORA(input = as.character(input_i),
           background = bckg_ph,
           overlap_cutoff = 0.3)
-}) %>% 
-  bind_rows(.id = "Module") %>% 
+}) %>%
+  bind_rows(.id = "Module") %>%
   mutate(log10p = -log10(p_value),
          Module = factor(Module, levels = unique(Module)))
 top_pathways_ph <- ora_wgcna_ph %>%
@@ -1515,7 +1521,7 @@ top_pathways_ph <- ora_wgcna_ph %>%
 # Filter the original dataset to keep all rows associated with selected pathways
 ora_top_per_module_ph <- ora_wgcna_ph %>%
   filter(set_short %in% top_pathways_ph) %>%
-  mutate(set_short = str_remove(set_short, "^GOBP_")) 
+  mutate(set_short = str_remove(set_short, "^GOBP_"))
 
 heatmap_mat_ora_ph <- ora_top_per_module_ph %>%
   select(Module, set_short, log10p) %>%
@@ -1528,26 +1534,26 @@ adjp_threshold <- 0.05
 
 heat_ora_ph <- Heatmap(
   heatmap_mat_ora_ph,
-  name = "-log10(P-value)", 
+  name = "-log10(P-value)",
   col = col_fun_ora_ph,
   cluster_rows = TRUE,  # Cluster modules
   cluster_columns = TRUE,  # Cluster pathways
   row_names_side = "left",
-  row_names_gp = gpar(fontsize = 9, fontface = "bold"),  
+  row_names_gp = gpar(fontsize = 9, fontface = "bold"),
   column_names_rot = 45,  # Ensure text rotates properly
   column_names_gp = gpar(fontsize = 9),  # Keep font size, but remove rotation from here
   heatmap_legend_param = list(title = "-log10(P-value)"),
   border = TRUE,
-  rect_gp = gpar(col = "black", lwd = 0.5),  
+  rect_gp = gpar(col = "black", lwd = 0.5),
   cell_fun = function(j, i, x, y, width, height, fill) {
-    grid.rect(x, y, width, height, gp = gpar(col = "black", fill = NA, lwd = 0.3))  
+    grid.rect(x, y, width, height, gp = gpar(col = "black", fill = NA, lwd = 0.3))
     if (heatmap_mat_ora_ph[i, j] >= -log10(adjp_threshold)) {
-      grid.text("*", x, y, gp = gpar(fontsize = 10, fontface = "bold", col = "black"))  
+      grid.text("*", x, y, gp = gpar(fontsize = 10, fontface = "bold", col = "black"))
     }
   }
 )
 
-# module (ph)-trait correlation 
+# module (ph)-trait correlation
 #make sure clinical and ME rows are aligned
 colnames(MEs2) <- gsub("ME", "Ph", colnames(MEs2))  # Replace "ME" with "T"
 MEs2 <- MEs2[, colnames(MEs2) != "Ph0"]             # Remove column T0
@@ -1568,7 +1574,7 @@ cor2 = bicorAndPvalue(cli_full_z2_ph, MEs2) # alternative biweight midcor
 df2 = melt(cor2$bicor) %>% dplyr::rename(bicor = value)
 df2$pval = melt(cor2$p)$value
 df2$obs = melt(cor2$nObs)$value
-df2 <- df2 %>% 
+df2 <- df2 %>%
   mutate(sig = ifelse(pval < 0.001, '***',
                       ifelse(pval < 0.01, '**',
                              ifelse(pval < 0.05, '*', ''))))
@@ -1585,10 +1591,10 @@ sig_table_ph$Var1 = NULL
 sig_table_ph <- sig_table_ph %>%
   select(Ph1, Ph2, Ph3, Ph4, Ph5, Ph6, Ph7, Ph8, Ph9, Ph10, Ph11, Ph12,  Ph13,  Ph14, Ph15,Ph16,Ph17,Ph18)
 
-traitXmod_mat_ph <- t(traitXmod_ph) 
+traitXmod_mat_ph <- t(traitXmod_ph)
 sig_table_mat_ph <- t(sig_table_ph)
 
-col_fun_ph <- colorRamp2(seq(min(traitXmod_mat_ph), max(traitXmod_mat_ph), length.out = 10), 
+col_fun_ph <- colorRamp2(seq(min(traitXmod_mat_ph), max(traitXmod_mat_ph), length.out = 10),
                          rev(brewer.pal(10, "RdBu")))
 
 Ph_count <- module_membership2%>%
@@ -1614,28 +1620,28 @@ right_annot_ph <- rowAnnotation(
 )
 heat_trait_mod_ph <- Heatmap(
   traitXmod_mat_ph,
-  name = "Correlation", 
+  name = "Correlation",
   col = col_fun_ph,
-  cluster_rows = FALSE,  
-  cluster_columns = FALSE,  
-  row_names_side = "left",  
-  row_names_gp = gpar(fontsize = 10),  
-  column_names_rot = 45, 
-  column_names_gp = gpar(fontsize = 10),  
+  cluster_rows = FALSE,
+  cluster_columns = FALSE,
+  row_names_side = "left",
+  row_names_gp = gpar(fontsize = 10),
+  column_names_rot = 45,
+  column_names_gp = gpar(fontsize = 10),
   heatmap_legend_param = list(title = "Correlation"),
-  border = TRUE,  
-  rect_gp = gpar(col = "black", lwd = 0.5),  
-  top_annotation = column_annotation,  
+  border = TRUE,
+  rect_gp = gpar(col = "black", lwd = 0.5),
+  top_annotation = column_annotation,
   right_annotation = right_annot_ph,  # Attach gene count barplot to the right
   cell_fun = function(j, i, x, y, width, height, fill) {
-    grid.rect(x, y, width, height, gp = gpar(col = "black", fill = NA, lwd = 0.3))  
-    
+    grid.rect(x, y, width, height, gp = gpar(col = "black", fill = NA, lwd = 0.3))
+
     if (!is.na(sig_table_mat_ph[i, j])) {
       fill_rgb <- col2rgb(fill)
       luminance <- (0.299 * fill_rgb[1] + 0.587 * fill_rgb[2] + 0.114 * fill_rgb[3]) / 255
       text_color <- if (luminance < 0.5) "white" else "black"
-      
-      grid.text(sig_table_mat_ph[i, j], x, y, gp = gpar(fontsize = 9, col = text_color))  
+
+      grid.text(sig_table_mat_ph[i, j], x, y, gp = gpar(fontsize = 9, col = text_color))
     }
   }
 )
@@ -1650,14 +1656,14 @@ precawg_phos_da <- precawg_phos_da %>%
   # Process the feature_id after mapping
   mutate(
     # Extract base_feature_id (protein ID) before the first underscore
-    base_feature_id = sub("_.*$", "", feature_id),  
-    
+    base_feature_id = sub("_.*$", "", feature_id),
+
     # Extract phosphosite(s) from everything after the first underscore
     phosphosites = sub("^.*_", "", feature_id) %>%
       gsub("s$", "", .) %>%  # Remove trailing 's'
       gsub("([STY]\\d+)[a-zA-Z]", "\\1;", .) %>%  # Replace any extra letters after phosphosites with ';'
       gsub(";$", "", .),  # Remove trailing semicolon
-    
+
     # Create gene_symbol_with_phosphosite
     gene_symbol_with_phosphosite = ifelse(
       !is.na(gene_symbol),
@@ -1737,13 +1743,13 @@ mm_ph_matrix <- mm_ph_combined %>% #This is from wgcna_downstream.R
   filter(module != "Ph0") %>%  # Exclude "T0", keep T1, T2, ...
   group_by(module, Modality) %>%  # Group by module & Modality
   summarise(yes_count = sum(yes_count), .groups = "drop") %>%  # Ensure unique pairs
-  pivot_wider(names_from = Modality, values_from = yes_count, values_fill = 0) %>% 
-  column_to_rownames("module") %>% 
+  pivot_wider(names_from = Modality, values_from = yes_count, values_fill = 0) %>%
+  column_to_rownames("module") %>%
   as.matrix()
 
 # Define color scale
 col_fun_ph_da <- colorRamp2(
-  c(0, max(mm_ph_matrix, na.rm = TRUE)), 
+  c(0, max(mm_ph_matrix, na.rm = TRUE)),
   c("white", "#F3A02B")  # White for low, Blue for high
 )
 colanno_ex <- columnAnnotation(
@@ -1758,11 +1764,11 @@ heat_ph_da <- Heatmap(
   col = col_fun_ph_da,
   cluster_rows = FALSE,  # Keep module order fixed
   cluster_columns = FALSE,  # Keep EE and RE order
-  row_names_side = "right",  
-  row_names_gp = gpar(fontsize = 10, fontface = "bold"),  
-  column_names_gp = gpar(fontsize = 10),  
+  row_names_side = "right",
+  row_names_gp = gpar(fontsize = 10, fontface = "bold"),
+  column_names_gp = gpar(fontsize = 10),
   heatmap_legend_param = list(title = "DA count"),
-  border = TRUE,  
+  border = TRUE,
   rect_gp = gpar(col = "black", lwd = 0.5),  # Grid lines
   top_annotation = colanno_ex,  # Add column annotation
   cell_fun = function(j, i, x, y, width, height, fill) {
@@ -1776,7 +1782,7 @@ wgcna_figure_ph <- heat_ora_ph + heat_trait_mod_ph + heat_ph_da
 draw(wgcna_figure_ph)
 
 
-##Metabolomics 
+##Metabolomics
 # 1. ORA
 mm3 = module_membership3 %>%
   filter(module != "M0" ) %>%
@@ -1787,8 +1793,8 @@ bckg_m <- as.character(colnames(datExpr3))
 ora_wgcna_m <- lapply(signatures3, function(input_i) {
   run_ORA(input = as.character(input_i),
           background = bckg_m)
-}) %>% 
-  bind_rows(.id = "Module") %>% 
+}) %>%
+  bind_rows(.id = "Module") %>%
   mutate(log10p = -log10(p_value),
          Module = factor(Module, levels = unique(Module)))
 
@@ -1813,27 +1819,27 @@ adjp_threshold <- 0.05
 
 heat_ora_m <- Heatmap(
   heatmap_mat_ora_m,
-  name = "-log10(P-value)", 
+  name = "-log10(P-value)",
   col = col_fun_ora_m,
   cluster_rows = TRUE,  # Cluster modules
   cluster_columns = TRUE,  # Cluster pathways
   row_names_side = "left",
-  row_names_gp = gpar(fontsize = 9, fontface = "bold"),  
+  row_names_gp = gpar(fontsize = 9, fontface = "bold"),
   column_names_rot = 45,  # Ensure text rotates properly
   column_names_gp = gpar(fontsize = 9),  # Keep font size, but remove rotation from here
   heatmap_legend_param = list(title = "-log10(P-value)"),
   border = TRUE,
-  rect_gp = gpar(col = "black", lwd = 0.5),  
+  rect_gp = gpar(col = "black", lwd = 0.5),
   cell_fun = function(j, i, x, y, width, height, fill) {
-    grid.rect(x, y, width, height, gp = gpar(col = "black", fill = NA, lwd = 0.3))  
+    grid.rect(x, y, width, height, gp = gpar(col = "black", fill = NA, lwd = 0.3))
     if (heatmap_mat_ora_m[i, j] >= -log10(adjp_threshold)) {
-      grid.text("*", x, y, gp = gpar(fontsize = 10, fontface = "bold", col = "black"))  
+      grid.text("*", x, y, gp = gpar(fontsize = 10, fontface = "bold", col = "black"))
     }
   }
 )
 draw(heat_ora_m)
 
-## module (M)-trait correlation 
+## module (M)-trait correlation
 colnames(MEs3) <- gsub("ME", "M", colnames(MEs3))  # Replace "ME" with "M"
 MEs3 <- MEs3[, colnames(MEs3) != "M0"]             # Remove column T0
 
@@ -1852,7 +1858,7 @@ cor3 = bicorAndPvalue(cli_full_z2_m, MEs3) # alternative biweight midcor
 df3 = melt(cor3$bicor) %>% dplyr::rename(bicor = value)
 df3$pval = melt(cor3$p)$value
 df3$obs = melt(cor3$nObs)$value
-df3 <- df3 %>% 
+df3 <- df3 %>%
   mutate(sig = ifelse(pval < 0.001, '***',
                       ifelse(pval < 0.01, '**',
                              ifelse(pval < 0.05, '*', ''))))
@@ -1869,10 +1875,10 @@ sig_table_m$Var1 = NULL
 sig_table_m <- sig_table_m %>%
   select(M1, M2, M3, M4, M5, M6, M7)
 
-traitXmod_mat_m <- t(traitXmod_m) 
+traitXmod_mat_m <- t(traitXmod_m)
 sig_table_mat_m <- t(sig_table_m)
 
-col_fun_m <- colorRamp2(seq(min(traitXmod_mat_m), max(traitXmod_mat_m), length.out = 10), 
+col_fun_m <- colorRamp2(seq(min(traitXmod_mat_m), max(traitXmod_mat_m), length.out = 10),
                         rev(brewer.pal(10, "RdBu")))
 
 M_count <- module_membership3%>%
@@ -1898,28 +1904,28 @@ right_annot_m <- rowAnnotation(
 )
 heat_trait_mod_m <- Heatmap(
   traitXmod_mat_m,
-  name = "Correlation", 
+  name = "Correlation",
   col = col_fun_m,
-  cluster_rows = FALSE,  
-  cluster_columns = FALSE,  
-  row_names_side = "left",  
-  row_names_gp = gpar(fontsize = 10),  
-  column_names_rot = 45, 
-  column_names_gp = gpar(fontsize = 10),  
+  cluster_rows = FALSE,
+  cluster_columns = FALSE,
+  row_names_side = "left",
+  row_names_gp = gpar(fontsize = 10),
+  column_names_rot = 45,
+  column_names_gp = gpar(fontsize = 10),
   heatmap_legend_param = list(title = "Correlation"),
-  border = TRUE,  
-  rect_gp = gpar(col = "black", lwd = 0.5),  
-  top_annotation = column_annotation,  
+  border = TRUE,
+  rect_gp = gpar(col = "black", lwd = 0.5),
+  top_annotation = column_annotation,
   right_annotation = right_annot_m,
   cell_fun = function(j, i, x, y, width, height, fill) {
-    grid.rect(x, y, width, height, gp = gpar(col = "black", fill = NA, lwd = 0.3))  
-    
+    grid.rect(x, y, width, height, gp = gpar(col = "black", fill = NA, lwd = 0.3))
+
     if (!is.na(sig_table_mat_m[i, j])) {
       fill_rgb <- col2rgb(fill)
       luminance <- (0.299 * fill_rgb[1] + 0.587 * fill_rgb[2] + 0.114 * fill_rgb[3]) / 255
       text_color <- if (luminance < 0.5) "white" else "black"
-      
-      grid.text(sig_table_mat_m[i, j], x, y, gp = gpar(fontsize = 9, col = text_color))  
+
+      grid.text(sig_table_mat_m[i, j], x, y, gp = gpar(fontsize = 9, col = text_color))
     }
   }
 )
@@ -1985,13 +1991,13 @@ mm_m_matrix <- mm_m_combined %>% #This is from wgcna_downstream.R
   filter(module != "M0") %>%  # Exclude "T0", keep T1, T2, ...
   group_by(module, Modality) %>%  # Group by module & Modality
   summarise(yes_count = sum(yes_count), .groups = "drop") %>%  # Ensure unique pairs
-  pivot_wider(names_from = Modality, values_from = yes_count, values_fill = 0) %>% 
-  column_to_rownames("module") %>% 
+  pivot_wider(names_from = Modality, values_from = yes_count, values_fill = 0) %>%
+  column_to_rownames("module") %>%
   as.matrix()
 
 # Define color scale
 col_fun_m_da <- colorRamp2(
-  c(0, max(mm_m_matrix, na.rm = TRUE)), 
+  c(0, max(mm_m_matrix, na.rm = TRUE)),
   c("white", "#6D4B08")  # White for low, Blue for high
 )
 colanno_ex <- columnAnnotation(
@@ -2006,11 +2012,11 @@ heat_m_da <- Heatmap(
   col = col_fun_m_da,
   cluster_rows = FALSE,  # Keep module order fixed
   cluster_columns = FALSE,  # Keep EE and RE order
-  row_names_side = "right",  
-  row_names_gp = gpar(fontsize = 10, fontface = "bold"),  
-  column_names_gp = gpar(fontsize = 10),  
+  row_names_side = "right",
+  row_names_gp = gpar(fontsize = 10, fontface = "bold"),
+  column_names_gp = gpar(fontsize = 10),
   heatmap_legend_param = list(title = "DA count"),
-  border = TRUE,  
+  border = TRUE,
   rect_gp = gpar(col = "black", lwd = 0.5),  # Grid lines
   top_annotation = colanno_ex,  # Add column annotation
   cell_fun = function(j, i, x, y, width, height, fill) {
@@ -2035,7 +2041,7 @@ draw(wgcna_figure_m)
 
 
 ### Figures 5C-D
-kME_ph = signedKME(datExpr2, MEs2) #Extracting module connectivity (kME) for each feature in phospho module. 
+kME_ph = signedKME(datExpr2, MEs2) #Extracting module connectivity (kME) for each feature in phospho module.
 kME_ph <- rownames_to_column(kME_ph, var = "feature_id")
 kME_ph <- kME_ph %>%
   # Join with HUMAN_FEATURE_TO_GENE to map feature_id to gene_symbol
@@ -2048,8 +2054,8 @@ kME_ph <- kME_ph %>%
     gene_symbol_with_phosphosite = ifelse(
       !is.na(gene_symbol),
       paste0(
-        gene_symbol, 
-        "-", 
+        gene_symbol,
+        "-",
         gsub("^[^_]*_", "", feature_id) %>%          # Extract portion after the last underscore
           gsub("([0-9]+)[a-zA-Z]", "\\1;", .) %>%   # Insert semicolon after each number-letter pair
           gsub("[a-zA-Z]+$", "", .) %>%            # Remove trailing letters
@@ -2059,11 +2065,11 @@ kME_ph <- kME_ph %>%
     )
   )
 
-# Label phosphosite whether it is a DA or not. 
+# Label phosphosite whether it is a DA or not.
 mm_ph <- mm_ph %>%
   mutate(
     da = case_when(
-      feature_id %in% precawg_phos_da_sig_ee & 
+      feature_id %in% precawg_phos_da_sig_ee &
         feature_id %in% precawg_phos_da_sig_re ~ "EE & RE",
       feature_id %in% precawg_phos_da_sig_ee ~ "EE",
       feature_id %in% precawg_phos_da_sig_re ~ "RE",
@@ -2146,7 +2152,7 @@ col_fun <- circlize::colorRamp2(seq(-1, 1, length.out = 50), color_palette)
 common_ids <- intersect(colnames(phos_pre), rownames(cli_full))
 
 # Subset data for common IDs
-phos_pre_feat <- phos_pre[ph10_da$feature_id, common_ids, drop = FALSE] #P15104_S343 is GLUL-S343. Q9UHB6_S343s is LIMA1-S343 
+phos_pre_feat <- phos_pre[ph10_da$feature_id, common_ids, drop = FALSE] #P15104_S343 is GLUL-S343. Q9UHB6_S343s is LIMA1-S343
 clinic_feat <- cli_full[common_ids, c("HOMA_IR", "Adipo_IR", "HbA1c")]
 clinic_feat <- scale(clinic_feat)
 
@@ -2191,9 +2197,9 @@ ph10_ir <- Heatmap(
       # Convert fill to RGB
       rgb_vals <- col2rgb(fill) / 255
       luminance <- sum(rgb_vals * c(0.299, 0.587, 0.114))  # perceptual brightness
-      
+
       text_color <- ifelse(luminance < 0.5, "white", "black")
-      
+
       grid.text(
         sig_markers[i, j],
         x = x, y = y,
@@ -2204,7 +2210,7 @@ ph10_ir <- Heatmap(
   column_names_gp = gpar(fontsize = 10)
 )
 
-# Custom function for generating 4hr only feature logFC heatmap. 
+# Custom function for generating 4hr only feature logFC heatmap.
 create_4hr_heatmap <- function(data, contrasts, features = NULL, gene_col, ordered_rows = NULL) {
   # Step 1: Filter and annotate
   heatmap_data <- data %>%
@@ -2215,19 +2221,19 @@ create_4hr_heatmap <- function(data, contrasts, features = NULL, gene_col, order
       contrast = factor(contrast, levels = contrasts)
     ) %>%
     arrange(contrast)
-  
+
   # Optional feature filtering
   if (!is.null(features)) {
     heatmap_data <- heatmap_data %>%
       filter(!!sym(gene_col) %in% features)
   }
-  
+
   # Deduplicate based on *lowest* adjusted p-value
   heatmap_data <- heatmap_data %>%
     group_by(!!sym(gene_col), contrast) %>%
     slice_min(order_by = adj_p_value, n = 1, with_ties = FALSE) %>%
     ungroup()
-  
+
   # Step 2: Pivot to matrix
   logFC_matrix <- heatmap_data %>%
     select(all_of(gene_col), contrast, logFC) %>%
@@ -2238,7 +2244,7 @@ create_4hr_heatmap <- function(data, contrasts, features = NULL, gene_col, order
     ) %>%
     column_to_rownames(gene_col) %>%
     as.matrix()
-  
+
   significance_matrix <- heatmap_data %>%
     select(all_of(gene_col), contrast, adj_p_value) %>%
     pivot_wider(
@@ -2248,24 +2254,24 @@ create_4hr_heatmap <- function(data, contrasts, features = NULL, gene_col, order
     ) %>%
     column_to_rownames(gene_col) %>%
     as.matrix()
-  
+
   significance_matrix <- ifelse(significance_matrix < 0.05, "*", "")
-  
+
   # Optional row ordering
   if (!is.null(ordered_rows)) {
     logFC_matrix <- logFC_matrix[ordered_rows, , drop = FALSE]
     significance_matrix <- significance_matrix[ordered_rows, , drop = FALSE]
   }
-  
+
   # Step 3: Annotations
   col_annotations <- data.frame(
     contrast = contrasts,
     group = ifelse(grepl("^group_timepointADUEndur", contrasts), "EE", "RE"),
     timeline = "4hrPost"
   )
-  
+
   col_annotations$timeline <- factor(col_annotations$timeline, levels = c("4hrPost"))
-  
+
   col_annotation <- HeatmapAnnotation(
     Exercise = col_annotations$group,
     Timeline = col_annotations$timeline,
@@ -2279,7 +2285,7 @@ create_4hr_heatmap <- function(data, contrasts, features = NULL, gene_col, order
     ),
     show_annotation_name = FALSE
   )
-  
+
   # Step 4: Heatmap
   heatmap <- Heatmap(
     logFC_matrix,
@@ -2291,7 +2297,7 @@ create_4hr_heatmap <- function(data, contrasts, features = NULL, gene_col, order
     cluster_rows = FALSE, # Turn to FALSE for wgcna main figures
     cluster_columns = FALSE,
     show_row_names = FALSE, # Turn to FALSE for wgcna main figures
-    show_column_names = FALSE, 
+    show_column_names = FALSE,
     border = TRUE,
     column_split = col_annotations$group,
     column_title = NULL,
@@ -2302,7 +2308,7 @@ create_4hr_heatmap <- function(data, contrasts, features = NULL, gene_col, order
       }
     }
   )
-  
+
   return(heatmap)
 }
 ordered_rownames <- rownames(draw(ph10_ir)@ht_list[[1]]@matrix)
@@ -2341,7 +2347,7 @@ kME_pr <- rownames_to_column(kME_pr, var = "feature_id")
 mm_pr <- mm_pr %>%
   mutate(
     da = case_when(
-      feature_id %in% precawg_prot_da_sig_ee_v2 & 
+      feature_id %in% precawg_prot_da_sig_ee_v2 &
         feature_id %in% precawg_prot_da_sig_re_v2 ~ "EE & RE",
       feature_id %in% precawg_prot_da_sig_ee_v2 ~ "EE",
       feature_id %in% precawg_prot_da_sig_re_v2 ~ "RE",
@@ -2400,13 +2406,13 @@ ggplot(pr5_genes, aes(x = feature_id, y = kME5)) +
     panel.grid.minor = element_blank()
   )
 
-#dev.off() 
+#dev.off()
 
 # correlation between Pr5 DA and BCAA
 common_ids <- intersect(colnames(prot_pre), rownames(cli_full))
 
 # Subset data for common IDs
-prot_pre_feat <- prot_pre[pr5_da$feature_id, common_ids, drop = FALSE] #P15104_S343 is GLUL-S343. Q9UHB6_S343s is LIMA1-S343 
+prot_pre_feat <- prot_pre[pr5_da$feature_id, common_ids, drop = FALSE] #P15104_S343 is GLUL-S343. Q9UHB6_S343s is LIMA1-S343
 clinic_feat <- cli_full[common_ids, c("Isoleucine", "Leucine", "Valine")]
 phos_pre_feat <- as.matrix(prot_pre_feat)  # Convert to matrix
 clinic_feat <- as.matrix(clinic_feat)  # Convert to matrix
@@ -2450,9 +2456,9 @@ pr5_bcaa <- Heatmap(
       # Convert fill to RGB
       rgb_vals <- col2rgb(fill) / 255
       luminance <- sum(rgb_vals * c(0.299, 0.587, 0.114))  # perceptual brightness
-      
+
       text_color <- ifelse(luminance < 0.5, "white", "black")
-      
+
       grid.text(
         sig_markers[i, j],
         x = x, y = y,
@@ -2574,12 +2580,12 @@ draw(ht, heatmap_legend_side = "right", annotation_legend_side = "right") # Figu
 #dev.off()
 
 ## FIgure S5B: Correlation between deconvolution outcome and module eigengene at baseline.
-# 1. Trans. 
+# 1. Trans.
 cor_decon_t = bicorAndPvalue(precawg_decon, MEs) # alternative biweight midcor2
 df_decon_t = melt(cor_decon_t$bicor) %>% dplyr::rename(bicor = value)
 df_decon_t$pval = melt(cor_decon_t$p)$value
 df_decon_t$obs = melt(cor_decon_t$nObs)$value
-df_decon_t <- df_decon_t %>% 
+df_decon_t <- df_decon_t %>%
   mutate(sig = ifelse(pval < 0.001, '***',
                       ifelse(pval < 0.01, '**',
                              ifelse(pval < 0.05, '*', ''))))
@@ -2593,7 +2599,7 @@ sig_table_decon_t = dcast(df_decon_t, Var1 ~ Var2, value.var = 'sig')
 rownames(sig_table_decon_t) = sig_table_decon_t$Var1
 sig_table_decon_t$Var1 = NULL
 
-# 2. Prot. 
+# 2. Prot.
 common_samples <- intersect(rownames(precawg_decon), rownames(MEs1))
 
 # Subset both data frames to keep only the common samples and ensure they are in the same order
@@ -2602,7 +2608,7 @@ cor_decon_pr = bicorAndPvalue(decon_pre_prot, MEs1) # alternative biweight midco
 df_decon_pr = melt(cor_decon_pr$bicor) %>% dplyr::rename(bicor = value)
 df_decon_pr$pval = melt(cor_decon_pr$p)$value
 df_decon_pr$obs = melt(cor_decon_pr$nObs)$value
-df_decon_pr <- df_decon_pr %>% 
+df_decon_pr <- df_decon_pr %>%
   mutate(sig = ifelse(pval < 0.001, '***',
                       ifelse(pval < 0.01, '**',
                              ifelse(pval < 0.05, '*', ''))))
@@ -2617,7 +2623,7 @@ sig_table_decon_pr = dcast(df_decon_pr, Var1 ~ Var2, value.var = 'sig')
 rownames(sig_table_decon_pr) = sig_table_decon_pr$Var1
 sig_table_decon_pr$Var1 = NULL
 
-# 3. Phosphoproteomics. 
+# 3. Phosphoproteomics.
 common_samples <- intersect(rownames(precawg_decon), rownames(MEs2))
 
 # Subset both data frames to keep only the common samples and ensure they are in the same order
@@ -2627,7 +2633,7 @@ cor_decon_ph = bicorAndPvalue(decon_pre_ph, MEs2) # alternative biweight midcor
 df_decon_ph = melt(cor_decon_ph$bicor) %>% dplyr::rename(bicor = value)
 df_decon_ph$pval = melt(cor_decon_ph$p)$value
 df_decon_ph$obs = melt(cor_decon_ph$nObs)$value
-df_decon_ph <- df_decon_ph %>% 
+df_decon_ph <- df_decon_ph %>%
   mutate(sig = ifelse(pval < 0.001, '***',
                       ifelse(pval < 0.01, '**',
                              ifelse(pval < 0.05, '*', ''))))
@@ -2652,7 +2658,7 @@ cor_decon_m = bicorAndPvalue(decon_pre_m, MEs3) # alternative biweight midcor
 df_decon_m = melt(cor_decon_m$bicor) %>% dplyr::rename(bicor = value)
 df_decon_m$pval = melt(cor_decon_m$p)$value
 df_decon_m$obs = melt(cor_decon_m$nObs)$value
-df_decon_m <- df_decon_m %>% 
+df_decon_m <- df_decon_m %>%
   mutate(sig = ifelse(pval < 0.001, '***',
                       ifelse(pval < 0.01, '**',
                              ifelse(pval < 0.05, '*', ''))))
@@ -2682,7 +2688,7 @@ deconXmod_combined <- as.data.frame(deconXmod_combined) %>%
     grepl("^Ph", Rowname) ~ "Phosphoproteomics",
     grepl("^M", Rowname)  ~ "Metabolomics"
   )) %>%
-  column_to_rownames(var = "Rowname")      
+  column_to_rownames(var = "Rowname")
 
 correct_order <- c(
   paste0("T", 1:12),   # T1 - T12
@@ -2713,7 +2719,7 @@ row_annotation <- rowAnnotation(
 Heatmap(
   as.matrix(deconXmod_combined[, 1:(ncol(deconXmod_combined) - 1)]),
   name = "Correlation",
-  col = col_fun, 
+  col = col_fun,
   right_annotation = row_annotation,
   cluster_rows = FALSE,
   cluster_columns = FALSE,
@@ -2722,15 +2728,15 @@ Heatmap(
   column_names_gp = gpar(fontsize = 10, col = "black"),
   column_names_side = "top",
   show_heatmap_legend = TRUE,
-  
+
   cell_fun = function(j, i, x, y, width, height, fill) {
     sig_marker <- deccon_sig_table_combined[i, j]
-    
+
     if (!is.na(sig_marker) && sig_marker != "") {
       rgb_col <- col2rgb(fill) / 255
       luminance <- 0.299 * rgb_col[1, ] + 0.587 * rgb_col[2, ] + 0.114 * rgb_col[3, ]
       text_color <- ifelse(luminance < 0.5, "white", "black")  # Threshold for brightness
-      
+
       grid.text(sig_marker, x, y, gp = gpar(fontsize = 10, col = text_color))
     }
   }
@@ -2747,11 +2753,11 @@ traits_residuals <- lapply(as.data.frame(cli_full_z2_t), function(y) {
 ME_residuals_matrix <- do.call(cbind, ME_residuals)
 traits_residuals_matrix <- do.call(cbind, traits_residuals)
 
-cor_adj = bicorAndPvalue(traits_residuals_matrix, ME_residuals_matrix) 
+cor_adj = bicorAndPvalue(traits_residuals_matrix, ME_residuals_matrix)
 df = melt(cor_adj$bicor) %>% dplyr::rename(bicor = value)
 df$pval = melt(cor_adj$p)$value
 df$obs = melt(cor_adj$nObs)$value
-df <- df %>% 
+df <- df %>%
   mutate(sig = ifelse(pval < 0.001, '***',
                       ifelse(pval < 0.01, '**',
                              ifelse(pval < 0.05, '*', ''))))
@@ -2782,7 +2788,7 @@ cor_adj = bicorAndPvalue(traits_residuals_matrix, ME1_residuals_matrix) # altern
 df = melt(cor_adj$bicor) %>% dplyr::rename(bicor = value)
 df$pval = melt(cor_adj$p)$value
 df$obs = melt(cor_adj$nObs)$value
-df <- df %>% 
+df <- df %>%
   mutate(sig = ifelse(pval < 0.001, '***',
                       ifelse(pval < 0.01, '**',
                              ifelse(pval < 0.05, '*', ''))))
@@ -2813,7 +2819,7 @@ cor_adj = bicorAndPvalue(traits_residuals_matrix, ME2_residuals_matrix) # altern
 df = melt(cor_adj$bicor) %>% dplyr::rename(bicor = value)
 df$pval = melt(cor_adj$p)$value
 df$obs = melt(cor_adj$nObs)$value
-df <- df %>% 
+df <- df %>%
   mutate(sig = ifelse(pval < 0.001, '***',
                       ifelse(pval < 0.01, '**',
                              ifelse(pval < 0.05, '*', ''))))
@@ -2844,7 +2850,7 @@ cor_adj = bicorAndPvalue(traits_residuals_matrix, ME3_residuals_matrix) # altern
 df = melt(cor_adj$bicor) %>% dplyr::rename(bicor = value)
 df$pval = melt(cor_adj$p)$value
 df$obs = melt(cor_adj$nObs)$value
-df <- df %>% 
+df <- df %>%
   mutate(sig = ifelse(pval < 0.001, '***',
                       ifelse(pval < 0.01, '**',
                              ifelse(pval < 0.05, '*', ''))))
@@ -2873,7 +2879,7 @@ new_order <- c(
   "Steps", "Movement", "Energy_exp",
   "VO2max_rel", "VO2max", "O2_Pulse",
   "Grip_strength", "Knee_torque",
-  "HOMA_IR", "Adipo_IR", 
+  "HOMA_IR", "Adipo_IR",
   "HbA1c", "Insulin", "Glucose", "Lactate", "Glycerol", "NEFA", "Trig", "Cholesterol", "HDL", "LDL", "KET", "Glucagon", "Cortisol",
   "Isoleucine", "Leucine", "Valine"
 )
@@ -2950,7 +2956,7 @@ column_annotation <- HeatmapAnnotation(
   Clinical_traits = column_groups,
   col = list(Clinical_traits = structure(
     c("#FCC737", "#0A5EB0", "#FF8000", "#BDE8CA", "#41B3A2", "#F95454", "#D7C3F1"),
-    names = c("Anthropometrics", "Muscle strength", "Cardiorespiration", 
+    names = c("Anthropometrics", "Muscle strength", "Cardiorespiration",
               "Accelerometry", "IR_index", "Blood", "Plasma BCAA")
   )),
   annotation_name_gp = gpar(fontsize = 10, fontface = "bold")
@@ -2960,7 +2966,7 @@ column_annotation <- HeatmapAnnotation(
 Heatmap(
   as.matrix(traitXmod_adj[, 1:(ncol(traitXmod_adj) - 1)]),  # Exclude annotation column
   name = "Correlation",
-  col = col_fun, 
+  col = col_fun,
   top_annotation = column_annotation,
   right_annotation = row_annotation,
   cluster_rows = FALSE,
@@ -2970,7 +2976,7 @@ Heatmap(
   column_names_gp = gpar(fontsize = 10, col = "black"),
   column_names_side = "top",
   show_heatmap_legend = TRUE,
-  
+
   # Dynamically set asterisk color based on fill brightness
   cell_fun = function(j, i, x, y, width, height, fill) {
     sig_marker <- sig_table_adj[i, j]

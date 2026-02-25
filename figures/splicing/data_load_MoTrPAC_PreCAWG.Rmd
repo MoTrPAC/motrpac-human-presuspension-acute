@@ -1,0 +1,338 @@
+---
+title: "Load Processed MoTrPAC PreCAWG Data into Workspace"
+output: html_document
+---
+
+```{r}
+library(data.table)
+
+library(ggplot2)
+library(patchwork)
+library(pheatmap)
+
+library(parallel)
+
+library(dplyr)
+```
+
+# Packages and functions
+
+```{r}
+# MoTrPAC package
+# devtools::install("../repos/MotrpacHumanPreSuspension/")
+# "MotrpacHumanPreSuspensionData" can be installed directly after setting github token
+# temporary: github credential issues on Minerva when using devtools::install, seems that github token is not passed to dependency install, and cannot pass the dependency check for "MotrpacHumanPreSuspensionData". So temporarily removed dependency in DESCRIPTION to install. 
+```
+
+```{r}
+library(MotrpacHumanPreSuspension)
+library(MotrpacHumanPreSuspensionData)
+```
+
+```{r}
+MOTRPAC_HUMAN_ENSEMBL_GENE_MAP <- MotrpacHumanPreSuspensionData::HUMAN_FEATURE_TO_GENE[assay == "transcript-rna-seq", ]
+
+# convert factors to characters
+MOTRPAC_HUMAN_ENSEMBL_GENE_MAP <- MOTRPAC_HUMAN_ENSEMBL_GENE_MAP[, .(assay, feature_id, entrez_gene, gene_symbol, ensembl_gene)]
+MOTRPAC_HUMAN_ENSEMBL_GENE_MAP <- setDT(lapply(MOTRPAC_HUMAN_ENSEMBL_GENE_MAP, as.character))
+
+ensembl_to_symbol_motrpac <- function(ensembl_ids, ensembl_id_suffix = T){
+    if (ensembl_id_suffix){
+        gene_symbols <- unique(MOTRPAC_HUMAN_ENSEMBL_GENE_MAP[feature_id %in% as.character(ensembl_ids), gene_symbol])
+    }else{
+        gene_symbols <- unique(MOTRPAC_HUMAN_ENSEMBL_GENE_MAP[ensembl_gene %in% as.character(ensembl_ids), gene_symbol])
+    }
+    return(as.character(gene_symbols))
+}
+
+symbol_to_ensembl_motrpac <- function(gene_symbols, ensembl_id_suffix = T){
+    if (ensembl_id_suffix){
+        ensembl_ids <- unique(MOTRPAC_HUMAN_ENSEMBL_GENE_MAP[gene_symbol %in% as.character(gene_symbols), feature_id])
+    }else{
+        ensembl_ids <- unique(MOTRPAC_HUMAN_ENSEMBL_GENE_MAP[gene_symbol %in% as.character(gene_symbols), ensembl_gene])
+    }
+    return(as.character(ensembl_ids))
+}
+```
+
+```{r}
+# Functions adapted from Signac to facilitate working with GRanges
+
+GRanges_to_Strings <- function(gr, sep = c("-", "-")){
+    gr_str <- paste0(GenomicRanges::seqnames(gr), sep[1], GenomicRanges::start(gr), sep[2], GenomicRanges::end(gr))
+    return(gr_str)
+}
+
+Strings_to_GRanges <- function(gr_str, sep = c("-", "-")){
+    gr_str_split <- strsplit(gr_str, split = paste0(sep, collapse = "|"))
+    gr <- GenomicRanges::GRanges(seqnames = sapply(gr_str_split, "[", 1),
+                                 ranges = IRanges::IRanges(start = strtoi(sapply(gr_str_split, "[", 2)),
+                                                           end = strtoi(sapply(gr_str_split, "[", 3))))
+    return(gr)
+}
+
+Extend_GRanges <- function(gr, upstream, downstream = upstream, from_midpoint = F){
+    ind_plus_strand <- GenomicRanges::strand(gr) == "+" | GenomicRanges::strand(gr) == "*"
+    if (from_midpoint){
+        midpoint <- floor((GenomicRanges::start(gr) + GenomicRanges::end(gr)) / 2)
+        start_extend <- midpoint - ifelse(ind_plus_strand, yes = upstream, no = downstream)
+        end_extend <- midpoint + ifelse(ind_plus_strand, yes = downstream, no = upstream)
+    }else{
+        start_extend <- GenomicRanges::start(gr) - ifelse(ind_plus_strand, yes = upstream, no = downstream)
+        end_extend <- GenomicRanges::end(gr) + ifelse(ind_plus_strand, yes = downstream, no = upstream)
+    }
+    IRanges::ranges(gr) <- IRanges::IRanges(start = start_extend, end = end_extend)
+    gr <- GenomicRanges::trim(gr)
+    return(gr)
+}
+```
+
+
+# Data - MoTrPAC PreCAWG
+
+## QC and DA data
+
+```{r}
+# Data downloaded Jun-25-2025
+
+# temp <- readRDS("../data_download/saved_objects_2025-06-25.rds")
+
+temp <- readRDS("../data_download/saved_objects.rds")
+
+qcdat <- temp$qcdat
+dadat <- temp$dadat
+phenodat <- temp$phenodat
+# clinicdat <- temp$clinicdat
+
+rm(temp)
+gc()
+```
+
+```{r}
+# tissue_name_mapping <- setNames(c("ADI", "BLO", "MUS"), c("adipose", "blood", "muscle"))
+# Update 2025-5-5
+tissue_name_mapping <- MotrpacHumanPreSuspension::HUMAN_TISSUE_ABBR
+tissues_all <- sort(names(tissue_name_mapping))
+
+# exercise_groups <- sort(unique(phenodat$sample_metadata$randomGroupCode))
+
+exercise_groups <- sort(unique(qcdat$blood$`transcript-rna-seq`$sample_metadata$randomGroupCode))
+# exercise_groups <- sort(unique(phenodat$pheno_data$randomGroupCode))
+
+timepoints_levels <- levels(phenodat$pheno_data$Timepoint)
+```
+
+## Time points
+
+### Exact time points namings
+
+```{r}
+timepoints_levels_exact <- c("pre_exercise", "during_20_min", "during_40_min", "post_10_min", "post_15_min", "post_30_min", "post_45_min", "post_3.5_hr", "post_4_hr", "post_24_hr")
+
+add_exact_timepoint <- function(sample_metadata_df, tissue_col = "sampleGroupCode", tissue_name_mapping = NULL, timepoint_col = "Timepoint"){
+    
+    if (is.null(tissue_name_mapping)){
+        tissue_name_mapping <- setNames(c("adipose", "blood", "muscle"), c("adipose", "blood", "muscle"))
+    }
+
+    sample_metadata_df$Timepoint_exact <- as.character(sample_metadata_df[[timepoint_col]])
+    
+    sample_metadata_df$Timepoint_exact <- ifelse(sample_metadata_df$Timepoint_exact == "post_15_30_45_min" & sample_metadata_df[[tissue_col]] == tissue_name_mapping["blood"], yes = "post_30_min", no = sample_metadata_df$Timepoint_exact)
+    sample_metadata_df$Timepoint_exact <- ifelse(sample_metadata_df$Timepoint_exact == "post_15_30_45_min" & sample_metadata_df[[tissue_col]] == tissue_name_mapping["muscle"], yes = "post_15_min", no = sample_metadata_df$Timepoint_exact)
+    sample_metadata_df$Timepoint_exact <- ifelse(sample_metadata_df$Timepoint_exact == "post_15_30_45_min" & sample_metadata_df[[tissue_col]] == tissue_name_mapping["adipose"], yes = "post_45_min", no = sample_metadata_df$Timepoint_exact)
+    
+    sample_metadata_df$Timepoint_exact <- ifelse(sample_metadata_df$Timepoint_exact == "post_3.5_4_hr" & sample_metadata_df[[tissue_col]] == tissue_name_mapping["blood"], yes = "post_3.5_hr", no = sample_metadata_df$Timepoint_exact)
+    sample_metadata_df$Timepoint_exact <- ifelse(sample_metadata_df$Timepoint_exact == "post_3.5_4_hr" & sample_metadata_df[[tissue_col]] == tissue_name_mapping["muscle"], yes = "post_3.5_hr", no = sample_metadata_df$Timepoint_exact)
+    sample_metadata_df$Timepoint_exact <- ifelse(sample_metadata_df$Timepoint_exact == "post_3.5_4_hr" & sample_metadata_df[[tissue_col]] == tissue_name_mapping["adipose"], yes = "post_4_hr", no = sample_metadata_df$Timepoint_exact)
+    
+    sample_metadata_df$Timepoint_exact <- factor(sample_metadata_df$Timepoint_exact, levels = timepoints_levels_exact)
+    
+    return(sample_metadata_df)
+}
+
+convert_to_exact_timepoint <- function(timepoints_vec, tissue){
+    if (tissue == "blood"){
+        return(setNames(c("pre_exercise", "during_20_min", "during_40_min", "post_10_min", "post_30_min", "post_3.5_hr", "post_24_hr"),
+                        c("pre_exercise", "during_20_min", "during_40_min", "post_10_min", "post_15_30_45_min", "post_3.5_4_hr", "post_24_hr"))[timepoints_vec])
+    }
+    if (tissue == "muscle"){
+        return(setNames(c("pre_exercise", "during_20_min", "during_40_min", "post_10_min", "post_15_min", "post_3.5_hr", "post_24_hr"),
+                        c("pre_exercise", "during_20_min", "during_40_min", "post_10_min", "post_15_30_45_min", "post_3.5_4_hr", "post_24_hr"))[timepoints_vec])
+    }
+    if (tissue == "adipose"){
+        return(setNames(c("pre_exercise", "during_20_min", "during_40_min", "post_10_min", "post_45_min", "post_4_hr", "post_24_hr"),
+                        c("pre_exercise", "during_20_min", "during_40_min", "post_10_min", "post_15_30_45_min", "post_3.5_4_hr", "post_24_hr"))[timepoints_vec])
+    }
+}
+
+timepoint_exact_to_range_vec <- setNames(c("pre_exercise", "during_20_min", "during_40_min", "post_10_min", "post_15_30_45_min", "post_15_30_45_min", "post_15_30_45_min", "post_3.5_4_hr", "post_3.5_4_hr", "post_24_hr"),
+                                         c("pre_exercise", "during_20_min", "during_40_min", "post_10_min", "post_15_min", "post_30_min", "post_45_min", "post_3.5_hr", "post_4_hr", "post_24_hr"))
+```
+
+
+
+### Timepoint categories
+
+```{r}
+timepoint_description_vec <- setNames(c("pre exercise", paste(c("20 min", "40 min"), "during exercise"), paste(c("10 min", "15 min", "30 min", "45 min", "15-45 min", "3.5 hr", "4 hr", "3.5-4 hr", "24 hr"), "post exercise")), 
+                                      c("pre_exercise", "during_20_min", "during_40_min", "post_10_min", "post_15_min", "post_30_min", "post_45_min", "post_15_30_45_min", "post_3.5_hr", "post_4_hr", "post_3.5_4_hr", "post_24_hr"))
+
+timepoint_cat_vector <- setNames(c("Pre", "During", "During", "Early Post", "Early Post", "Early Post", "Early Post", "Early Post", "Mid Post", "Mid Post", "Mid Post", "Late Post"),
+                                 c("pre_exercise", "during_20_min", "during_40_min", "post_10_min", "post_15_min", "post_30_min", "post_45_min", "post_15_30_45_min", "post_3.5_hr", "post_4_hr", "post_3.5_4_hr", "post_24_hr"))
+timepoint_cat_vector <- factor(timepoint_cat_vector, levels = c("Pre", "During", "Early Post", "Mid Post", "Late Post"))
+```
+
+
+### Time point renaming
+
+```{r}
+# rename the time points for visulization
+timepoint_renaming_vector <- setNames(c("Pre", "D20M", "D40M", "P10M", "P15M", "P30M", "P45M", "P15-45M", "P3.5H", "P4H", "P3.5-4H", "P24H"),
+                                      c("pre_exercise", "during_20_min", "during_40_min", "post_10_min", "post_15_min", "post_30_min", "post_45_min", "post_15_30_45_min", "post_3.5_hr", "post_4_hr", "post_3.5_4_hr", "post_24_hr"))
+```
+
+
+
+## Group rename
+
+```{r}
+# group_renaming_vector <- setNames(c("Control", "Endurance", "Resistance"), c("ADUControl", "ADUEndur", "ADUResist"))
+group_renaming_vector <- setNames(c("Control", "EE", "RE"), c("ADUControl", "ADUEndur", "ADUResist"))
+```
+
+
+
+## Plotting colors
+
+```{r}
+# Define a common set of colors for plotting the tissue, group, time point, AS type, etc.
+annot_colors_use_list <- list()
+
+# annot_colors_use_list[["tissue"]] <- setNames(c("#2a9d8f", "#e9c46a", "#e76f51"), names(AS_psi_table_tissue_list))
+# annot_colors_use_list[["group"]] <- setNames(c("#f86624", "#f9c80e", "#43bccd"), exercise_groups)
+# annot_colors_use_list[["timepoint"]] <- setNames(c("#001219", "#005F73", "#0A9396", "#E9D8A6", "#EE9B00", "#CA6702", "#9B2226"), levels(phenodat$Timepoint))
+# annot_colors_use_list[["AS_type"]] <- setNames(c("#194030", "#358568", "#70c299", "#b7e4c7"), AS_types)
+
+
+# annot_colors_use_list <- list()
+# 
+# source("../repos/precovid-analyses/library/human_colors.R", local = T)
+# 
+# annot_colors_use_list[["tissue"]] <- human_tissue_cols
+# annot_colors_use_list[["group"]] <- exercise_type_cols
+# annot_colors_use_list[["timepoint"]] <- acute_timepoint_cols
+# annot_colors_use_list[["AS_type"]] <- setNames(c("#405099", "#5080AA", "#6599CC", "#90BBEE"), AS_types)
+# 
+# annot_colors_use_list[["modality"]] <- c(MotrpacHumanPreSuspension::HUMAN_OME_COLORS, setNames(c("#90CCEE"), c("AS")))
+
+#TODO: colors for the new timepoint naming
+# temp <- annot_colors_use_list[["timepoint"]]
+# names(temp) <- timepoint_new_levels_renaming_vec[names(temp)]
+
+
+# Update 2025-5-5
+# New color schemes
+annot_colors_use_list <- list()
+
+annot_colors_use_list[["tissue"]] <- MotrpacHumanPreSuspension::HUMAN_TISSUE_COLORS
+annot_colors_use_list[["group"]] <- MotrpacHumanPreSuspension::HUMAN_EXERCISE_GROUP_COLORS
+annot_colors_use_list[["timepoint"]] <- MotrpacHumanPreSuspension::HUMAN_ACUTE_TIMEPOINT_COLORS
+
+
+annot_colors_use_list$group <- c(annot_colors_use_list$group, 
+                                 setNames(annot_colors_use_list$group[names(group_renaming_vector)], group_renaming_vector))
+
+annot_colors_use_list$timepoint <- c(annot_colors_use_list$timepoint, 
+                                     setNames(annot_colors_use_list$timepoint["post_3.5_4_hr"], "post_3.5_hr")) 
+
+annot_colors_use_list$timepoint <- c(annot_colors_use_list$timepoint, 
+                                     setNames(annot_colors_use_list$timepoint[names(timepoint_renaming_vector)], timepoint_renaming_vector)) 
+```
+
+
+## Sample numbers - all omes
+
+### Combined
+
+```{r}
+sample_metadata_df_list <- list()
+
+temp_colnames <- Reduce("intersect", lapply(qcdat, function(x){colnames(x$`transcript-rna-seq`$sample_metadata)}))
+sample_metadata_df <- do.call("rbind", lapply(qcdat, function(x){x$`transcript-rna-seq`$sample_metadata[, temp_colnames]}))
+sample_metadata_df$vialLabel <- as.character(sample_metadata_df$vialLabel)
+sample_metadata_df <- add_exact_timepoint(sample_metadata_df, tissue_col = "sampleGroupCode", tissue_name_mapping = tissue_name_mapping, timepoint_col = "Timepoint")
+sample_metadata_df_list[["transcript-rna-seq"]] <- sample_metadata_df
+
+temp_colnames <- Reduce("intersect", lapply(qcdat[c("blood", "muscle")], function(x){colnames(x$`epigen-atac-seq`$sample_metadata)}))
+sample_metadata_df <- do.call("rbind", lapply(qcdat[c("blood", "muscle")], function(x){x$`epigen-atac-seq`$sample_metadata[, temp_colnames]}))
+sample_metadata_df$vialLabel <- as.character(sample_metadata_df$vialLabel)
+sample_metadata_df <- add_exact_timepoint(sample_metadata_df, tissue_col = "sampleGroupCode", tissue_name_mapping = tissue_name_mapping, timepoint_col = "Timepoint")
+sample_metadata_df_list[["epigen-atac-seq"]] <- sample_metadata_df
+
+temp_colnames <- Reduce("intersect", lapply(qcdat[c("adipose", "muscle")], function(x){colnames(x$`prot-ph`$sample_metadata)}))
+sample_metadata_df <- do.call("rbind", lapply(qcdat[c("adipose", "muscle")], function(x){x$`prot-ph`$sample_metadata[, temp_colnames]}))
+sample_metadata_df$vialLabel <- as.character(sample_metadata_df$vialLabel)
+sample_metadata_df <- add_exact_timepoint(sample_metadata_df, tissue_col = "sampleGroupCode", tissue_name_mapping = tissue_name_mapping, timepoint_col = "Timepoint")
+sample_metadata_df_list[["prot-ph"]] <- sample_metadata_df
+
+gplots::venn(lapply(sample_metadata_df_list, function(x){x$vialLabel}))
+```
+
+```{r}
+# Summarize number of participants for all tissue, groups and time points
+
+num_participants_df <- list()
+
+for (tissue_select in c("adipose", "blood", "muscle")){
+    for (group_select in c("ADUControl", "ADUEndur", "ADUResist")){
+        for (timepoint_select in Reduce("union", lapply(sample_metadata_df_list, "[[", "Timepoint_exact"))){
+            num_participants_df[[paste0(tissue_select, "-", group_select, "-", timepoint_select)]] <- 
+                data.frame(Tissue = tissue_select,
+                           Group = group_select,
+                           Timepoint = timepoint_select,
+                           Num_participants = length(Reduce("union",
+                                                            lapply(sample_metadata_df_list, 
+                                                                   function(sample_metadata_df){sample_metadata_df$pid[sample_metadata_df$sampleGroupCode == tissue_name_mapping[tissue_select] & 
+                                                                                                                           sample_metadata_df$randomGroupCode == group_select & 
+                                                                                                                           sample_metadata_df$Timepoint_exact == timepoint_select]}))))
+        }
+    }
+}
+num_participants_df <- do.call("rbind", num_participants_df)
+
+
+
+sample_numbers_df_all <- num_participants_df
+
+sample_numbers_df_all$Group <- factor(sample_numbers_df_all$Group, levels = exercise_groups)
+sample_numbers_df_all$Timepoint <- factor(sample_numbers_df_all$Timepoint, levels = timepoints_levels_exact)
+
+sample_numbers_df_all$Group <- factor(group_renaming_vector[sample_numbers_df_all$Group], levels = group_renaming_vector)
+
+sample_numbers_df_all$Tissue <- factor(sample_numbers_df_all$Tissue, levels = c("muscle", "adipose", "blood"))
+
+sample_numbers_df_all$Timepoint_cat <- timepoint_cat_vector[as.character(sample_numbers_df_all$Timepoint)]
+
+p1 <- ggplot(sample_numbers_df_all) + 
+    geom_bar(aes(x = Timepoint, y = Num_participants, fill = Group), stat = "identity", position = position_dodge()) + 
+    scale_fill_manual(values = annot_colors_use_list$group[unique(as.character(sample_numbers_df_all$Group))]) + 
+    # facet_wrap("Tissue", scales = "fixed", ncol = 1) + 
+    facet_grid(Tissue ~ Timepoint_cat, scales = "free_x", space = "free_x") + 
+    ylab("Number of participants") + 
+    theme_minimal() + 
+    theme(axis.text.x = element_text(size = 10, angle = 315, hjust = 0, vjust = 1),
+          strip.text.x = element_text(size = 12),
+          legend.title = element_text(size = 12),
+          legend.text = element_text(size = 10),
+          panel.spacing.y = unit(2, "lines"),
+          strip.text.y = element_text(size = 10)) + 
+    ggtitle("Number of Participants (RNAseq, ATACseq, Phospho)")
+print(p1)
+# ggsave(file.path("../results_DS/", paste0("Num-Participants_", "Alltissues", "_", "Allgroups", ".png")), p1, width = 5, height = 4)
+ggsave(file.path("../results_DS/", paste0("Num-Participants_", "Alltissues", "_", "Allgroups", ".pdf")), p1, width = 5, height = 4)
+
+ggsave(file.path("../results_DS/", paste0("Num-Participants_", "Alltissues", "_", "Allgroups", ".svg")), p1, width = 5, height = 4)
+```
+
+
+

@@ -1,4 +1,5 @@
-library(MotrpacHumanPreSuspension)
+library(MotrpacHumanPreSuspensionAnalysis)
+library(MotrpacHumanPreSuspensionData)
 library(TMSig)
 library(dplyr)
 library(patchwork)
@@ -14,6 +15,9 @@ library(tibble)
 library(circlize)
 library(ComplexHeatmap)
 library(readxl)
+
+#the `load_qc` function requires access to sample level data. To repeat this specific analysis, you will
+#need to request access to sample level data via a request to the consortium.
 
 motrpac_qc <- load_qc()
 motrpac_da <- load_differential_analysis()
@@ -64,7 +68,7 @@ t_vol <- map_df(
   names(subset_list),
   function(name) {
     contrast_value <- subset_list[[name]]
-    
+
     precawg_trans_da %>%
       filter(contrast == contrast_value) %>%
       mutate(
@@ -94,8 +98,8 @@ logfc_matrix <- t_vol  %>%
   group_by(gene_symbol, facet_label) %>%
   dplyr::summarise(logFC = mean(logFC, na.rm = TRUE), .groups = 'drop') %>%
   pivot_wider(names_from = facet_label, values_from = logFC) %>%
-  drop_na() 
-#PCA 
+  drop_na()
+#PCA
 pca_result <- prcomp(t(logfc_matrix %>% dplyr::select(-gene_symbol)), scale = TRUE)
 explained_variance <- pca_result$sdev^2 / sum(pca_result$sdev^2) * 100 # to label PC percentage
 
@@ -128,11 +132,11 @@ ggplot(pca_df, aes(x = PC1, y = PC2, label = contrast, color = contrast)) +
     y = paste0("PC2 (", round(explained_variance[2], 2), "%)")
   ) +
   scale_color_manual(
-    values = c("EE 45min" = "#d95f02", 
-               "EE 4hr" = "#d95f02", 
+    values = c("EE 45min" = "#d95f02",
+               "EE 4hr" = "#d95f02",
                "EE 24hr" = "#d95f02",
-               "RE 45min" = "#1b9e77", 
-               "RE 4hr" = "#1b9e77", 
+               "RE 45min" = "#1b9e77",
+               "RE 4hr" = "#1b9e77",
                "RE 24hr" = "#1b9e77"),
     name = "Contrast"
   ) +
@@ -151,7 +155,7 @@ pr_vol <- map_df(
   names(prot_list),
   function(name) {
     contrast_value <- prot_list[[name]]
-    
+
     precawg_prot_da %>%
       filter(contrast == contrast_value) %>%
       mutate(
@@ -187,14 +191,14 @@ precawg_phos_da <- precawg_phos_da %>%
   # Process the feature_id after mapping
   mutate(
     # Extract base_feature_id (protein ID) before the first underscore
-    base_feature_id = sub("_.*$", "", feature_id),  
-    
+    base_feature_id = sub("_.*$", "", feature_id),
+
     # Extract phosphosite(s) from everything after the first underscore
     phosphosites = sub("^.*_", "", feature_id) %>%
       gsub("s$", "", .) %>%  # Remove trailing 's'
       gsub("([STY]\\d+)[a-zA-Z]", "\\1;", .) %>%  # Replace any extra letters after phosphosites with ';'
       gsub(";$", "", .),  # Remove trailing semicolon
-    
+
     # Create gene_symbol_with_phosphosite
     gene_symbol_with_phosphosite = ifelse(
       !is.na(gene_symbol),
@@ -206,7 +210,7 @@ ph_vol <- map_df(
   names(prot_list),
   function(name) {
     contrast_value <- prot_list[[name]]
-    
+
     precawg_phos_da %>%
       filter(contrast == contrast_value) %>%
       mutate(
@@ -220,7 +224,7 @@ ph_vol <- map_df(
           grepl("RE", name) ~ "#1b9e77",
           TRUE ~ "#7570b3"
         ),
-        
+
         # Top-10 labels using gene_symbol_with_phosphosite
         label = ifelse(
           adj_p_value < 0.05 & rank(p_value) <= 10,
@@ -244,17 +248,17 @@ for (metab_name in names(motrpac_qc$adipose)) {
     # Extract qc_norm and sample_metadata for the current metab object
     qc_norm <- motrpac_qc$adipose[[metab_name]]$qc_norm
     sample_metadata <- motrpac_qc$adipose[[metab_name]]$sample_metadata
-    
+
     # Filter sample_metadata to keep only pre-exercise samples
     pre_exercise_samples <- sample_metadata$Timepoint == "pre_exercise" & sample_metadata$visitcode == "ADU_BAS"
     filtered_metadata <- sample_metadata[pre_exercise_samples, ]
-    
+
     # Subset qc_norm to include only pre-exercise vialLabels
     pre_exercise_qc_norm <- qc_norm[, colnames(qc_norm) %in% filtered_metadata$vialLabel, drop = FALSE]
-    
+
     # Rename vialLabels (columns) to their corresponding pid from sample_metadata
     colnames(pre_exercise_qc_norm) <- filtered_metadata$pid[match(colnames(pre_exercise_qc_norm), filtered_metadata$vialLabel)]
-    
+
     # Add the filtered qc_norm to the list
     qc_norm_list[[metab_name]] <- pre_exercise_qc_norm
   }
@@ -264,7 +268,7 @@ m_vol <- map_df(
   names(subset_list),
   function(name) {
     contrast_value <- subset_list[[name]]
-    
+
     precawg_metab_da %>%
       filter(contrast == contrast_value) %>%
       mutate(
@@ -279,10 +283,10 @@ m_vol <- map_df(
           TRUE ~ "#7570b3"
         ),
         p_rank = rank(p_value),
-        
+
         # use feature_id (s label
-        label = ifelse(adj_p_value < 0.05 & p_rank <= 6, 
-                       as.character(feature_id), 
+        label = ifelse(adj_p_value < 0.05 & p_rank <= 6,
+                       as.character(feature_id),
                        NA)
       )
   }
@@ -293,8 +297,8 @@ logfc_matrix_metab <- m_vol  %>%
   group_by(feature_id, facet_label) %>%
   dplyr::summarise(logFC = mean(logFC, na.rm = TRUE), .groups = 'drop') %>%
   pivot_wider(names_from = facet_label, values_from = logFC) %>%
-  drop_na() 
-#PCA 
+  drop_na()
+#PCA
 pca_result <- prcomp(t(logfc_matrix_metab %>% dplyr::select(-feature_id)), scale = TRUE)
 explained_variance <- pca_result$sdev^2 / sum(pca_result$sdev^2) * 100 # to label PC percentage
 
@@ -328,11 +332,11 @@ ggplot(pca_df, aes(x = PC1, y = PC2, label = contrast, color = contrast)) +
     y = paste0("PC2 (", round(explained_variance[2], 2), "%)")
   ) +
   scale_color_manual(
-    values = c("EE 45min" = "#d95f02", 
-               "EE 4hr" = "#d95f02", 
+    values = c("EE 45min" = "#d95f02",
+               "EE 4hr" = "#d95f02",
                "EE 24hr" = "#d95f02",
-               "RE 45min" = "#1b9e77", 
-               "RE 4hr" = "#1b9e77", 
+               "RE 45min" = "#1b9e77",
+               "RE 4hr" = "#1b9e77",
                "RE 24hr" = "#1b9e77"),
     name = "Contrast"
   ) +
@@ -342,7 +346,7 @@ ggplot(pca_df, aes(x = PC1, y = PC2, label = contrast, color = contrast)) +
 
 # Plot volcano plots for each omic layer
 selected_facets <- c(
-  "EE 45min vs Control", "EE 4hr vs Control", "EE 24hr vs Control", 
+  "EE 45min vs Control", "EE 4hr vs Control", "EE 24hr vs Control",
   "RE 45min vs Control", "RE 4hr vs Control", "RE 24hr vs Control"
 )
 all_vol <- bind_rows(
@@ -364,40 +368,40 @@ all_vol <- all_vol %>%
       str_starts(facet_label, "RE") ~ "RE",
       TRUE ~ NA_character_
     ),
-    Clean_Time = facet_label %>% 
-      str_remove(" vs Control") %>%  
-      str_remove("^EE ") %>%          
-      str_remove("^RE "),              
+    Clean_Time = facet_label %>%
+      str_remove(" vs Control") %>%
+      str_remove("^EE ") %>%
+      str_remove("^RE "),
     Clean_Time = factor(Clean_Time, levels = c("45min", "4hr", "24hr"))
   )
 
 # Custom function for volcano plots
 plot_volcano <- function(omic_type, data) {
-  
+
   df <- data %>% filter(Data_Type == omic_type)
-  
+
   df <- df %>%
     mutate(
       color2 = case_when(
         adj_p_value >= 0.05 ~ "grey80",
-        
+
         # EE vs RE: use direction
         Exercise == "EE vs RE" & logFC > 0 ~ "#d95f02",  # EE
         Exercise == "EE vs RE" & logFC < 0 ~ "#1b9e77",  # RE
-        
+
         # EE vs CON (non-directional)
         Exercise == "EE" ~ "#d95f02",
-        
+
         # RE vs CON (non-directional)
         Exercise == "RE" ~ "#1b9e77",
-        
+
         # Control only
         Exercise == "CON" ~ "#7570b3",
-        
+
         TRUE ~ "#7570b3"
       )
     )
-  
+
   ggplot(df, aes(x = logFC, y = -log10(adj_p_value), color = color2)) +
     geom_point(alpha = 0.7, size = 1) +
     scale_color_identity() +
@@ -446,7 +450,7 @@ p_metab <- plot_volcano("Metabolomics", all_vol)
 ## Make volcano for Figure S2: CON-unadjusted DA
 selected_facets2 <- c(
   "Control 45min", "Control 4hr", "Control 24hr",
-  "EE 45min", "EE 4hr", "EE", 
+  "EE 45min", "EE 4hr", "EE",
   "RE 45min", "RE 4hr", "RE 24hr"
 )
 
@@ -459,7 +463,7 @@ all_vol2 <- bind_rows(
   filter(facet_label %in% selected_facets2) %>%
   mutate(
     Data_Type = factor(Data_Type, levels = c("Transcriptomics", "Proteomics", "Phosphoproteomics", "Metabolomics")),
-    facet_label = factor(facet_label, levels = selected_facets2)  
+    facet_label = factor(facet_label, levels = selected_facets2)
   )
 all_vol2 <- all_vol2 %>%
   mutate(
@@ -469,14 +473,14 @@ all_vol2 <- all_vol2 %>%
       str_starts(facet_label, "Control") ~ "CON",
       TRUE ~ NA_character_
     ),
-    Clean_Time = facet_label %>% 
-      str_remove(" vs Control") %>%  
-      str_remove("^EE ") %>%          
-      str_remove("^RE ") %>%          
-      str_remove("^Control "),         
-    Clean_Time = factor(Clean_Time, levels = c("45min", "4hr", "24hr"))  
+    Clean_Time = facet_label %>%
+      str_remove(" vs Control") %>%
+      str_remove("^EE ") %>%
+      str_remove("^RE ") %>%
+      str_remove("^Control "),
+    Clean_Time = factor(Clean_Time, levels = c("45min", "4hr", "24hr"))
   ) %>%
-  drop_na(Clean_Time) 
+  drop_na(Clean_Time)
 
 # Figure S2A
 p_trans2 <- plot_volcano("Transcriptomics", all_vol2)
@@ -498,17 +502,17 @@ all_vol3 <- bind_rows(
   filter(facet_label %in% selected_facets3) %>%
   mutate(
     Data_Type = factor(Data_Type, levels = c("Transcriptomics", "Proteomics", "Phosphoproteomics", "Metabolomics")),
-    facet_label = factor(facet_label, levels = selected_facets3)  
+    facet_label = factor(facet_label, levels = selected_facets3)
   )
 all_vol3 <- all_vol3 %>%
   mutate(
     Exercise = ifelse(str_detect(facet_label, "EE .* vs RE"), "EE vs RE", NA_character_),  # ✅ Detects "EE (any time) vs RE"
-    Clean_Time = facet_label %>% 
-      str_remove(" vs RE") %>%   
-      str_remove("^EE "),        
-    Clean_Time = factor(Clean_Time, levels = c("45min", "4hr", "24hr"))  
+    Clean_Time = facet_label %>%
+      str_remove(" vs RE") %>%
+      str_remove("^EE "),
+    Clean_Time = factor(Clean_Time, levels = c("45min", "4hr", "24hr"))
   ) %>%
-  drop_na(Clean_Time)  
+  drop_na(Clean_Time)
 
 # Figure 3A
 p_trans3 <- plot_volcano("Transcriptomics", all_vol3)
@@ -549,7 +553,7 @@ label_df <- bind_rows(
     filter((`EE-CON` < 0 & `RE-CON` > 0) | (`EE-CON` > 0 & `RE-CON` < 0)) %>%
     filter(assay == "prot-ph") %>%
     slice_max(order_by = abs(`EE-CON` - `RE-CON`), n = 15, with_ties = FALSE),
-  
+
   eere_wide %>%
     filter((`EE-CON` < 0 & `RE-CON` > 0) | (`EE-CON` > 0 & `RE-CON` < 0)) %>%
     filter(assay != "prot-ph") %>%
@@ -557,7 +561,7 @@ label_df <- bind_rows(
     slice_max(order_by = abs(`EE-CON` - `RE-CON`), n = 7, with_ties = FALSE) %>%
     ungroup(),
   eere_wide %>% filter(label_name %in% c("NR4A1", "NDRG1-S336", "SM 42:2;O2"))
-  
+
 )
 # Figure 3B
 ggplot(eere_wide, aes(x = `EE-CON`, y = `RE-CON`, color = assay, shape = Clean_Time)) +
@@ -612,10 +616,10 @@ all_vol_celltype <- all_vol %>%
   filter(facet_label %in% selected_facets) %>%
   mutate(
     Data_Type = factor(Data_Type, levels = c("Transcriptomics", "Proteomics", "Phosphoproteomics")),
-    facet_label = factor(facet_label, levels = selected_facets)  
+    facet_label = factor(facet_label, levels = selected_facets)
   )
 
-## Apply cell type on previous DA volcano dfs.   
+## Apply cell type on previous DA volcano dfs.
 all_vol_celltype_fil <- all_vol_celltype %>%
   filter(adj_p_value<0.05)  %>%
   mutate(
@@ -627,7 +631,7 @@ all_vol_celltype_fil <- all_vol_celltype %>%
   )
 
 
-# Define colors 
+# Define colors
 cell_types <-c(
   "Adip_1", "Adip_2", "Vascular", "Pre_Ad", "Stem", "LAM", "Resident", "Mast", "NK.T"
 )
@@ -641,16 +645,16 @@ color_mapping["Non-marker"] <- "grey90"
 
 plot_volcano_celltype <- function(omic_type, data) {
   data <- data %>%
-    filter(Data_Type == omic_type) 
-  ggplot(data, aes(x = logFC, y = -log10(adj_p_value), color = CellType, alpha = CellType != "Non-marker")) +  
-    geom_point(size = 1.5) +  
-    
+    filter(Data_Type == omic_type)
+  ggplot(data, aes(x = logFC, y = -log10(adj_p_value), color = CellType, alpha = CellType != "Non-marker")) +
+    geom_point(size = 1.5) +
+
     # Use custom colors for CellType
     scale_color_manual(values = color_mapping) +
-    
+
     # Make Non-marker more transparent
-    scale_alpha_manual(values = c("TRUE" = 0.8, "FALSE" = 0.2), guide = "none") +  
-    
+    scale_alpha_manual(values = c("TRUE" = 0.8, "FALSE" = 0.2), guide = "none") +
+
     # Nested facets
     facet_nested(
       cols = vars(Clean_Time),
@@ -662,17 +666,17 @@ plot_volcano_celltype <- function(omic_type, data) {
         background_y = elem_list_rect(fill = "white", color = "black")
       )
     ) +
-    
+
     # Vertical dashed line at x=0
     geom_vline(xintercept = 0, linetype = "dashed", color = "darkgrey", linewidth = 0.8) +
-    
+
     # Label only top 20 per facet dynamically!
     geom_label_repel(
       aes(label = label, fill = CellType),
       size = 2.5,
-      max.overlaps = 25,  
-      force = 3,  
-      direction = "both",  
+      max.overlaps = 25,
+      force = 3,
+      direction = "both",
       nudge_y = 0.5,
       box.padding = 0.2,
       label.padding = 0.2,
@@ -680,9 +684,9 @@ plot_volcano_celltype <- function(omic_type, data) {
       segment.color = "grey50",
       label.size = 0.2,
       color = "black"
-    ) +  
-    scale_fill_manual(values = color_mapping) +  
-    
+    ) +
+    scale_fill_manual(values = color_mapping) +
+
     # Titles and themes
     labs(title = omic_type, x = "Log Fold Change", y = "-log10 Adjusted P-Value") +
     theme_minimal() +
@@ -726,7 +730,7 @@ p_phos_ct_eere  <- plot_volcano_celltype("Phosphoproteomics", all_vol_celltype_e
 
 
 
-### Feature heatmap - ceramide (Metab) 
+### Feature heatmap - ceramide (Metab)
 cer_features <- precawg_metab_da %>%
   filter(str_detect(feature_id, "Cer")) %>%
   pull(feature_id) %>%
@@ -747,13 +751,13 @@ create_feature_heatmap <- function(data, contrasts, order, features = NULL, gene
       contrast = factor(contrast, levels = order) # Ensure correct contrast order
     ) %>%
     arrange(contrast)
-  
+
   # If features are provided, filter data to include only those features
   if (!is.null(features)) {
     heatmap_data <- heatmap_data %>%
       filter(!!sym(gene_col) %in% features)
   }
-  
+
   # Step 2: Pivot data to wide format
   logFC_matrix <- heatmap_data %>%
     select(all_of(gene_col), contrast, logFC) %>%
@@ -764,7 +768,7 @@ create_feature_heatmap <- function(data, contrasts, order, features = NULL, gene
     ) %>%
     column_to_rownames(gene_col) %>%
     as.matrix()
-  
+
   # Create a significance mask for asterisks
   significance_matrix <- heatmap_data %>%
     select(all_of(gene_col), contrast, adj_p_value) %>%
@@ -775,19 +779,19 @@ create_feature_heatmap <- function(data, contrasts, order, features = NULL, gene
     ) %>%
     column_to_rownames(gene_col) %>%
     as.matrix()
-  
+
   significance_matrix <- ifelse(significance_matrix < 0.05, "*", "")
-  
+
   # Step 3: Column annotations
   col_annotations <- data.frame(
     contrast = order,
     group = ifelse(grepl("^group_timepointADUEndur", order), "EE", "RE"),
     timeline = rep(c("Post 45 min", "Post 4 hr", "Post 24 hr"), times = 2) # Repeat for EE and RE
   )
-  
+
   # Set order for timeline legend
   col_annotations$timeline <- factor(col_annotations$timeline, levels = c("Post 45 min", "Post 4 hr", "Post 24 hr"))
-  
+
   col_annotation <- HeatmapAnnotation(
     Exercise = col_annotations$group,
     Timeline = col_annotations$timeline,
@@ -803,7 +807,7 @@ create_feature_heatmap <- function(data, contrasts, order, features = NULL, gene
     simple_anno_size = unit(2, "mm"),
     height=unit(0.5, "mm")
   )
-  
+
   # Step 4: Heatmap creation
   heatmap <- Heatmap(
     logFC_matrix,
@@ -823,10 +827,10 @@ create_feature_heatmap <- function(data, contrasts, order, features = NULL, gene
         # Convert fill (RGB) to luminance
         rgb_vals <- col2rgb(fill)
         luminance <- (0.299 * rgb_vals[1, ] + 0.587 * rgb_vals[2, ] + 0.114 * rgb_vals[3, ]) / 255
-        
+
         # Decide text color based on brightness
         text_color <- ifelse(luminance < 0.5, "white", "black")
-        
+
         grid.text(
           significance_matrix[i, j],
           x,
@@ -836,7 +840,7 @@ create_feature_heatmap <- function(data, contrasts, order, features = NULL, gene
       }
     }
   )
-  
+
   return(heatmap)
 }
 contrasts_to_include <- c(
@@ -866,7 +870,7 @@ create_feature_heatmap(
 
 # Custom heatmap function for proteomics or phosphoproteomics
 create_4hr_heatmap <- function(data, contrasts, features = NULL, gene_col) {
-  
+
   # Step 1: Filter data for the specified contrasts
   heatmap_data <- data %>%
     filter(contrast %in% contrasts) %>%
@@ -876,19 +880,19 @@ create_4hr_heatmap <- function(data, contrasts, features = NULL, gene_col) {
       contrast = factor(contrast, levels = contrasts)
     ) %>%
     arrange(contrast)
-  
+
   # If features are provided, filter to those features
   if (!is.null(features)) {
     heatmap_data <- heatmap_data %>%
       filter(!!sym(gene_col) %in% features)
   }
-  
+
   # STEP to solve duplicate rows: keep the one with smallest adj_p_value
   heatmap_data <- heatmap_data %>%
     group_by(!!sym(gene_col), contrast) %>%
     slice_min(adj_p_value, with_ties = FALSE) %>%
     ungroup()
-  
+
   # Step 2: Pivot to wide format (logFC matrix)
   logFC_matrix <- heatmap_data %>%
     select(all_of(gene_col), contrast, logFC) %>%
@@ -899,7 +903,7 @@ create_4hr_heatmap <- function(data, contrasts, features = NULL, gene_col) {
     ) %>%
     column_to_rownames(gene_col) %>%
     as.matrix()
-  
+
   # Step 3: Create significance matrix for asterisks
   significance_matrix <- heatmap_data %>%
     select(all_of(gene_col), contrast, adj_p_value) %>%
@@ -910,7 +914,7 @@ create_4hr_heatmap <- function(data, contrasts, features = NULL, gene_col) {
     ) %>%
     column_to_rownames(gene_col) %>%
     as.matrix()
-  
+
   significance_matrix <- apply(significance_matrix, c(1, 2), function(p) {
     if (p < 0.05) {
       "*"
@@ -920,16 +924,16 @@ create_4hr_heatmap <- function(data, contrasts, features = NULL, gene_col) {
       ""
     }
   })
-  
+
   # Step 4: Column annotations
   col_annotations <- data.frame(
     contrast = contrasts,
     group = ifelse(grepl("^group_timepointADUEndur", contrasts), "EE", "RE"),
     timeline = "4hrPost"
   )
-  
+
   col_annotations$timeline <- factor(col_annotations$timeline, levels = c("4hrPost"))
-  
+
   col_annotation <- HeatmapAnnotation(
     Exercise = col_annotations$group,
     Timeline = col_annotations$timeline,
@@ -945,7 +949,7 @@ create_4hr_heatmap <- function(data, contrasts, features = NULL, gene_col) {
     simple_anno_size = unit(2, "mm"),
     height=unit(0.5, "mm")
   )
-  
+
   # Step 5: Heatmap
   heatmap <- Heatmap(
     logFC_matrix,
@@ -977,7 +981,7 @@ create_4hr_heatmap <- function(data, contrasts, features = NULL, gene_col) {
       }
     }
   )
-  
+
   return(heatmap)
 }
 
@@ -1047,20 +1051,20 @@ group_colors_named <- c("CON" = "#7570b3", "EE" = "#d95f02", "RE" = "#1b9e77")
 ggplot(protein_df, aes(x = TNS1, y = ROCK1, color = group_label, shape = shape_group)) +
   geom_point(size = 4, alpha = 0.85) +
   geom_smooth(
-    aes(x = TNS1, y = ROCK1), 
-    method = "lm", 
-    se = TRUE, 
-    color = "black", 
-    linetype = "dashed", 
+    aes(x = TNS1, y = ROCK1),
+    method = "lm",
+    se = TRUE,
+    color = "black",
+    linetype = "dashed",
     inherit.aes = FALSE
   ) +
   scale_color_manual(values = group_colors_named, name = "Group") +
   scale_shape_manual(values = c("Pre" = 1, "Post 4hr" = 16), name = "Timepoint") +
-  annotate("text", 
-           label = annot_text, 
-           x = Inf, y = -Inf, 
-           hjust = 1.05, vjust = -0.5, 
-           size = 4.5, 
+  annotate("text",
+           label = annot_text,
+           x = Inf, y = -Inf,
+           hjust = 1.05, vjust = -0.5,
+           size = 4.5,
            fontface = "italic") +
   labs(
     title = NULL,

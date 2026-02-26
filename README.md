@@ -2,7 +2,7 @@
 
 This repository tracks the exact code, parameters, and documentation/links to external data used to generate each of the manuscripts for the Molecular Transducers of Physical Activity Consortium Pre-Suspension Human Phase.
 
-For each manuscript, the code used to generate the figures is located in the subfolder `figures/`, labeled under the relevant manuscript name. The `landscape` folder indicates the integrative analysis that incorporates data from all tissues. Each topic sub-analysis group is responsible for the relevant code for their figures. If you have any questions or issues that show up, please [submit a new issue](https://github.com/MoTrPAC/MotrpacPreSuspensionAcute/issues){target="_blank"} 
+For each manuscript, the code used to generate the figures is located in the subfolder `figures/`, labeled under the relevant manuscript name. The `landscape` folder indicates the integrative analysis that incorporates data from all tissues. Each topic sub-analysis group is responsible for the relevant code for their figures. If you have any questions or issues that show up, please [submit a new issue](https://github.com/MoTrPAC/MotrpacPreSuspensionAcute/issues)
 and be very clear about which specific code or figure panel you are describing. Please include as many details as possible. 
 
 This repository also contains some of the quality control steps that visualize decisions such as how outliers were flagged, or how the decisions were made that reflect the data generation process that is implemented in `MotrpacHumanPreSuspensionAnalysis`.

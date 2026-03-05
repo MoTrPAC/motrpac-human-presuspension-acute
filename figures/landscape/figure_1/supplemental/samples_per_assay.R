@@ -6,16 +6,17 @@
 # using the OUTLIERS object, which represent the samples that don't pass QC.
 
 library(MotrpacHumanPreSuspensionAnalysis)
+library(MotrpacHumanPreSuspensionData)
 
 # Note:
 
 # This figure(s) requires access to `MotrpacHumanPreSuspensionData` to fully recreate.
 
-config = jsonlite::fromJSON("~/config.json")
-repo_local_dir = file.path(config$precovid_repo_path, "data", "tmp")
+# config = jsonlite::fromJSON("~/config.json")
+# repo_local_dir = file.path(config$precovid_repo_path, "data", "tmp")
 
 all_dataset = load_qc(epigen = TRUE,
-                      repo_local_dir = repo_local_dir,
+                      repo_local_dir = "~/Downloads/",
                       remove_redundant_metab = TRUE)
 
 split_tissues = unlist(all_dataset, recursive = FALSE)

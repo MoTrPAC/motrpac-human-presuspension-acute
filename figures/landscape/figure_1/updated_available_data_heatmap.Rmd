@@ -24,18 +24,17 @@ analysis have been commented out.
 ##' a. "gsutil_user" and "gsutil_path": this is the way your machine calls the gsutil, usually "/usr/bin/gsutil"
 ##' b. "local_path": this is the absolute file path for the `precovid-analyses` repo. Please do not include the final "/"
 #' 5. Add the path to this config file below 
+# config <- jsonlite::read_json(path = "//mnt/c/Users/dankatz/Documents/motrpac_config.json")
 
-config <- jsonlite::read_json(path = "//mnt/c/Users/dankatz/Documents/motrpac_config.json")
- # config <- jsonlite::read_json(path = "C:/Users/dankatz/Documents/motrpac_config_win.json")
-
-#config <- rjson::fromJSON(file = '//mnt/c/Users/dankatz/Documents/motrpac_config.json')
-source(file.path(config$precovid_repo_path,"/library/library-general.R"))
+#----for the public audience, the above can be ignored. 
+config = list()
+config$precovid_repo_path = "~/Downloads/" #or wherever you'd like things to be downloaded
 
 
 session_packages = c('pheatmap', 'limma', 'UpSetR', 'ComplexHeatmap', 'gprofiler2',
                      'plier', 'cluster', 'readxl','qvalue', 'reshape2',
-                     'MASS', 'splitstackshape', 'MotrpacBicQC', 'tidyverse', 'MotrpacHumanPreSuspension',
-                     'powerjoin','MotrpacHumanPreSuspension','variancePartition','conflicted','patchwork','ggbeeswarm','circlize',
+                     'MASS', 'splitstackshape', 'MotrpacBicQC', 'tidyverse', 'MotrpacHumanPreSuspensionData',
+                     'powerjoin','MotrpacHumanPreSuspensionAnalysis','variancePartition','conflicted','patchwork','ggbeeswarm','circlize',
                      'grid','gridExtra')
 
 
@@ -54,9 +53,7 @@ conflict_prefer('filter','dplyr')
 
 sessionInfo()
 
-#source(file.path(config$precovid_repo_path,"library/human_colors.R"))
 HUMAN_OME_COLORS -> human_omic_cols 
-
 ```
 
 ```{r}

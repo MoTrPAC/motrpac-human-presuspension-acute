@@ -15,7 +15,7 @@ library(MotrpacHumanPreSuspensionData)
 # config = jsonlite::fromJSON("~/config.json")
 # repo_local_dir = file.path(config$precovid_repo_path, "data", "tmp")
 
-all_dataset = load_qc(epigen = TRUE,
+all_dataset = load_qc(epigen = FALSE, #toggle true if needed
                       repo_local_dir = "~/Downloads/",
                       remove_redundant_metab = TRUE)
 
@@ -61,9 +61,14 @@ full_counts_by_tp = qc_norm_counts %>%
               values_from = "n") %>%
   arrange(assay)
 
-saveRDS(full_counts_by_tp, file.path(repo_local_dir, "figures", "table_S1_participants_per_tp.RDS"))
-write.csv(full_counts_by_tp, file.path(repo_local_dir, "figures", "table_S1_participants_per_tp.csv"),
-          row.names = FALSE)
+#add group by sex, and other stuff above if you want to split by sex
+# write.csv(full_counts_by_tp, file.path(repo_local_dir, "split_by_sex_participants_per_tp.csv"),
+#           row.names = FALSE)
+
+# saveRDS(full_counts_by_tp, file.path(repo_local_dir, "figures", "table_S1_participants_per_tp.RDS"))
+# write.csv(full_counts_by_tp, file.path(repo_local_dir, "figures", "table_S1_participants_per_tp.csv"),
+#           row.names = FALSE)
+
 
 
 #then we append outlier info to append some extra info
@@ -75,7 +80,7 @@ outliers_append = OUTLIERS %>%
               values_from = "n") %>%
   arrange(ome)
 
-
-saveRDS(outliers_append, file.path(repo_local_dir, "figures", "table_S1_outliers.RDS"))
-write.csv(outliers_append, file.path(repo_local_dir, "figures", "table_S1_outliers.csv"),
-          row.names = FALSE)
+#
+# saveRDS(outliers_append, file.path(repo_local_dir, "figures", "table_S1_outliers.RDS"))
+# write.csv(outliers_append, file.path(repo_local_dir, "figures", "table_S1_outliers.csv"),
+#           row.names = FALSE)

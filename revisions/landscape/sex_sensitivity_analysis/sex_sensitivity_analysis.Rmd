@@ -1,0 +1,16 @@
+---
+title: "sex_effects_acute"
+output: html_document
+date: "2026-03-11"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Review Comment: 
+
+The cohort is 72% female, yet the manuscript fails to analyze whether molecular responses differ by sex. Given the well-established biological sexual dimorphism in exercise responses, this is a major oversight. Consequently, it is unclear whether the results are generalizable or primarily reflect the physiology of the female majority. The authors should perform and report a sex-stratified analysis or, at minimum, discuss this potential bias as a significant limitation.
+
+
+The sex-based differential analysis is described in `MotrpacHumanPreSuspensionAnalysis/data-raw/generate_differential_analysis.R`.

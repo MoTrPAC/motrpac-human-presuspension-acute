@@ -24,18 +24,17 @@ analysis have been commented out.
 ##' a. "gsutil_user" and "gsutil_path": this is the way your machine calls the gsutil, usually "/usr/bin/gsutil"
 ##' b. "local_path": this is the absolute file path for the `precovid-analyses` repo. Please do not include the final "/"
 #' 5. Add the path to this config file below 
+# config <- jsonlite::read_json(path = "//mnt/c/Users/dankatz/Documents/motrpac_config.json")
+config <- jsonlite::read_json(path = "~/config.json")
 
-config <- jsonlite::read_json(path = "//mnt/c/Users/dankatz/Documents/motrpac_config.json")
- # config <- jsonlite::read_json(path = "C:/Users/dankatz/Documents/motrpac_config_win.json")
+#notes for public -> the above was an implementation for the consortium to keep some file structures consistent. please feel free to ignore.
 
-#config <- rjson::fromJSON(file = '//mnt/c/Users/dankatz/Documents/motrpac_config.json')
-source(file.path(config$precovid_repo_path,"/library/library-general.R"))
+# config = list(); config$precovid_repo_path = "~/Downloads" #wherever you'd like to download things
 
-
-session_packages = c('pheatmap', 'limma', 'UpSetR', 'ComplexHeatmap', 'gprofiler2',
-                     'plier', 'cluster', 'readxl','qvalue', 'reshape2',
-                     'MASS', 'splitstackshape', 'MotrpacBicQC', 'tidyverse', 'MotrpacHumanPreSuspension',
-                     'powerjoin','MotrpacHumanPreSuspension','variancePartition','conflicted','patchwork','ggbeeswarm','circlize',
+session_packages = c('pheatmap', 'limma', 'UpSetR', 'ComplexHeatmap',
+                     'cluster', 'readxl','qvalue', 'reshape2',
+                     'MASS', 'splitstackshape', 'MotrpacBicQC', 'tidyverse', 'MotrpacHumanPreSuspensionData',
+                     'MotrpacHumanPreSuspensionAnalysis','conflicted','patchwork','ggbeeswarm','circlize',
                      'grid','gridExtra')
 
 
@@ -54,7 +53,6 @@ conflict_prefer('filter','dplyr')
 
 sessionInfo()
 
-#source(file.path(config$precovid_repo_path,"library/human_colors.R"))
 HUMAN_OME_COLORS -> human_omic_cols 
 
 ```
@@ -79,8 +77,6 @@ for (tiss in names(qc_object)){
       #mutate() %>% 
       mutate(tissue = tiss, assay = assay1) %>% 
       bind_rows(all_vials)
-    
-    
   }
 }
 
@@ -122,7 +118,7 @@ pheno_vials_long<-pheno_vials_long_all_times %>%
   arrange(`Time Window`,ome) 
 
 
-pheno_vials <-pheno_vials_long %>% 
+pheno_vials <- pheno_vials_long %>% 
   pivot_wider(values_from = binary,names_from = c(ome,`Time Window`),values_fill = 0,names_sep = ";") %>%
   mutate(randomGroupCode = factor(randomGroupCode, levels=c("ADUEndur","ADUResist","ADUControl")), 
          tissue = factor(tissue,levels=c("blood","muscle","adipose"))) %>%
@@ -278,6 +274,8 @@ bsp_bar_alternate_faceting <- ggplot(just_tissue_ome_nums, aes(x = tissue, fill 
 
 bsp_bar_alternate_faceting
 ```
+```{r}
+```
 
 Command for rendering. Only one figure is really utilized in the paper, but there are others that were experimented with. SVG is used to enhance adding to Biorender full image. Note that to render an SVG is best done in Windows. In Unix, use the package `svglite` but you may need to fix issues with fonts
 
@@ -370,36 +368,36 @@ Below are other plots that we did not end up using
 
 
 ```{r Biospecimen bar by Sex}
-# length(unique(pheno_vials_long_all_times$pid))
-# # just_tissue_ome_nums<-pheno_vials_long_all_times %>% 
-# #   select(pid,tissue,Timepoint,randomGroupCode,assay,Sex) %>% 
-# #   mutate(ome = if_else((assay=="prot-ol" | assay == "prot-pr"),"prot-pr",assay)) %>% 
-# #   mutate(ome = case_when(str_detect(ome,"metab") ~ "Metabolomics",
-# #                          str_detect(ome,"prot-pr") ~ "Proteomics",
-# #                          str_detect(ome,"prot-ph") ~ "Phosphoproteomics",
-# #                          str_detect(ome, "rna") ~ "Transcriptomics",
-# #                          str_detect(ome, "atac") ~ "Chromatin Accessibility (ATAC)", .default = ome)) %>%
-# #   
-# #   mutate(ome = factor(ome, levels = c("Transcriptomics","Metabolomics","Proteomics","Phosphoproteomics","Chromatin Accessibility (ATAC)"))) %>%
-# #   select(-assay) %>% 
-# #   distinct() %>% 
-# #   # group_by(tissue,Timepoint,randomGroupCode,ome,Sex,pid) %>% 
-# #   # slice(1) %>% 
-# #   # group_by(tissue,Timepoint,randomGroupCode,ome,Sex) %>% 
-# #   # summarise(n = n()) %>% 
-# #   mutate(Group = factor(randomGroupCode,levels = c("ADUEndur","ADUResist","ADUControl"))) %>% 
-# #   mutate(tissue = factor(tissue,levels = c("muscle","adipose","blood"))) %>% 
-# #   mutate(Group = fct_recode(Group, EE = "ADUEndur", RE = "ADUResist",CON = "ADUControl")) %>% 
-# #   mutate(Timepoint = fct_recode(Timepoint,
-# #                                 "Pre-Exercise" = "pre_exercise",
-# #                                 "During 20 Min" = "during_20_min",
-# #                                 "During 40 Min" = "during_40_min",
-# #                                 "Post 10 Min" = "post_10_min",
-# #                                 "Post 15/30/45 Min" = "post_15_30_45_min",
-# #                                 "Post 3.5/4 Hour" = "post_3.5_4_hr",
-# #                                 "Post 24 Hour" = "post_24_hr"))
-# 
-# 
+length(unique(pheno_vials_long_all_times$pid))
+# just_tissue_ome_nums<-pheno_vials_long_all_times %>%
+#   select(pid,tissue,Timepoint,randomGroupCode,assay,Sex) %>%
+#   mutate(ome = if_else((assay=="prot-ol" | assay == "prot-pr"),"prot-pr",assay)) %>%
+#   mutate(ome = case_when(str_detect(ome,"metab") ~ "Metabolomics",
+#                          str_detect(ome,"prot-pr") ~ "Proteomics",
+#                          str_detect(ome,"prot-ph") ~ "Phosphoproteomics",
+#                          str_detect(ome, "rna") ~ "Transcriptomics",
+#                          str_detect(ome, "atac") ~ "Chromatin Accessibility (ATAC)", .default = ome)) %>%
+#
+#   mutate(ome = factor(ome, levels = c("Transcriptomics","Metabolomics","Proteomics","Phosphoproteomics","Chromatin Accessibility (ATAC)"))) %>%
+#   select(-assay) %>%
+#   distinct() %>%
+#   # group_by(tissue,Timepoint,randomGroupCode,ome,Sex,pid) %>%
+#   # slice(1) %>%
+#   # group_by(tissue,Timepoint,randomGroupCode,ome,Sex) %>%
+#   # summarise(n = n()) %>%
+#   mutate(Group = factor(randomGroupCode,levels = c("ADUEndur","ADUResist","ADUControl"))) %>%
+#   mutate(tissue = factor(tissue,levels = c("muscle","adipose","blood"))) %>%
+#   mutate(Group = fct_recode(Group, EE = "ADUEndur", RE = "ADUResist",CON = "ADUControl")) %>%
+#   mutate(Timepoint = fct_recode(Timepoint,
+#                                 "Pre-Exercise" = "pre_exercise",
+#                                 "During 20 Min" = "during_20_min",
+#                                 "During 40 Min" = "during_40_min",
+#                                 "Post 10 Min" = "post_10_min",
+#                                 "Post 15/30/45 Min" = "post_15_30_45_min",
+#                                 "Post 3.5/4 Hour" = "post_3.5_4_hr",
+#                                 "Post 24 Hour" = "post_24_hr"))
+
+
 # bsp_bar_by_sex<-ggplot(just_tissue_ome_nums, aes(x = Timepoint, fill = ome)) +
 #   geom_bar(position = position_dodge(preserve = "single")) + # Grouped bar plot
 #   facet_grid(tissue ~ Sex+Group,switch = "y") + # Facet grid with tissue on rows and randomGroupCode on columns
@@ -412,7 +410,8 @@ Below are other plots that we did not end up using
 #   theme_bw() + # Minimal theme for better appearance
 #   theme(axis.text.x = element_text(angle = 45, hjust = 1),
 #         strip.background = element_rect("white"))
-# 
+# ggsave(filename = file.path(config$precovid_repo_path, "samples_measured_per_ome.png"),
+#        dpi = 900, width = 16, height = 6)
 # bsp_bar_by_sex
 ```
 

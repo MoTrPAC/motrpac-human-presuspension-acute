@@ -6,7 +6,9 @@
 # using the OUTLIERS object, which represent the samples that don't pass QC.
 
 library(MotrpacHumanPreSuspensionAnalysis)
-
+library(MotrpacHumanPreSuspensionData)
+library(tidyr)
+library(dplyr)
 # Note:
 
 # This figure(s) requires access to `MotrpacHumanPreSuspensionData` to fully recreate.
@@ -14,7 +16,7 @@ library(MotrpacHumanPreSuspensionAnalysis)
 config = jsonlite::fromJSON("~/config.json")
 repo_local_dir = file.path(config$precovid_repo_path, "data", "tmp")
 
-all_dataset = load_qc(epigen = TRUE,
+all_dataset = load_qc(epigen = FALSE,
                       repo_local_dir = repo_local_dir,
                       remove_redundant_metab = TRUE)
 
@@ -40,7 +42,7 @@ qc_norm_counts = lapply(seq_len(nrow(samples_per_plat)), function(row) {
 
   pheno$data %>%
     filter(vialLabel %in% vials_vec) %>%
-    group_by(randomGroupCode, Timepoint) %>%
+    group_by(randomGroupCode, Timepoint, Sex) %>%
     summarise(
       n = n(),
       vialLabels = paste(vialLabel, collapse = ","),
@@ -52,17 +54,30 @@ qc_norm_counts = lapply(seq_len(nrow(samples_per_plat)), function(row) {
     )
 }) %>%
   bind_rows() %>%
-  select(tissue, assay, randomGroupCode, Timepoint, n, vialLabels)
+  select(tissue, assay, randomGroupCode, Sex, Timepoint, n, vialLabels)
 
-full_counts_by_tp = qc_norm_counts %>%
+full_counts_by_tp_by_sex = qc_norm_counts %>%
   select(-vialLabels) %>%
   pivot_wider(names_from = c("tissue", "Timepoint"),
               values_from = "n") %>%
   arrange(assay)
 
+saveRDS(full_counts_by_tp_by_sex, file.path(repo_local_dir, "figures", "participants_per_tp_per_sex.RDS"))
+write.csv(full_counts_by_tp_by_sex, file.path(repo_local_dir, "figures", "participants_per_tp_per_sex.csv"),
+          row.names = FALSE)
+
+full_counts_by_tp = full_counts_by_tp_by_sex %>%
+  group_by(assay, randomGroupCode) %>%
+  mutate(across(where(is.numeric), ~sum(.x, na.rm = TRUE))) %>%
+  ungroup() %>%
+  select(-Sex) %>%
+  distinct()
+
+
 saveRDS(full_counts_by_tp, file.path(repo_local_dir, "figures", "table_S1_participants_per_tp.RDS"))
 write.csv(full_counts_by_tp, file.path(repo_local_dir, "figures", "table_S1_participants_per_tp.csv"),
           row.names = FALSE)
+
 
 
 #then we append outlier info to append some extra info

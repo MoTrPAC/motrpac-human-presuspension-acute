@@ -1,0 +1,144 @@
+---
+title: "control_only_analysis"
+output: html_document
+date: "2026-03-17"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(MotrpacHumanPreSuspensionAnalysis)
+library(MotrpacHumanPreSuspensionData)
+library(dplyr)
+library(ggplot2)
+library(grid)
+
+source(here::here("revisions/landscape/control_analysis/plot_control_da_matrix.R"))
+```
+
+
+## Review Comment: 
+
+The inclusion of a non-exercise resting control group is a strength, allowing for control of circadian rhythms, fasting, and handling stress. However, the manuscript fails to fully quantify and present these "non-exercise effects." I suggest a supplementary analysis that systematically reports the molecular features changing over time in the control group. This will allow for a clearer isolation of responses induced purely by exercise.
+
+## How to address this comment
+
+To some extent, I think this reviewer only put this comment because we somewhat emphasized the control aspects of the analysis in Fig S2A-B.
+
+We already have a pretty good amount of control-only analysis. 
+
+```{r}
+control_only_analysis = load_differential_analysis(single_matrix = TRUE) %>%
+  filter(contrast_type == "control_only")
+```
+
+```{r, fig.width = 14, fig.height = 3}
+plot_control_da_matrix(control_only_analysis)
+```
+
+## Top control DA features
+
+```{r, include = FALSE}
+top_control_features = control_only_analysis %>%
+  dplyr::group_by(feature_id) %>%
+  dplyr::slice_min(adj_p_value, n = 1, with_ties = FALSE) %>%
+  dplyr::ungroup() %>%
+  dplyr::filter(adj_p_value < 0.05) %>%
+  dplyr::arrange(adj_p_value) %>%
+  dplyr::slice_head(n = 5) %>%
+  dplyr::pull(feature_id)
+```
+
+```{r, results = "asis"}
+for (feat in top_control_features) {
+  tryCatch({
+    cat("\n\n###", feat, "\n\n")
+    print(plot_single_feature(feat))
+  }, error = function(e) {
+    message("Skipping ", feat, ": ", conditionMessage(e))
+  })
+}
+```
+
+
+## Enrichments
+
+```{r}
+control_camera = CAMERA_RESULTS %>%
+  filter(contrast_type == "control_only",
+         collection != "CELLMARKER")
+
+top_control_pathways = control_camera %>%
+  dplyr::group_by(tissue, set_id) %>%
+  dplyr::slice_min(adj_p_value, n = 1, with_ties = FALSE) %>%
+  dplyr::ungroup() %>%
+  dplyr::arrange(tissue, adj_p_value) %>%
+  dplyr::group_by(tissue) %>%
+  dplyr::slice_head(n = 15) %>%
+  dplyr::ungroup() %>%
+  dplyr::pull(set_id) %>%
+  unique() %>%
+  as.character()
+
+enrich_pdf = tempfile(fileext = ".pdf")
+plot_enrich_heatmap(
+  x = CAMERA_RESULTS,
+  set_ids = top_control_pathways,
+  contrast_type = "control_only",
+  filename = enrich_pdf
+)
+```
+
+<iframe src="`r enrich_pdf`" width="100%" height="600px"></iframe>
+
+And now to figure out why the controls are going down so much in oxphos related pathways?
+
+```{r, fig.width = 10, fig.height = 20}
+oxphos_setid = SET_TO_ID %>% filter(set_short == "OXPHOS") %>% pull(set_id)
+plot_feature_heatmap(set_id = oxphos_setid,
+                     selected_ome = "transcript-rna-seq",
+                     contrast_type = "control_only",
+                     max_size = 100)
+```
+
+Quick check for vo2 max info
+```{r}
+controls = load_qc(selected_tissues = "muscle",
+                   selected_omes = "transcript-rna-seq")
+control_meta = controls$muscle$`transcript-rna-seq`$sample_metadata %>%
+  filter(randomGroupCode == "ADUControl")
+
+vo2_info = MotrpacHumanPreSuspensionData::cln_curated_screening[["data"]]
+
+all_control_pids = control_meta %>% pull(pid) %>% unique()
+
+pids_pre = control_meta %>%
+  filter(Timepoint == "pre_exercise") %>%
+  pull(pid)
+
+pids_post24 = control_meta %>%
+  filter(Timepoint == "post_24_hr") %>%
+  pull(pid)
+
+pids_not_post24 = setdiff(all_control_pids, pids_post24)
+
+vo2_plot_data = dplyr::bind_rows(
+  vo2_info %>% filter(pid %in% pids_pre) %>% mutate(timepoint_group = "pre_exercise"),
+  vo2_info %>% filter(pid %in% pids_post24) %>% mutate(timepoint_group = "post_24_hr"),
+  vo2_info %>% filter(pid %in% pids_not_post24) %>% mutate(timepoint_group = "not post_24_hr")
+) %>%
+  mutate(timepoint_group = factor(timepoint_group,
+                                  levels = c("pre_exercise", "post_24_hr", "not post_24_hr")))
+```
+
+```{r}
+ggplot(vo2_plot_data, aes(x = timepoint_group, y = VO2max_L)) +
+  geom_boxplot(outlier.shape = NA) +
+  ggbeeswarm::geom_beeswarm(size = 1.5, alpha = 0.7) +
+  theme_bw() +
+  xlab("Timepoint group") +
+  ylab("VO2max (L)")
+```
+
+# Other theories 
+
+This could be a cell-type related answer too. I think it's possible that the increase in the immune response means less muscle cells => lower contribution from muscle cells => lower representation in oxphos related transcripts...? 

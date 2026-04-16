@@ -1,4 +1,4 @@
-# MotrpacPreSuspensionAcute
+# motrpac-human-presuspension-acute
 
 This repository tracks the exact code, parameters, and documentation/links to external data used to generate each of the manuscripts for the Molecular Transducers of Physical Activity Consortium Pre-Suspension Human Phase.
 

@@ -15,7 +15,7 @@ sex_differences_single_feature = function(feature,
                     tolower(gene_symbol) == tolower(feature) |
                     tolower(refmet_name) == tolower(feature)) %>%
     dplyr::semi_join(MotrpacHumanPreSuspensionAnalysis::HUMAN_FEATURE_TO_GENE, by = "gene_symbol") %>%
-    dplyr::mutate(feature_id = case_when(
+    dplyr::mutate(feature_id = dplyr::case_when(
       !is.na(refmet_name) ~ refmet_name,
       TRUE ~ feature_id
     ))
@@ -130,7 +130,7 @@ sex_differences_single_feature = function(feature,
     geom_point(aes(y = Mean), size = 1.8 * sc) +
     geom_errorbar(
       aes(ymin = CI_low, ymax = CI_high),
-      width = 0.2 * sc,
+      width = 0.3 * sc,
       linewidth = 0.4 * sc,
       alpha = 0.6
     ) +
@@ -144,13 +144,13 @@ sex_differences_single_feature = function(feature,
     theme_bw() +
     theme(
       legend.position = "none",
-      axis.text.x = element_text(angle = 30, hjust = 1, size = 7.5 * sc, color = "black"),
-      axis.text.y = element_text(size = 7 * sc, color = "black"),
+      axis.text.x = element_text(angle = 30, hjust = 1, size = 9 * sc, color = "black"),
+      axis.text.y = element_text(size = 10 * sc, color = "black"),
       axis.title.x = element_blank(),
-      axis.title.y = element_text(size = 8 * sc),
-      plot.title = element_text(size = 10 * sc, margin = margin(0, 0, 0, 0)),
+      axis.title.y = element_text(size = 11 * sc),
+      plot.title = element_text(size = 12 * sc, margin = margin(0, 0, 0, 0)),
       strip.text.x = element_text(size = 8 * sc, margin = margin(0.05 * sc, 0, 0.05 * sc, 0, "cm")),
-      legend.text = element_text(size = 7 * sc, margin = margin(0, 0, 0, 0)),
+      legend.text = element_text(size = 9 * sc, margin = margin(0, 0, 0, 0)),
       legend.spacing.x = unit(0.01 * sc, "in"),
       legend.spacing.y = unit(0.1 * sc, "in"),
       legend.box.spacing = unit(0.01 * sc, "in"),
@@ -166,14 +166,14 @@ sex_differences_single_feature = function(feature,
   if(include_legend == TRUE & !is.null(legend_position)) {
     g <- g + theme(legend.position = legend_position)
   }
-
+  #for output file I manually make these for different tissue/combinations for dimensions
   if(!is.null(output_file)) {
     if(include_legend == TRUE) {
       ggsave(g, filename = output_file,
-             height = 2.2 * sc, width = 2.45 * sc, dpi = 600, units = "in")
+             height = 2.5 + 1.5 * sc, width = 5 + 2.45 * sc, dpi = 600, units = "in")
     } else {
       ggsave(g, filename = output_file,
-             height = 2.2 * sc, width = 1.75 * sc, dpi = 600, units = "in")
+             height = 2.5 + 1.5 * sc, width = 5 + 1.75 * sc, dpi = 600, units = "in")
     }
   }
 
@@ -196,7 +196,7 @@ sex_differences_logfc_feature = function(feature,
                     tolower(gene_symbol) == tolower(feature) |
                     tolower(refmet_name) == tolower(feature)) %>%
     dplyr::semi_join(MotrpacHumanPreSuspensionAnalysis::HUMAN_FEATURE_TO_GENE, by = "gene_symbol") %>%
-    dplyr::mutate(feature_id = case_when(
+    dplyr::mutate(feature_id = dplyr::case_when(
       !is.na(refmet_name) ~ refmet_name,
       TRUE ~ feature_id
     ))
@@ -231,30 +231,21 @@ sex_differences_logfc_feature = function(feature,
     "post_24_hr" = "P24H"
   )
 
-  sex_long = data_filtered %>%
+  plot_data = data_filtered %>%
     dplyr::select(tissue, platform, feature_id, randomGroupCode, Timepoint,
                   series = sex_comparison,
                   logFC = logFC_sex_diff,
                   CI_low = CI.L_sex_diff,
-                  CI_high = CI.R_sex_diff)
-
-  precawg_long = data_filtered %>%
-    dplyr::distinct(tissue, platform, feature_id, randomGroupCode, Timepoint,
-                    logFC = logFC_precawg,
-                    CI_low = CI.L_precawg,
-                    CI_high = CI.R_precawg) %>%
-    dplyr::mutate(series = "Overall")
-
-  plot_data = dplyr::bind_rows(sex_long, precawg_long) %>%
+                  CI_high = CI.R_sex_diff) %>%
     dplyr::mutate(
       tissue = stringr::str_to_sentence(tissue),
       Timepoint = dplyr::recode(as.character(Timepoint), !!!timepoint_recode),
       Timepoint = factor(Timepoint, levels = timepoint_levels),
       tissue_assay = stringr::str_c(tissue, " ", platform),
-      series = factor(series, levels = c("Female", "Male", "Overall"))
+      series = factor(series, levels = c("Female", "Male"))
     )
 
-  series_colors = c("Female" = "#E87461", "Male" = "#5B9BD5", "Overall" = "black")
+  series_colors = c("Female" = "#E87461", "Male" = "#5B9BD5")
   label_map = c("ADUControl" = "CON", "ADUEndur" = "EE", "ADUResist" = "RE")
 
   sc = scale_factor * 0.7

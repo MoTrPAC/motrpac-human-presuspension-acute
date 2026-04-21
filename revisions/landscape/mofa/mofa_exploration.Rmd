@@ -1,7 +1,7 @@
 ---
-title: "mofa_exploration"
+title: "MOFA Exploration — Human PreSuspension"
 output: html_document
-date: "2026-03-11"
+date: "2026-04-21"
 ---
 
 ```{r setup, include=FALSE}
@@ -12,14 +12,23 @@ library(MotrpacHumanPreSuspensionData)
 library(here)
 library(dplyr)
 library(tidyr)
+library(ggplot2)
+library(ComplexHeatmap)
+library(conflicted)
+source(here::here("revisions", "landscape", "mofa", "mofa_helpers.R"))
+
+conflicted::conflict_prefer("select", "dplyr")
+conflicted::conflict_prefer("filter", "dplyr")
 
 mofa_out = file.path(here(), "revisions", "landscape", "mofa")
-dir.create(mofa_out, recursive = TRUE, showWarnings = FALSE)
+plot_out = file.path(here(), "revisions", "landscape", "mofa", "plots")
+dir.create(plot_out, showWarnings = FALSE, recursive = TRUE)
+dir.create(file.path(plot_out, "custom_panels"), showWarnings = FALSE)
 ```
 
 The goal of this is to run MOFA on the SCION input matrices to identify latent factors
 that jointly explain variation across transcriptomics and phosphoproteomics in muscle.
-MOFA is run separately for ADUResist and ADUControl samples.
+MOFA is run separately for ADUResist and ADUEndur samples.
 
 # Overview
 
@@ -33,11 +42,11 @@ SCION network.
 ```{r load-data}
 phospho_mat = .load_scion_matrixes(desired_matrixes = "muscle.prot-ph",
                                    subset_TFs = TRUE,
-                                   subset_DE = FALSE) 
+                                   subset_DE = FALSE)
 
 trnscrpt_mat = .load_scion_matrixes(desired_matrixes = "muscle.transcript-rna-seq",
                                     subset_TFs = FALSE,
-                                    subset_DE = TRUE) 
+                                    subset_DE = TRUE)
 
 rownames(phospho_mat)  = sub("\\.\\..*", "", rownames(phospho_mat))
 rownames(trnscrpt_mat) = sub("\\.\\..*", "", rownames(trnscrpt_mat))
@@ -47,11 +56,11 @@ cat("Transcript dimensions:", dim(trnscrpt_mat), "\n")
 ```
 
 
-Per MOFA instructions, we select the top features by variability. 
+Per MOFA instructions, we select the top features by variability.
 
 The number of features we select is somewhat arbitrary, but I've done used 1000 per the instructions.
 
-This actually does NOT include the TFEB transcript. 
+This actually does NOT include the TFEB transcript.
 ```{r}
 select_top_var = function(mat, n) {
   vars = apply(mat, 1, var)
@@ -98,23 +107,23 @@ run_mofa_for_group = function(grp, outfile) {
     mat_to_long(phospho_mat,  "Phosphoproteomics", samps),
     mat_to_long(trnscrpt_mat, "Transcriptomics",   samps)
   )
-  
+
   obj = create_mofa_from_df(mofa_df)
   samples_metadata(obj) = meta
-  
+
   data_opts = MOFA2::get_default_data_options(obj)
   data_opts$scale_views = TRUE
-  
+
   model_opts = MOFA2::get_default_model_options(obj)
   model_opts$num_factors = 10
-  
+
   train_opts = MOFA2::get_default_training_options(obj)
-  
+
   obj = MOFA2::prepare_mofa(obj,
                             data_options = data_opts,
                             model_options = model_opts,
                             training_options = train_opts)
-  
+
   MOFA2::run_mofa(obj, outfile = outfile, use_basilisk = TRUE)
 }
 ```
@@ -122,69 +131,170 @@ run_mofa_for_group = function(grp, outfile) {
 # Run MOFA per group
 
 ```{r train-resist, results='hide', message=FALSE}
-mofa_resist = run_mofa_for_group(
-  "ADUResist",
-  outfile = file.path(mofa_out, "mofa_ADUResist.out")
+# mofa_resist = run_mofa_for_group(
+#   "ADUResist",
+#   outfile = file.path(mofa_out, "mofa_ADUResist.out")
+# )
+mofa_resist = load_model(
+  file.path(mofa_out, "mofa_ADUResist.out")
 )
 ```
 
-```{r train-control, results='hide', message=FALSE}
-mofa_endur = run_mofa_for_group(
-  "ADUEndur",
-  outfile = file.path(mofa_out, "mofa_ADUEndur.out")
+```{r train-endur, results='hide', message=FALSE}
+# mofa_endur = run_mofa_for_group(
+#   "ADUEndur",
+#   outfile = file.path(mofa_out, "mofa_ADUEndur.out")
+# )
+mofa_endur = load_model(
+  file.path(mofa_out, "mofa_ADUEndur.out")
 )
+```
+
+# Normalize metadata
+
+Add abbreviated `Timepoint` and `Modality` columns to each model's sample metadata
+so the downstream helper functions can use them.
+
+```{r normalize-metadata}
+add_human_metadata = function(mofa_trained) {
+  meta = MOFA2::samples_metadata(mofa_trained) %>%
+    dplyr::mutate(
+      Timepoint = recode_timepoint(Timepoint),
+      Modality  = recode_modality(randomGroupCode)
+    )
+  MOFA2::samples_metadata(mofa_trained) = meta
+  mofa_trained
+}
+
+mofa_resist = add_human_metadata(mofa_resist)
+mofa_endur  = add_human_metadata(mofa_endur)
+
+mofa_models = list(ADUResist = mofa_resist, ADUEndur = mofa_endur)
+```
+
+# Annotate features_metadata
+
+
+```{r annotate-feature-metadata}
+trn_label_map = HUMAN_FEATURE_TO_GENE %>%
+  filter(assay == "transcript-rna-seq") %>%
+  distinct(feature_id, .keep_all = TRUE) %>%
+  select(feature_id, gene_symbol)
+
+phos_label_map = HUMAN_FEATURE_TO_GENE %>%
+  filter(assay == "prot-ph") %>%
+  distinct(feature_id, .keep_all = TRUE) %>%
+  mutate(label = paste0(gene_symbol, "_", sub("^[^_]+_", "", feature_id))) %>%
+  select(feature_id, label)
+
+rename_mofa_features = function(mofa_trained) {
+  for (view in MOFA2::views_names(mofa_trained)) {
+    old_names = MOFA2::features_names(mofa_trained)[[view]]
+    if (view == "Transcriptomics") {
+      mapping = setNames(trn_label_map$gene_symbol, trn_label_map$feature_id)
+      new_names = dplyr::coalesce(mapping[old_names], old_names)
+    } else if (view == "Phosphoproteomics") {
+      mapping = setNames(phos_label_map$label, phos_label_map$feature_id)
+      new_names = dplyr::coalesce(mapping[old_names], old_names)
+    } else {
+      new_names = old_names
+    }
+    MOFA2::features_names(mofa_trained)[[view]] = unname(new_names)
+  }
+  mofa_trained
+}
+
+mofa_resist = rename_mofa_features(mofa_resist)
+mofa_endur  = rename_mofa_features(mofa_endur)
+mofa_models = list(ADUResist = mofa_resist, ADUEndur = mofa_endur)
 ```
 
 # Downstream exploration
 
 ## Variance explained
 
-```{r var-explained-resist}
-cat("--- ADUResist ---\n")
-plot_variance_explained(mofa_resist, plot_total = TRUE)
-```
-
-```{r var-explained-control}
-cat("--- ADUEndur ---\n")
-plot_variance_explained(mofa_endur, plot_total = TRUE)
+```{r var-explained, fig.width=12, fig.height=5}
+for (grp in names(mofa_models)) {
+  ve_plots = MOFA2::plot_variance_explained(mofa_models[[grp]], plot_total = TRUE)
+  p_ve = patchwork::wrap_plots(ve_plots)
+  ggplot2::ggsave(
+    file.path(plot_out, paste0("variance_explained_", grp, ".png")),
+    plot = p_ve, width = 12, height = 5, units = "in", dpi = 600
+  )
+  print(patchwork::wrap_plots(ve_plots, title = grp))
+}
 ```
 
 ## Factor plots
 
-```{r factor-timepoint-resist, fig.width=8, fig.height=6}
-plot_factor(mofa_resist,  factors = 1:5, color_by = "Timepoint", shape_by = "Sex")
+```{r factor-plots, fig.width=10, fig.height=6}
+tp_shapes = c(
+  "Pre"     = 25, "D20M"   = 21, "D40M"    = 24,
+  "P10M"    = 22, "P15-45M" = 23, "P3.5/4H" = 8, "P24H" = 4
+)
+
+for (grp in names(mofa_models)) {
+  factor_df = MOFA2::get_factors(mofa_models[[grp]], factors = 1:5, as.data.frame = TRUE) %>%
+    dplyr::left_join(MOFA2::samples_metadata(mofa_models[[grp]]), by = "sample") %>%
+    dplyr::mutate(
+      factor    = factor(factor, levels = paste0("Factor", 1:5)),
+      Timepoint = factor(Timepoint, levels = HUMAN_TP_LEVELS)
+    )
+  p = ggplot2::ggplot(factor_df,
+      ggplot2::aes(x = "", y = value, fill = Sex, shape = Timepoint)) +
+    ggplot2::geom_jitter(width = 0.4, height = 0, size = 2.5,
+                         color = "black", stroke = 0.4) +
+    ggplot2::facet_wrap(~factor, nrow = 1) +
+    ggplot2::scale_shape_manual(values = tp_shapes) +
+    ggplot2::scale_fill_manual(
+      values = c(Female = MotrpacBicQC::sex_cols[["Female"]],
+                 Male   = MotrpacBicQC::sex_cols[["Male"]])
+    ) +
+    ggplot2::labs(
+      title = grp, x = NULL, y = "Factor value",
+      fill = "Sex", shape = "Timepoint"
+    ) +
+    ggplot2::theme_bw() +
+    ggplot2::theme(
+      axis.text    = ggplot2::element_text(size = 12),
+      axis.title   = ggplot2::element_text(size = 13),
+      strip.text   = ggplot2::element_text(size = 12),
+      legend.text  = ggplot2::element_text(size = 11),
+      legend.title = ggplot2::element_text(size = 12)
+    )
+  ggplot2::ggsave(
+    file.path(plot_out, paste0("factor_plot_", grp, ".png")),
+    plot = p, width = 10, height = 6, units = "in", dpi = 600
+  )
+  print(p)
+}
 ```
 
-```{r factor-timepoint-control, fig.width=8, fig.height=6}
-plot_factor(mofa_endur, factors = 1:5, color_by = "Timepoint", shape_by = "Sex")
+## Feature weight plots
+
+```{r feature-weights, fig.width=12, fig.height=8}
+view_colors = c(Transcriptomics = HUMAN_OME_COLORS[["Transcriptomics"]], 
+                Phosphoproteomics = HUMAN_OME_COLORS[["Phosphoproteomics"]])
+
+for (grp in names(mofa_models)) {
+  for (f in 1:10) {
+    p = plot_feature_weights(
+      mofa_models[[grp]],
+      factors     = f,
+      n_features  = 10,
+      view_colors = view_colors,
+      group       = sub("ADU", "", grp),
+      png_path    = file.path(plot_out, paste0("factor", f, "_feature_weights_", grp, ".png"))
+    )
+    print(p)
+  }
+}
 ```
 
-```{r factor-sex-resist, fig.width=8, fig.height=6}
-plot_factor(mofa_resist,  factors = 1:5, color_by = "Sex", shape_by = "Timepoint")
-```
-
-```{r factor-sex-control, fig.width=8, fig.height=6}
-plot_factor(mofa_endur, factors = 1:5, color_by = "Sex", shape_by = "Timepoint")
-```
-
-## Factor correlations
-
-```{r factor-cor-resist}
-plot_factor_cor(mofa_resist)
-```
-
-```{r factor-cor-control}
-plot_factor_cor(mofa_endur)
-```
-
-Next we want to find the weighting of genes of interest to see how some of the methods align.
+## Gene weights for genes of interest
 
 ```{r gene-weights}
 genes_of_interest = c("TFEB", "MEF2A", "NFIC", "BAG3", "HIPK3", "HIPK2", "ZEB1", "FOXO1", "FOXO3")
-
-target_features = HUMAN_FEATURE_TO_GENE %>%
-  filter(assay %in% c("transcript-rna-seq", "prot-ph")) %>%
-  select(feature_id, gene_symbol)
 
 get_gene_weights = function(mofa_trained, grp) {
   var_exp = get_variance_explained(mofa_trained)$r2_per_factor[[1]] %>%
@@ -196,7 +306,6 @@ get_gene_weights = function(mofa_trained, grp) {
     group_by(factor, view) %>%
     mutate(rank = rank(-abs(value))) %>%
     ungroup() %>%
-    left_join(target_features, by = c("feature" = "feature_id")) %>%
     left_join(var_exp, by = c("factor", "view")) %>%
     mutate(group = grp) %>%
     arrange(rank)
@@ -207,14 +316,16 @@ full_gene_weight_results = bind_rows(
   get_gene_weights(mofa_endur,  "ADUEndur")
 )
 
-write.csv(full_gene_weight_results, file = file.path(here(), "revisions", "landscape", "mofa", "full_revision_gene_weight_results.csv"),
+write.csv(full_gene_weight_results,
+          file = file.path(here(), "revisions", "landscape", "mofa", "full_revision_gene_weight_results.csv"),
           row.names = FALSE)
 
-interested_gene_weights = full_gene_weight_results %>% 
-  filter(gene_symbol %in% genes_of_interest) %>%
-  arrange(gene_symbol, rank)
+interested_gene_weights = full_gene_weight_results %>%
+  filter(grepl(paste(genes_of_interest, collapse = "|"), feature, ignore.case = TRUE)) %>%
+  arrange(feature, rank)
 
-write.csv(interested_gene_weights, file = file.path(here(), "revisions", "landscape", "mofa", "scion_revision_gene_weight_results.csv"),
+write.csv(interested_gene_weights,
+          file = file.path(here(), "revisions", "landscape", "mofa", "scion_revision_gene_weight_results.csv"),
           row.names = FALSE)
 
 interested_gene_weights

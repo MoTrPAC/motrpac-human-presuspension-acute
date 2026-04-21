@@ -1,0 +1,153 @@
+"feature_id","tissue","assay","Notes","Control_pre_exercise","Control_during_20_min","Control_during_40_min","Control_post_10_min","Control_post_15_30_45_min","Control_post_3.5_4_hr","Control_post_24_hr","Endur_pre_exercise","Endur_during_20_min","Endur_during_40_min","Endur_post_10_min","Endur_post_15_30_45_min","Endur_post_3.5_4_hr","Endur_post_24_hr","Resist_pre_exercise","Resist_post_10_min","Resist_post_15_30_45_min","Resist_post_3.5_4_hr","Resist_post_24_hr"
+"Citric acid","muscle","metab-t-tca","",31,NA,NA,NA,16,12,16,59,NA,NA,NA,24,21,29,65,NA,24,27,32
+"Isocitric acid","muscle","metab-t-tca","",31,NA,NA,NA,16,12,16,59,NA,NA,NA,24,21,29,65,NA,24,27,32
+"Carnitine","muscle","metab-u-hilicpos","",36,NA,NA,NA,18,13,17,64,NA,NA,NA,27,25,31,71,NA,32,34,35
+"Glutamic acid","muscle","metab-u-ionpneg","",36,NA,NA,NA,18,13,18,64,NA,NA,NA,25,25,31,70,NA,31,33,34
+"Lactic acid","muscle","metab-u-ionpneg","",36,NA,NA,NA,18,13,18,64,NA,NA,NA,25,25,31,70,NA,31,33,34
+"Pyruvic acid","muscle","metab-u-ionpneg","",36,NA,NA,NA,18,13,18,64,NA,NA,NA,25,25,31,70,NA,31,33,34
+"Inosine","muscle","metab-u-ionpneg","",36,NA,NA,NA,18,13,18,64,NA,NA,NA,25,25,31,70,NA,31,33,34
+"Hypoxanthine","muscle","metab-u-ionpneg","",36,NA,NA,NA,18,13,18,64,NA,NA,NA,25,25,31,70,NA,31,33,34
+"Malic acid","muscle","metab-u-ionpneg","",36,NA,NA,NA,18,13,18,64,NA,NA,NA,25,25,31,70,NA,31,33,34
+"3-Hydroxybutyric acid","muscle","metab-u-rpneg","",36,NA,NA,NA,18,13,18,64,NA,NA,NA,25,25,31,71,NA,30,33,34
+"PC 33:2","muscle","metab-u-rppos","",36,NA,NA,NA,18,13,18,64,NA,NA,NA,25,25,31,71,NA,30,33,34
+"CAR 10:1","muscle","metab-u-rppos","",36,NA,NA,NA,18,13,18,64,NA,NA,NA,25,25,31,71,NA,30,33,34
+"CAR 11:0","muscle","metab-u-rppos","",36,NA,NA,NA,18,13,18,64,NA,NA,NA,25,25,31,71,NA,30,33,34
+"CAR 18:1","muscle","metab-u-rppos","",36,NA,NA,NA,18,13,18,64,NA,NA,NA,25,25,31,71,NA,30,33,34
+"P22736_S14s","muscle","prot-ph","NR4A1",16,NA,NA,NA,10,6,9,28,NA,NA,NA,13,9,16,35,NA,12,14,20
+"O60716-3_S920s","muscle","prot-ph","CTNND1 pS920",13,NA,NA,NA,10,3,5,20,NA,NA,NA,7,4,12,24,NA,10,12,11
+"Q53EU6_S68s","muscle","prot-ph","GPAT3 pS68",20,NA,NA,NA,7,7,11,37,NA,NA,NA,13,13,18,41,NA,21,21,23
+"O60936_T114t","muscle","prot-ph","NOL3 pT114",33,NA,NA,NA,15,12,17,57,NA,NA,NA,25,21,28,59,NA,25,26,34
+"Q9Y613_S1078s","muscle","prot-ph","FHOD1",28,NA,NA,NA,15,10,16,38,NA,NA,NA,16,14,18,52,NA,21,24,28
+"Q9UBF9_T145t","muscle","prot-ph","Myotilin",35,NA,NA,NA,17,12,18,60,NA,NA,NA,26,23,29,66,NA,28,29,36
+"P19484_S109s","muscle","prot-ph","TFEB pS109",15,NA,NA,NA,7,6,9,22,NA,NA,NA,6,10,10,19,NA,6,8,12
+"P19484_S114s","muscle","prot-ph","TFEB pS114",30,NA,NA,NA,17,10,15,46,NA,NA,NA,19,18,18,49,NA,20,25,27
+"P19484_S122s","muscle","prot-ph","TFEB pS122",22,NA,NA,NA,13,7,11,31,NA,NA,NA,13,10,15,37,NA,17,18,21
+"P19484_S109sS114s","muscle","prot-ph","TFEB",35,NA,NA,NA,17,12,18,58,NA,NA,NA,24,22,28,62,NA,28,28,34
+"P19484_S109sS114sS122s","muscle","prot-ph","TFEB",34,NA,NA,NA,17,12,17,56,NA,NA,NA,23,23,27,63,NA,27,29,34
+"P19484_S114sS122s","muscle","prot-ph","TFEB",30,NA,NA,NA,16,10,15,48,NA,NA,NA,18,22,22,50,NA,18,24,28
+"P19484_S334s","muscle","prot-ph","TFEB",15,NA,NA,NA,9,3,7,22,NA,NA,NA,7,5,12,19,NA,11,11,14
+"P19484_S423s","muscle","prot-ph","TFEB",35,NA,NA,NA,17,12,18,52,NA,NA,NA,22,17,24,56,NA,26,24,32
+"O00622","muscle","prot-pr","CCN1",35,NA,NA,NA,17,12,18,58,NA,NA,NA,26,21,29,64,NA,26,27,34
+"P49023","muscle","prot-pr","PXN",35,NA,NA,NA,17,12,18,60,NA,NA,NA,26,23,29,66,NA,28,29,36
+"PPARGC1A","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"PER2","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"MYC","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"SIPA1L3","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"NR4A1","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"NR4A2","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"NEDD9","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"NFKBIZ","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"APOLD1","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"ADAMTS1","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"CCN2","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"EGR1","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"JUN","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"CRK","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"PI3KCA","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"GRB10","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"PTPN1","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"SDCBP","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"HLX","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"INPP4B","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"AMOT","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"ASCC3","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"HSPH1","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"CBFA2T3","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"LDHA","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"PDK4","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"PFKP","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"BCKDHB","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"MYOG","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"FBXO32","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"ZBTB4","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"LIMA1 lncRNA","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"LRRC14B","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"HADHA","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"MLYCD","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"ACAA2","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"HNRNPU","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"DYRK1A","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"PITX3","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"STAT5B","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"CHCHD3","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"RXRA","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"NFYA","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"CEBPB","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"TAMALIN","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"TFEB","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"CX3CL1","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"CCN1","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"FOXO1","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"FOXO3","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"NFY","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"USF2","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"MITF","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"BMAL1","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"NFATC2","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"ATF1","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"ATF7","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"CARG","muscle","transcript-rna-seq","",36,NA,NA,NA,18,15,18,63,NA,NA,NA,27,25,31,71,NA,34,34,35
+"Citric acid","blood","metab-t-tca","",37,36,37,34,37,16,19,65,63,58,64,64,28,33,72,68,72,35,38
+"Isocitric acid","blood","metab-t-tca","",37,36,37,34,37,16,19,65,63,58,64,64,28,33,72,68,72,35,38
+"Carnitine","blood","metab-u-hilicpos","",37,36,37,34,37,16,19,65,63,58,64,64,28,33,72,68,72,35,38
+"Glutamic acid","blood","metab-u-hilicpos","",37,36,37,34,37,16,19,65,63,58,64,64,28,33,72,68,72,35,38
+"PC 33:2","blood","metab-u-hilicpos","",37,36,37,34,37,16,19,65,63,58,64,64,28,33,72,68,72,35,38
+"CAR 6:0","blood","metab-u-hilicpos","",37,36,37,34,37,16,19,65,63,58,64,64,28,33,72,68,72,35,38
+"CAR 10:1","blood","metab-u-hilicpos","",37,36,37,34,37,16,19,65,63,58,64,64,28,33,72,68,72,35,38
+"CAR 18:1","blood","metab-u-hilicpos","",37,36,37,34,37,16,19,65,63,58,64,64,28,33,72,68,72,35,38
+"Leucine","blood","metab-u-hilicpos","",37,36,37,34,37,16,19,65,63,58,64,64,28,33,72,68,72,35,38
+"Isoleucine","blood","metab-u-hilicpos","",37,36,37,34,37,16,19,65,63,58,64,64,28,33,72,68,72,35,38
+"N1-Acetylspermidine","blood","metab-u-hilicpos","",37,36,37,34,37,16,19,65,63,58,64,64,28,33,72,68,72,35,38
+"Inosine","blood","metab-u-hilicpos","",37,36,37,34,37,16,19,65,63,58,64,64,28,33,72,68,72,35,38
+"Lactic acid","blood","metab-u-ionpneg","",37,36,36,33,37,15,19,65,60,56,63,62,28,33,72,68,71,35,37
+"Pyruvic acid","blood","metab-u-ionpneg","",37,36,36,33,37,15,19,65,60,56,63,62,28,33,72,68,71,35,37
+"Hypoxanthine","blood","metab-u-ionpneg","",37,36,36,33,37,15,19,65,60,56,63,62,28,33,72,68,71,35,37
+"Malic acid","blood","metab-u-ionpneg","",37,36,36,33,37,15,19,65,60,56,63,62,28,33,72,68,71,35,37
+"CAR 11:0","blood","metab-u-lrppos","",37,36,37,34,37,16,19,65,63,58,64,64,28,33,72,68,72,35,38
+"3-Hydroxybutyric acid","blood","metab-u-rpneg","",37,35,37,34,37,16,19,62,63,58,64,62,28,33,70,67,71,35,37
+"Spermidine","blood","metab-u-rppos","",37,36,37,34,37,16,19,63,62,58,62,63,28,33,70,67,70,34,38
+"OID20762","blood","prot-ol","CX3CL1",12,12,12,12,12,7,7,13,14,12,14,12,5,7,18,16,18,8,7
+"OID21368","blood","prot-ol","CCN1",12,12,12,12,12,7,7,13,14,12,14,12,5,7,18,16,18,8,7
+"OID20684","blood","prot-ol","TIMP3",12,12,12,12,12,7,7,13,14,12,14,12,5,7,18,16,18,8,7
+"OID20726","blood","prot-ol","ANGPT2",12,12,12,12,12,7,7,13,14,12,14,12,5,7,18,16,18,8,7
+"MYC","blood","transcript-rna-seq","",33,31,35,33,35,15,19,58,56,54,59,60,27,28,66,61,68,33,36
+"SIPA1L3","blood","transcript-rna-seq","",33,31,35,33,35,15,19,58,56,54,59,60,27,28,66,61,68,33,36
+"NR4A1","blood","transcript-rna-seq","",33,31,35,33,35,15,19,58,56,54,59,60,27,28,66,61,68,33,36
+"NR4A2","blood","transcript-rna-seq","",33,31,35,33,35,15,19,58,56,54,59,60,27,28,66,61,68,33,36
+"NEDD9","blood","transcript-rna-seq","",33,31,35,33,35,15,19,58,56,54,59,60,27,28,66,61,68,33,36
+"NFKBIZ","blood","transcript-rna-seq","",33,31,35,33,35,15,19,58,56,54,59,60,27,28,66,61,68,33,36
+"CRK","blood","transcript-rna-seq","",33,31,35,33,35,15,19,58,56,54,59,60,27,28,66,61,68,33,36
+"PI3KCA","blood","transcript-rna-seq","",33,31,35,33,35,15,19,58,56,54,59,60,27,28,66,61,68,33,36
+"GRB10","blood","transcript-rna-seq","",33,31,35,33,35,15,19,58,56,54,59,60,27,28,66,61,68,33,36
+"PTPN1","blood","transcript-rna-seq","",33,31,35,33,35,15,19,58,56,54,59,60,27,28,66,61,68,33,36
+"SDCBP","blood","transcript-rna-seq","",33,31,35,33,35,15,19,58,56,54,59,60,27,28,66,61,68,33,36
+"HLX","blood","transcript-rna-seq","",33,31,35,33,35,15,19,58,56,54,59,60,27,28,66,61,68,33,36
+"INPP4B","blood","transcript-rna-seq","",33,31,35,33,35,15,19,58,56,54,59,60,27,28,66,61,68,33,36
+"HSPH1","blood","transcript-rna-seq","",33,31,35,33,35,15,19,58,56,54,59,60,27,28,66,61,68,33,36
+"HNRNPU","blood","transcript-rna-seq","",33,31,35,33,35,15,19,58,56,54,59,60,27,28,66,61,68,33,36
+"DYRK1A","blood","transcript-rna-seq","",33,31,35,33,35,15,19,58,56,54,59,60,27,28,66,61,68,33,36
+"HSP90AA1","blood","transcript-rna-seq","",33,31,35,33,35,15,19,58,56,54,59,60,27,28,66,61,68,33,36
+"TAMALIN","blood","transcript-rna-seq","",33,31,35,33,35,15,19,58,56,54,59,60,27,28,66,61,68,33,36
+"Carnitine","adipose","metab-u-hilicpos","",37,NA,NA,NA,10,16,11,61,NA,NA,NA,16,26,20,73,NA,16,34,17
+"Glutamic acid","adipose","metab-u-hilicpos","",37,NA,NA,NA,10,16,11,61,NA,NA,NA,16,26,20,73,NA,16,34,17
+"PC 33:2","adipose","metab-u-hilicpos","",37,NA,NA,NA,10,16,11,61,NA,NA,NA,16,26,20,73,NA,16,34,17
+"Lactic acid","adipose","metab-u-ionpneg","",37,NA,NA,NA,10,15,11,58,NA,NA,NA,16,25,20,70,NA,14,33,17
+"O60716-3_S920s","adipose","prot-ph","CTNND1 pS920",4,NA,NA,NA,NA,6,NA,6,NA,NA,NA,NA,6,NA,7,NA,NA,7,NA
+"Q53EU6_S68s","adipose","prot-ph","GPAT3 pS68",5,NA,NA,NA,NA,5,NA,8,NA,NA,NA,NA,5,NA,6,NA,NA,7,NA
+"P41182_S366s","adipose","prot-ph","BCL6 p366",6,NA,NA,NA,NA,6,NA,8,NA,NA,NA,NA,7,NA,8,NA,NA,7,NA
+"P49023","adipose","prot-pr","PXN",6,NA,NA,NA,NA,6,NA,8,NA,NA,NA,NA,7,NA,8,NA,NA,7,NA
+"Q16254","adipose","prot-pr","E2F4",6,NA,NA,NA,NA,6,NA,8,NA,NA,NA,NA,7,NA,8,NA,NA,7,NA
+"MYC","adipose","transcript-rna-seq","",37,NA,NA,NA,10,15,11,62,NA,NA,NA,16,27,19,73,NA,16,35,18
+"SIPA1L3","adipose","transcript-rna-seq","",37,NA,NA,NA,10,15,11,62,NA,NA,NA,16,27,19,73,NA,16,35,18
+"NR4A1","adipose","transcript-rna-seq","",37,NA,NA,NA,10,15,11,62,NA,NA,NA,16,27,19,73,NA,16,35,18
+"NR4A2","adipose","transcript-rna-seq","",37,NA,NA,NA,10,15,11,62,NA,NA,NA,16,27,19,73,NA,16,35,18
+"NEDD9","adipose","transcript-rna-seq","",37,NA,NA,NA,10,15,11,62,NA,NA,NA,16,27,19,73,NA,16,35,18
+"NFKBIZ","adipose","transcript-rna-seq","",37,NA,NA,NA,10,15,11,62,NA,NA,NA,16,27,19,73,NA,16,35,18
+"APOLD1","adipose","transcript-rna-seq","",37,NA,NA,NA,10,15,11,62,NA,NA,NA,16,27,19,73,NA,16,35,18
+"ADAMTS1","adipose","transcript-rna-seq","",37,NA,NA,NA,10,15,11,62,NA,NA,NA,16,27,19,73,NA,16,35,18
+"CCN2","adipose","transcript-rna-seq","",37,NA,NA,NA,10,15,11,62,NA,NA,NA,16,27,19,73,NA,16,35,18
+"EGR1","adipose","transcript-rna-seq","",37,NA,NA,NA,10,15,11,62,NA,NA,NA,16,27,19,73,NA,16,35,18
+"JUN","adipose","transcript-rna-seq","",37,NA,NA,NA,10,15,11,62,NA,NA,NA,16,27,19,73,NA,16,35,18
+"TAMALIN","adipose","transcript-rna-seq","",37,NA,NA,NA,10,15,11,62,NA,NA,NA,16,27,19,73,NA,16,35,18
+"CX3CL1","adipose","transcript-rna-seq","",37,NA,NA,NA,10,15,11,62,NA,NA,NA,16,27,19,73,NA,16,35,18
+"CCN1","adipose","transcript-rna-seq","",37,NA,NA,NA,10,15,11,62,NA,NA,NA,16,27,19,73,NA,16,35,18

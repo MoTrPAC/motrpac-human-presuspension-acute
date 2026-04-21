@@ -1,0 +1,287 @@
+---
+title: "n_documentation_features"
+output: html_document
+date: "2026-03-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyr)
+library(dplyr)
+library(MotrpacHumanPreSuspensionData)
+library(MotrpacHumanPreSuspensionAnalysis)
+
+library(ComplexHeatmap)
+library(circlize)
+library(grid)
+```
+
+## Review Comment
+
+Furthermore, inconsistent sampling strategies across tissues and time points (e.g., proteomics analysis for adipose tissue was performed at only a single intermediate time point) create uneven statistical power for cross-tissue and cross-time comparisons, potentially introducing bias. The authors must transparently articulate the extent to which key conclusions are influenced by these small-sample subgroups throughout the manuscript.
+
+## Draft Reviewer Response
+
+We thank the reviewer for this comment. To address this concern, we compiled a comprehensive table documenting the sample sizes underlying each specifically described molecular feature in the manuscript. For assays without feature-level missingness (RNA-seq and Olink), sample sizes are uniform within a given tissue-assay-group-timepoint combination and are reported at that level. For proteomics and phosphoproteomics — where data-dependent acquisition introduces per-feature missingness — we report the observed sample size for each individual feature across every group-timepoint combination, reflecting the actual number of participants contributing to each differential abundance estimate. For metabolomics, sample sizes are reported at the platform level, as missingness in this assay is driven by metabolite detection thresholds that vary by platform rather than by individual feature. This table is provided as a supplementary resource and is referenced in the relevant results sections so that readers can assess the statistical basis for each reported finding in context.
+
+## Overview
+
+The goal of this document is to systematically describe the sample sizes (n) underlying each comparison performed across the landscape analysis. For any statistical result reported in the manuscript — differential abundance tests, pathway enrichment analyses, cross-tissue correlations, or multi-omics factor analyses — readers require a clear understanding of the number of participants, features, tissues, and time points that contributed to that comparison. This document therefore serves as a reference to contextualize the statistical power and generalizability of each finding, making explicit any variation in n that arises from missing data, tissue availability, outlier exclusion, or assay-specific filtering. By consolidating this information in one place, we aim to provide transparency into the statistical background for all reported results and facilitate interpretation of effect sizes and significance thresholds in light of the underlying sample structure.
+
+
+This is a table of the specifically described features in the landscape paper. 
+```{r}
+motrpac_named_features = read.csv("motrpac_named_features.csv")
+```
+
+```{r, include = F}
+all_dataset = load_qc(epigen = FALSE)
+
+split_tissues = unlist(all_dataset, recursive = FALSE)
+split_tissue_assay = unlist(split_tissues, recursive = FALSE)
+qc_norm_only = split_tissue_assay[grep("qc_norm", names(split_tissue_assay))]
+
+#makes a big list of tissues, assays
+samples_per_plat = data.frame(
+  list_name = names(qc_norm_only),
+  vialLabels = sapply(qc_norm_only, function(x) paste(colnames(x), collapse = ";"))
+) %>%
+  mutate(
+    tissue = sapply(strsplit(list_name, "\\."), `[`, 1),
+    assay = sapply(strsplit(list_name, "\\."), `[`, 2)
+  ) %>%
+  dplyr::select(-list_name)
+
+#then uses the pheno file to annotate group and timepoint info and split the vector
+qc_norm_counts = lapply(seq_len(nrow(samples_per_plat)), function(row) {
+  vials_vec = strsplit(samples_per_plat[row, "vialLabels"], ";")[[1]] %>%
+    base::trimws()
+  
+  pheno$data %>%
+    filter(vialLabel %in% vials_vec) %>%
+    group_by(randomGroupCode, Timepoint) %>%
+    summarise(
+      n = n(),
+      vialLabels = paste(vialLabel, collapse = ","),
+      .groups = "drop"
+    ) %>%
+    mutate(
+      tissue = samples_per_plat$tissue[row],
+      assay = samples_per_plat$assay[row]
+    )
+}) %>%
+  bind_rows() %>%
+  dplyr::select(tissue, assay, randomGroupCode, Timepoint, n)
+```
+
+However, since the proteomics and phosphoproteomics have missingness patterns, the number of samples per feature are more limited. This table 1 loaded above is the most optimistic case, where there's no missingness present. 
+
+```{r, include = F}
+qc_data = load_qc(selected_omes = c("prot-pr", "prot-ph"), 
+                  epigen = F)
+all_group_stats = data.frame()
+for(tissue in names(qc_data)){
+  for(ome in names(qc_data[[tissue]])){
+    curr_data = qc_data[[tissue]][[ome]][["qc_norm"]]
+    if(nrow(curr_data) == 0) next
+    curr_meta = qc_data[[tissue]][[ome]][["sample_metadata"]] %>%
+      dplyr::filter(visitcode == "ADU_BAS")
+    curr_data = curr_data[,colnames(curr_data) %in% curr_meta$vialLabel]
+    curr_meta = curr_meta[match(colnames(curr_data), curr_meta$vialLabel), ] #reorder so they're in the same order as colnames of raw_counts
+    
+    vial_to_participant = setNames(curr_meta$pid, curr_meta$vialLabel)
+    vial_to_group = setNames(curr_meta$randomGroupCode, curr_meta$vialLabel)
+    vial_to_timepoint = setNames(curr_meta$Timepoint, curr_meta$vialLabel)
+    
+    sample_participant = vial_to_participant[colnames(curr_data)]
+    sample_groups = vial_to_group[colnames(curr_data)]
+    sample_timepoints = vial_to_timepoint[colnames(curr_data)]
+    
+    #needed to make the matrix long - probably a better way to do it, but should work.
+    curr_data_long = as.data.frame(t(curr_data))
+    curr_data_long$Sample <- rownames(curr_data_long)
+    curr_data_long = tidyr::pivot_longer(curr_data_long, -Sample, names_to = "feature_id", values_to = "Value")
+    curr_data_long$randomGroupCode = sample_groups[curr_data_long$Sample]
+    curr_data_long$Timepoint = sample_timepoints[curr_data_long$Sample]
+    curr_data_long$Participant = sample_participant[curr_data_long$Sample]
+    
+    group_stats = curr_data_long %>%
+      group_by(randomGroupCode, feature_id, Timepoint) %>%
+      summarize(
+        Count = sum(!is.na(Value))
+      )
+    group_stats$tissue = tissue; group_stats$ome = ome
+    
+    all_group_stats = rbind(all_group_stats, group_stats)
+  }
+}
+```
+
+
+RNAseq + Olink are pretty easy because there is no missingness and just the one platform
+```{r}
+named_features_rna_ol = motrpac_named_features %>%
+  dplyr::filter(assay %in% c("transcript-rna-seq", "prot-ol")) %>%
+  dplyr::left_join(qc_norm_counts, by = c("tissue", "assay"))
+```
+
+Metab is slightly harder because I have to make sure the exact n of the platform is pulled up.
+```{r}
+da_platforms = load_differential_analysis(selected_omes = "metab", single_matrix = TRUE) %>%
+  dplyr::select(feature_id, tissue, assay, platform) %>%
+  distinct()
+named_features_metab = motrpac_named_features %>%
+  dplyr::filter(assay == "metab") %>%
+  dplyr::left_join(da_platforms, by = c("feature_id", "tissue", "assay")) %>%
+  dplyr::mutate(assay = platform) %>%
+  dplyr::left_join(qc_norm_counts, by = c("tissue", "assay"))
+```
+
+Not sure which sites this is referring to. 
+```{r}
+prot_omes = c("prot-pr", "prot-ph")
+
+named_features_prot = motrpac_named_features %>%
+  dplyr::filter(assay %in% prot_omes) %>%
+  dplyr::left_join(all_group_stats, by = c("feature_id", "tissue", "assay" = "ome")) %>%
+  rename(n = Count)
+```
+
+
+```{r}
+named_features_with_n = dplyr::bind_rows(named_features_rna_ol, named_features_metab, named_features_prot) %>%
+  mutate(randomGroupCode = gsub("ADU", "", randomGroupCode)) %>%
+  dplyr::arrange(randomGroupCode, Timepoint) %>%
+  tidyr::pivot_wider(
+    names_from = c(randomGroupCode, Timepoint),
+    values_from = n,
+    names_sep = "_"
+  ) %>%
+  dplyr::select(-platform) %>%
+  mutate(tissue = factor(tissue, levels = c("muscle", "blood", "adipose"))) %>%
+  arrange(tissue, assay)
+head(named_features_with_n)
+
+write.csv(named_features_with_n,
+          file = "named_features_w_n.csv",
+          row.names = FALSE)
+```
+
+```{r, fig.width=14, fig.height=28}
+group_max_n = c(Control = 37, Endur = 65, Resist = 73)
+
+n_cols = grep("^(Control|Endur|Resist)_", colnames(named_features_with_n), value = TRUE)
+col_groups = sub("_.*", "", n_cols)
+
+group_cols = c(Control = "#7570b3", Endur = "#d95f02", Resist = "#1b9e77")
+col_fun_pct = colorRamp2(c(0, 1), c("white", "#2171b5"))
+assay_cols = HUMAN_OME_COLORS[names(HUMAN_OME_COLORS) %in% unique(named_features_with_n$assay)]
+tissue_cols = HUMAN_TISSUE_COLORS
+
+col_anno = HeatmapAnnotation(
+  Group = col_groups,
+  col = list(Group = group_cols),
+  show_annotation_name = FALSE,
+  annotation_legend_param = list(Group = list(title = "Group"))
+)
+
+pct_lg = ComplexHeatmap::Legend(
+  title = "% of max N\n(CON=37, EE=65, RE=73)",
+  col_fun = col_fun_pct,
+  at = c(0, 1),
+  labels = c("0%", "100%"),
+  legend_height = grid::unit(4, "cm")
+)
+assay_lg = ComplexHeatmap::Legend(
+  title = "Assay",
+  at = names(assay_cols),
+  legend_gp = grid::gpar(fill = assay_cols)
+)
+tissue_lg = ComplexHeatmap::Legend(
+  title = "Tissue",
+  at = names(tissue_cols),
+  legend_gp = grid::gpar(fill = tissue_cols)
+)
+na_lg = ComplexHeatmap::Legend(
+  title = "No measurement done",
+  at = "NA",
+  legend_gp = grid::gpar(fill = "grey65", col = NA)
+)
+
+.make_ht = function(df, use_cols = n_cols) {
+  use_groups = sub("_.*", "", use_cols)
+  mat = as.matrix(df[, use_cols])
+  rownames(mat) = df$feature_id
+  pct_mat = mat
+  for (j in seq_along(use_cols)) pct_mat[, j] = mat[, j] / group_max_n[use_groups[j]]
+
+  row_anno = rowAnnotation(
+    Assay  = df$assay,
+    Tissue = df$tissue,
+    col    = list(Assay = assay_cols, Tissue = tissue_cols),
+    show_annotation_name = TRUE,
+    annotation_name_side = "top",
+    show_legend = c(Assay = FALSE, Tissue = FALSE)
+  )
+
+  col_anno_sub = HeatmapAnnotation(
+    Group = use_groups,
+    col = list(Group = group_cols),
+    show_annotation_name = FALSE,
+    annotation_legend_param = list(Group = list(title = "Group"))
+  )
+
+  Heatmap(
+    pct_mat,
+    name = "pct",
+    col = col_fun_pct,
+    na_col = "grey65",
+    cell_fun = function(j, i, x, y, width, height, fill) {
+      val = mat[i, j]
+      if (!is.na(val)) grid::grid.text(as.character(val), x, y,
+                                       gp = grid::gpar(fontsize = 11, col = "black"))
+    },
+    top_annotation = col_anno_sub,
+    left_annotation = row_anno,
+    row_split = df$tissue,
+    row_gap = grid::unit(2, "mm"),
+    column_split = use_groups,
+    column_gap = grid::unit(2, "mm"),
+    cluster_rows = FALSE,
+    cluster_columns = FALSE,
+    show_row_names = TRUE,
+    show_column_names = TRUE,
+    column_names_rot = 45,
+    row_names_gp = grid::gpar(fontsize = 10),
+    column_names_gp = grid::gpar(fontsize = 8),
+    row_title_rot = 0,
+    row_title_gp = grid::gpar(fontsize = 9),
+    show_heatmap_legend = FALSE
+  )
+}
+
+muscle_cols = n_cols[!grepl("during|post_10_min", n_cols)]
+muscle_df = named_features_with_n %>% dplyr::filter(tissue == "muscle")
+blood_adi_df = named_features_with_n %>% dplyr::filter(tissue %in% c("blood", "adipose"))
+
+ht_muscle = .make_ht(muscle_df, use_cols = muscle_cols)
+ht_blood_adi = .make_ht(blood_adi_df)
+
+png("n_named_features_muscle.png", width = 14, height = 14, units = "in", res = 150)
+ComplexHeatmap::draw(
+  ht_muscle,
+  heatmap_legend_list = list(pct_lg, assay_lg, tissue_lg, na_lg),
+  merge_legend = TRUE,
+  heatmap_legend_side = "left"
+)
+dev.off()
+
+png("n_named_features_blood_adipose.png", width = 14, height = 14, units = "in", res = 150)
+ComplexHeatmap::draw(
+  ht_blood_adi,
+  heatmap_legend_list = list(pct_lg, assay_lg, tissue_lg, na_lg),
+  merge_legend = TRUE,
+  heatmap_legend_side = "left"
+)
+dev.off()
+```

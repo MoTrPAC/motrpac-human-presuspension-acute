@@ -221,56 +221,65 @@ finished_da_with_cell_types = read.csv(file.path(repo_local_dir, "data", "tmp",
 existing_motrpac_da = load_differential_analysis(selected_omes = "transcript-rna-seq",
                                                  selected_tissues = "blood",
                                                  single_matrix = TRUE) %>%
-  dplyr::select(feature_id, z.std, contrast)
+  dplyr::select(feature_id, z.std, logFC, contrast)
 
 
 combined_da = finished_da_with_cell_types %>%
-  dplyr::select(feature_id, z.std, contrast) %>%
-  dplyr::left_join(existing_motrpac_da, by = c("feature_id", "contrast"), suffix = c(".cell_type", ".no_cell_type")) %>%
+  dplyr::select(feature_id, z.std, logFC, contrast) %>%
+  dplyr::left_join(
+    existing_motrpac_da %>% dplyr::select(feature_id, z.std, logFC, contrast),
+    by = c("feature_id", "contrast"),
+    suffix = c(".cell_type", ".no_cell_type")
+  ) %>%
   dplyr::left_join(MotrpacHumanPreSuspensionAnalysis::CONTRAST_CONVERTER, by = "contrast") %>%
   dplyr::filter(contrast_type == "exercise_with_controls")
 
 ```
 
 ```{r}
-combined_da_plot = combined_da %>%
-  dplyr::filter(!is.na(z.std.cell_type), !is.na(z.std.no_cell_type),
-                randomGroupCode %in% c("ADUEndur", "ADUResist"))
+.plot_covariate_corr = function(da, metric, outfile) {
+  x_col = paste0(metric, ".no_cell_type")
+  y_col = paste0(metric, ".cell_type")
 
-corr_labels = combined_da_plot %>%
-  dplyr::group_by(randomGroupCode, Timepoint) %>%
-  dplyr::summarise(
-    r = cor(z.std.cell_type, z.std.no_cell_type, use = "complete.obs"),
-    .groups = "drop"
-  ) %>%
-  dplyr::mutate(label = paste0("R = ", round(r, 2)))
+  plot_df = da %>%
+    dplyr::filter(!is.na(.data[[x_col]]), !is.na(.data[[y_col]]),
+                  randomGroupCode %in% c("ADUEndur", "ADUResist"))
 
-p_zstd = combined_da_plot %>%
-  ggplot(aes(x = z.std.no_cell_type, y = z.std.cell_type)) +
-  geom_point(size = 0.4, alpha = 0.25) +
-  geom_abline(slope = 1, intercept = 0, color = "firebrick", linetype = "dashed", linewidth = 0.6) +
-  geom_text(data = corr_labels,
-            aes(x = -Inf, y = Inf, label = label),
-            hjust = -0.15, vjust = 1.5,
-            size = 3.5, inherit.aes = FALSE) +
-  facet_grid(randomGroupCode ~ Timepoint) +
-  labs(
-    x = "z.std (no cell type covariate)",
-    y = "z.std (with cell type covariate)",
-    title = "Effect of adding cell type covariates on blood RNA-seq DA"
-  ) +
-  theme_bw() +
-  theme(
-    axis.text = element_text(size = 10),
-    axis.title = element_text(size = 12),
-    title = element_text(size = 13),
-    strip.text = element_text(size = 9)
-  )
-ggsave("cell_type_covariate_inclusion.png",
-       width = 8,
-       height = 4)
+  corr_labels = plot_df %>%
+    dplyr::group_by(randomGroupCode, Timepoint) %>%
+    dplyr::summarise(
+      r = cor(.data[[x_col]], .data[[y_col]], use = "complete.obs"),
+      .groups = "drop"
+    ) %>%
+    dplyr::mutate(label = paste0("R = ", round(r, 2)))
 
-print(p_zstd)
+  p = plot_df %>%
+    ggplot(aes(x = .data[[x_col]], y = .data[[y_col]])) +
+    geom_point(size = 0.4, alpha = 0.25) +
+    geom_abline(slope = 1, intercept = 0, color = "firebrick", linetype = "dashed", linewidth = 0.6) +
+    geom_text(data = corr_labels,
+              aes(x = -Inf, y = Inf, label = label),
+              hjust = -0.15, vjust = 1.5,
+              size = 3.5, inherit.aes = FALSE) +
+    facet_grid(randomGroupCode ~ Timepoint) +
+    labs(
+      x = paste0(metric, " (no cell type covariate)"),
+      y = paste0(metric, " (with cell type covariate)"),
+      title = paste0("Effect of adding cell type covariates on blood RNA-seq DA (", metric, ")")
+    ) +
+    theme_bw() +
+    theme(
+      axis.text = element_text(size = 10),
+      axis.title = element_text(size = 12),
+      title = element_text(size = 13),
+      strip.text = element_text(size = 9)
+    )
+  ggsave(outfile, width = 8, height = 4)
+  p
+}
+
+print(.plot_covariate_corr(combined_da, "z.std", "cell_type_covariate_inclusion.png"))
+print(.plot_covariate_corr(combined_da, "logFC", "cell_type_covariate_inclusion_logFC.png"))
 ```
 
 

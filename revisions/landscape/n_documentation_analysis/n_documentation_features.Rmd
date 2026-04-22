@@ -14,6 +14,8 @@ library(MotrpacHumanPreSuspensionAnalysis)
 library(ComplexHeatmap)
 library(circlize)
 library(grid)
+library(ggplot2)
+
 ```
 
 ## Review Comment
@@ -117,6 +119,62 @@ for(tissue in names(qc_data)){
 }
 ```
 
+Lets check the counts for any data that couldve been imputed, for SCION specifically
+```{r}
+imputed_data = MotrpacHumanPreSuspensionData::load_qc(selected_tissues = "muscle", selected_omes = "prot-ph")
+imputed_features = rownames(imputed_data$muscle$`prot-ph`$qc_imputed)
+imputed_group_stats = all_group_stats %>% filter(
+  feature_id %in% imputed_features,
+  tissue == "muscle"
+)
+```
+
+```{r, eval = FALSE, fig.width = 8, fig.height = 5}
+group_labels = c(
+  "ADU_CON" = "Control",
+  "ADU_EE"  = "Endurance",
+  "ADU_RE"  = "Resistance"
+)
+group_colors = HUMAN_EXERCISE_GROUP_COLORS
+
+imputed_group_stats %>%
+  mutate(
+    Group = group_labels[randomGroupCode],
+    Group = factor(Group, levels = c("Control", "Endurance", "Resistance"))
+  ) %>%
+  ggplot(aes(x = Count, fill = Group)) +
+  geom_histogram(
+    binwidth = 1,
+    color = "white",
+    linewidth = 0.25,
+    alpha = 0.85,
+    position = "identity"
+  ) +
+  scale_fill_manual(values = group_colors, name = "Group", guide = "none") +
+  scale_x_continuous(
+    limits = c(0, 75),
+    breaks = seq(0, 75, by = 10),
+    expand = c(0.01, 0)
+  ) +
+  scale_y_continuous(expand = c(0, 0, 0.05, 0)) +
+  labs(
+    title = "Distribution of observed sample counts for SCION-imputed features",
+    subtitle = "Muscle phosphoproteomics (prot-ph); each observation is one feature × group × timepoint",
+    x = "Number of non-missing samples per feature",
+    y = "Number of feature × group × timepoint observations"
+  ) +
+  theme_classic(base_size = 13) +
+  theme(
+    plot.title    = element_text(size = 14, face = "bold"),
+    plot.subtitle = element_text(size = 11, color = "grey40"),
+    axis.title    = element_text(size = 12),
+    axis.text     = element_text(size = 11),
+    panel.grid.major.y = element_line(color = "grey90", linewidth = 0.4),
+    plot.margin   = margin(10, 16, 10, 10)
+  )
+ggsave("scion_imputation_n_histogram.png", width = 8, height = 5, units = "in", dpi = 600)
+```
+
 
 RNAseq + Olink are pretty easy because there is no missingness and just the one platform
 ```{r}
@@ -137,7 +195,6 @@ named_features_metab = motrpac_named_features %>%
   dplyr::left_join(qc_norm_counts, by = c("tissue", "assay"))
 ```
 
-Not sure which sites this is referring to. 
 ```{r}
 prot_omes = c("prot-pr", "prot-ph")
 

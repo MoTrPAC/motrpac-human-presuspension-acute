@@ -12,24 +12,13 @@ knitr::opts_chunk$set(echo = TRUE)
 
 config = jsonlite::fromJSON("~/config.json")
 repo_local_dir = config$precovid_repo_path
+library(MotrpacHumanPreSuspensionAnalysis)
 
 # permute = 1
 permute = params$permute
 num_cores = params$num_cores
-devtools::load_all(path = config$r_package_path)
 ```
 
-```{r}
-regulators_network_one = .load_scion_matrixes(desired_matrixes = "muscle.prot-ph",
-                                              repo_local_dir = repo_local_dir,
-                                              subset_TFs = TRUE,
-                                              subset_DE = FALSE)
-
-regulators_network_one_test = .load_scion_matrixes(desired_matrixes = "muscle.prot-ph",
-                                              repo_local_dir = repo_local_dir,
-                                              subset_TFs = TRUE,
-                                              subset_DE = TRUE)
-```
 
 ```{r, eval = F}
 regulators_network_one = .load_scion_matrixes(desired_matrixes = "muscle.prot-ph",

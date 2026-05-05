@@ -11,9 +11,7 @@ library(MotrpacHumanPreSuspensionData)
 library(dplyr)
 library(ggplot2)
 
-source(here::here("revisions/landscape/sex_sensitivity_analysis/sex_differences_single_feat.R"))
-source(here::here("revisions/landscape/sex_sensitivity_analysis/plot_mvsf_da_matrix.R"))
-source(here::here("revisions/landscape/sex_sensitivity_analysis/plot_precawg_mvsf_matrix.R"))
+source(here::here("revisions/landscape/sex_sensitivity_analysis/sex_sensitivity_helpers.R"))
 ```
 
 ## Review Comment:
@@ -22,7 +20,9 @@ The cohort is 72% female, yet the manuscript fails to analyze whether molecular 
 
 ## Draft Reviewer Response
 
-We thank the reviewer for raising this important point. We acknowledge that the cohort composition (72% female) warrants careful consideration of potential sex-specific effects on the molecular responses we report. In our primary analysis, sex was included as a covariate, which accounts for baseline sex differences across the full dataset but does not directly test whether the exercise-induced response differs between males and females. To address this concern, we performed a supplementary sex-stratified sensitivity analysis in which we estimated exercise-induced log fold-changes separately for male and female participants across each group-timepoint combination. This analysis was restricted to tissue-assay platforms where at least three participants of each sex were present in every group-timepoint cell, to ensure estimates were not unduly driven by individual observations. For the specific molecular features highlighted in the manuscript — including key transcripts (e.g., NR4A1, PPARGC1A, MYC, FOXO1/3) and metabolites (e.g., lactate, leucine, isoleucine, glutamic acid) — the direction and approximate magnitude of exercise-induced change were consistent between male and female participants, supporting the generalizability of our primary findings. We note that the reduced per-sex sample sizes yield wider confidence intervals and lower statistical power than the full-cohort analysis, so this sex-stratified analysis should be interpreted as descriptive and hypothesis-generating rather than confirmatory. We have added a dedicated section to the manuscript describing this analysis and its limitations, and have updated the limitations section to explicitly discuss the unbalanced sex composition of the cohort.
+We thank the reviewer for raising this important point. We acknowledge that the cohort composition (72% female) warrants careful consideration of potential sex-specific effects on the molecular responses we report. In our primary analysis, sex was included as a covariate, which accounts for baseline sex differences across the full dataset but does not directly test whether the exercise-induced response differs between males and females. To address this concern, we performed a supplementary sex-stratified sensitivity analysis in which we estimated exercise-induced log fold-changes separately for male and female participants across each group-timepoint combination. This analysis was restricted to tissue-assay platforms where at least three participants of each sex were present in every group-timepoint cell, to ensure estimates were not unduly driven by individual observations. This limits our sensitivity analysis to metabolomics and transcriptomics for every tissue. 
+
+For the specific molecular features highlighted in the manuscript — including key transcripts (e.g., NR4A1, PPARGC1A, MYC, FOXO1/3) and metabolites (e.g., lactate, leucine, isoleucine, glutamic acid) — the direction and approximate magnitude of exercise-induced change were consistent between male and female participants, supporting the generalizability of our primary findings. We note that the reduced per-sex sample sizes yield wider confidence intervals and lower statistical power than the full-cohort analysis, so this sex-stratified analysis should be interpreted as descriptive and hypothesis-generating rather than confirmatory. We have added a dedicated section to the manuscript describing this analysis and its limitations, and have updated the limitations section to explicitly discuss the unbalanced sex composition of the cohort.
 
 
 ## How to address this comment
@@ -34,8 +34,6 @@ Instead, we want to try to estimate the effect of exercise in a specific sex and
 ### **Caveats** 
 
 1. The major reason we avoided this is because in most cases, the number of samples for a sex-group-timepoint can be very limited (especially for smaller male groups). Any conclusions have to be made with the understanding some of the potential differences (or lack of differences) may be due to sampling limitations
-
-2. The MoTrPAC exec has limited sex-difference analysis (outside of baseline comparisons) for this above reason.
 
 Therefore, I am proposing we describe these to reviewers + clarify that any results are descriptive in nature only and a point of possible comparison. 
 
@@ -85,11 +83,15 @@ qc_norm_counts = lapply(seq_len(nrow(samples_per_plat)), function(row) {
   dplyr::select(tissue, assay, randomGroupCode, Sex, Timepoint, n, vialLabels)
 
 qualifying_omes_tissues = qc_norm_counts %>%
+  dplyr::filter(randomGroupCode != "ADUControl") %>%
   dplyr::group_by(tissue, assay) %>%
   dplyr::mutate(flag_low_n = any(n < 3)) %>%
   dplyr::filter(!flag_low_n) %>%
   dplyr::distinct(tissue, assay)
 ```
+
+
+If we don't include controls - see filter just above. we CAN do adipose. If we require >3 for EVERY cell, this limits our conclusions that we can make. 
 
 ```{r}
 qualifying_omes_tissues %>%
@@ -110,7 +112,8 @@ sex_differential_analysis = list.files(file.path(repo_local_dir, "data", "tmp", 
 read_sex_diff = lapply(sex_differential_analysis, function(f) {
   tissue = dplyr::case_when(
     grepl("muscle", f) ~ "muscle",
-    grepl("blood|plasma", f) ~ "blood"
+    grepl("blood|plasma", f) ~ "blood",
+    grepl("adipose", f) ~ "adipose"
   )
   read.table(f, header = TRUE, sep = "\t", stringsAsFactors = FALSE) %>%
     dplyr::mutate(tissue = tissue)
@@ -164,6 +167,30 @@ precawg_and_m_vs_f_diff = precawg_analysis %>%
 plot_precawg_mvsf_matrix(precawg_and_m_vs_f_diff)
 ```
 
+
+There is a distinct difference in the Male and Female blood RE, especially at 3.5
+```{r}
+annotated_differences = precawg_and_m_vs_f_diff %>% 
+    left_join(HUMAN_FEATURE_TO_GENE %>% filter(assay == "transcript-rna-seq"), by = c("feature_id", "assay")) 
+
+sig_differences = annotated_differences %>%
+  dplyr::filter(Timepoint == "post_3.5_4_hr",
+                randomGroupCode == "ADUResist",
+                assay == "transcript-rna-seq",
+                tissue == "blood",
+                adj_p_value_precawg < 0.05 & adj_p_value_sex_diff < 0.05)
+write.csv(sig_differences, "outputs/sig_differences_blood_RE_P35_rna.csv", row.names = FALSE)
+
+all_blood_transcripts = unique(annotated_differences %>% dplyr::filter(assay == "transcript-rna-seq", tissue == "blood") %>% pull(gene_symbol)) %>% as.character()
+
+ora_results = run_ORA(
+  input = sig_differences$gene_symbol %>% as.character(),
+  background = all_blood_transcripts
+)
+write.csv(ora_results, "outputs/ora_blood_RE_P35_rna.csv", row.names = FALSE)
+ora_results %>% dplyr::filter(collection != "CELLMARKER") %>% select(set_short, adj_p_value) %>% head(20)
+```
+
 ```{r, include = FALSE}
 sex_single_da_annotated = read_sex_diff %>%
   dplyr::filter(!(grepl("Male", contrast) & grepl("Female", contrast))) %>%
@@ -215,7 +242,7 @@ for (feat in relevant_feature_ids) {
 
 For PGC1a specifically we highlight just the muscle, its not really mentioned as much in the context of other tissues in the landscape. 
 ```{r, results = "asis"}
-print(sex_differences_single_feature("PPARGC1A", selected_tissues = "muscle", output_file = "specific_figures/PPARGC1A.png"))
+print(sex_differences_single_feature("PPARGC1A", selected_tissues = "muscle", output_file = "outputs/PPARGC1A.png"))
 ```
 
 

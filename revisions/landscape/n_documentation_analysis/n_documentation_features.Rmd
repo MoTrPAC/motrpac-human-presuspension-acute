@@ -16,7 +16,9 @@ library(circlize)
 library(grid)
 library(ggplot2)
 
+source("n_documentation_helpers.R")
 ```
+
 
 ## Review Comment
 
@@ -119,63 +121,6 @@ for(tissue in names(qc_data)){
 }
 ```
 
-Lets check the counts for any data that couldve been imputed, for SCION specifically
-```{r}
-imputed_data = MotrpacHumanPreSuspensionData::load_qc(selected_tissues = "muscle", selected_omes = "prot-ph")
-imputed_features = rownames(imputed_data$muscle$`prot-ph`$qc_imputed)
-imputed_group_stats = all_group_stats %>% filter(
-  feature_id %in% imputed_features,
-  tissue == "muscle"
-)
-```
-
-```{r, eval = FALSE, fig.width = 8, fig.height = 5}
-group_labels = c(
-  "ADU_CON" = "Control",
-  "ADU_EE"  = "Endurance",
-  "ADU_RE"  = "Resistance"
-)
-group_colors = HUMAN_EXERCISE_GROUP_COLORS
-
-imputed_group_stats %>%
-  mutate(
-    Group = group_labels[randomGroupCode],
-    Group = factor(Group, levels = c("Control", "Endurance", "Resistance"))
-  ) %>%
-  ggplot(aes(x = Count, fill = Group)) +
-  geom_histogram(
-    binwidth = 1,
-    color = "white",
-    linewidth = 0.25,
-    alpha = 0.85,
-    position = "identity"
-  ) +
-  scale_fill_manual(values = group_colors, name = "Group", guide = "none") +
-  scale_x_continuous(
-    limits = c(0, 75),
-    breaks = seq(0, 75, by = 10),
-    expand = c(0.01, 0)
-  ) +
-  scale_y_continuous(expand = c(0, 0, 0.05, 0)) +
-  labs(
-    title = "Distribution of observed sample counts for SCION-imputed features",
-    subtitle = "Muscle phosphoproteomics (prot-ph); each observation is one feature × group × timepoint",
-    x = "Number of non-missing samples per feature",
-    y = "Number of feature × group × timepoint observations"
-  ) +
-  theme_classic(base_size = 13) +
-  theme(
-    plot.title    = element_text(size = 14, face = "bold"),
-    plot.subtitle = element_text(size = 11, color = "grey40"),
-    axis.title    = element_text(size = 12),
-    axis.text     = element_text(size = 11),
-    panel.grid.major.y = element_line(color = "grey90", linewidth = 0.4),
-    plot.margin   = margin(10, 16, 10, 10)
-  )
-ggsave("scion_imputation_n_histogram.png", width = 8, height = 5, units = "in", dpi = 600)
-```
-
-
 RNAseq + Olink are pretty easy because there is no missingness and just the one platform
 ```{r}
 named_features_rna_ol = motrpac_named_features %>%
@@ -188,6 +133,7 @@ Metab is slightly harder because I have to make sure the exact n of the platform
 da_platforms = load_differential_analysis(selected_omes = "metab", single_matrix = TRUE) %>%
   dplyr::select(feature_id, tissue, assay, platform) %>%
   distinct()
+
 named_features_metab = motrpac_named_features %>%
   dplyr::filter(assay == "metab") %>%
   dplyr::left_join(da_platforms, by = c("feature_id", "tissue", "assay")) %>%
@@ -219,10 +165,87 @@ named_features_with_n = dplyr::bind_rows(named_features_rna_ol, named_features_m
   arrange(tissue, assay)
 head(named_features_with_n)
 
-write.csv(named_features_with_n,
-          file = "named_features_w_n.csv",
-          row.names = FALSE)
+# write.csv(named_features_with_n,
+#           file = "outputs/named_features_w_n.csv",
+#           row.names = FALSE)
 ```
+
+```{r}
+# Build a boolean significance matrix mirroring named_features_with_n,
+# TRUE where adj_p_value < 0.05 for that feature × group × timepoint.
+#
+# transcript-rna-seq: named_features uses gene symbols as feature_id, but DA
+# results use actual transcript feature IDs — bridge via HUMAN_FEATURE_TO_GENE.
+transcript_gene_map = HUMAN_FEATURE_TO_GENE %>%
+  dplyr::filter(
+    gene_symbol %in% motrpac_named_features$feature_id[
+      motrpac_named_features$assay == "transcript-rna-seq"
+    ]
+  ) %>%
+  dplyr::select(feature_id, gene_symbol)
+
+da_all_for_sig = load_differential_analysis(single_matrix = TRUE) %>%
+  dplyr::filter(contrast_type == "exercise_with_controls") %>%
+  dplyr::mutate(
+    randomGroupCode = gsub("ADU", "", randomGroupCode),
+    significant = adj_p_value < 0.05
+  )
+
+da_transcript = da_all_for_sig %>%
+  dplyr::filter(assay == "transcript-rna-seq") %>%
+  dplyr::inner_join(transcript_gene_map, by = "feature_id") %>%
+  dplyr::mutate(feature_id = gene_symbol) %>%
+  dplyr::select(-gene_symbol)
+
+da_other = da_all_for_sig %>%
+  dplyr::filter(
+    assay != "transcript-rna-seq",
+    feature_id %in% motrpac_named_features$feature_id
+  )
+
+sig_wide = dplyr::bind_rows(da_transcript, da_other) %>%
+  dplyr::group_by(feature_id, tissue, randomGroupCode, Timepoint) %>%
+  dplyr::summarise(significant = any(significant, na.rm = TRUE), .groups = "drop") %>%
+  tidyr::pivot_wider(
+    names_from = c(randomGroupCode, Timepoint),
+    values_from = significant,
+    names_sep = "_"
+  )
+
+# For each Endur/Resist column that is TRUE, mark the matching Control column TRUE too.
+# Control samples are included in the exercise_with_controls model, so if EE or RE is
+# significant at a timepoint the control observations contributed to that estimate.
+er_cols = grep("^(Endur|Resist)_", colnames(sig_wide), value = TRUE)
+for (col in er_cols) {
+  tp = sub("^(Endur|Resist)_", "", col)
+  con_col = paste0("Control_", tp)
+  er_true = !is.na(sig_wide[[col]]) & sig_wide[[col]]
+  if (con_col %in% colnames(sig_wide)) {
+    sig_wide[[con_col]] = sig_wide[[con_col]] | er_true
+  } else {
+    sig_wide[[con_col]] = er_true
+  }
+}
+
+# If any post-baseline timepoint for a group is significant, also mark that
+# group's pre-exercise column TRUE (the baseline sample contributed to every
+# within-group contrast for that feature).
+for (grp in c("Control", "Endur", "Resist")) {
+  pre_col = paste0(grp, "_pre_exercise")
+  grp_cols = setdiff(grep(paste0("^", grp, "_"), colnames(sig_wide), value = TRUE), pre_col)
+  if (length(grp_cols) == 0) next
+  any_sig = apply(
+    sig_wide[, grp_cols, drop = FALSE], 1,
+    function(row) any(!is.na(row) & row)
+  )
+  if (pre_col %in% colnames(sig_wide)) {
+    sig_wide[[pre_col]] = sig_wide[[pre_col]] | any_sig
+  } else {
+    sig_wide[[pre_col]] = any_sig
+  }
+}
+```
+
 
 ```{r, fig.width=14, fig.height=28}
 group_max_n = c(Control = 37, Endur = 65, Resist = 73)
@@ -265,12 +288,29 @@ na_lg = ComplexHeatmap::Legend(
   legend_gp = grid::gpar(fill = "grey65", col = NA)
 )
 
-.make_ht = function(df, use_cols = n_cols) {
+.make_ht = function(df, use_cols = n_cols, sig_df = NULL) {
   use_groups = sub("_.*", "", use_cols)
   mat = as.matrix(df[, use_cols])
   rownames(mat) = df$feature_id
   pct_mat = mat
   for (j in seq_along(use_cols)) pct_mat[, j] = mat[, j] / group_max_n[use_groups[j]]
+
+  # Boolean matrix: TRUE where that group × timepoint is DA-significant (adj_p < 0.05)
+  sig_mat = matrix(FALSE, nrow = nrow(df), ncol = length(use_cols),
+                   dimnames = list(df$feature_id, use_cols))
+  if (!is.null(sig_df)) {
+    sig_cols = intersect(use_cols, colnames(sig_df))
+    joined = df %>%
+      dplyr::select(feature_id, tissue) %>%
+      dplyr::left_join(
+        sig_df %>% dplyr::select(feature_id, tissue, dplyr::all_of(sig_cols)),
+        by = c("feature_id", "tissue")
+      )
+    for (col in sig_cols) {
+      vals = joined[[col]]
+      sig_mat[, col] = !is.na(vals) & vals
+    }
+  }
 
   row_anno = rowAnnotation(
     Assay  = df$assay,
@@ -295,8 +335,14 @@ na_lg = ComplexHeatmap::Legend(
     na_col = "grey65",
     cell_fun = function(j, i, x, y, width, height, fill) {
       val = mat[i, j]
-      if (!is.na(val)) grid::grid.text(as.character(val), x, y,
-                                       gp = grid::gpar(fontsize = 11, col = "black"))
+      if (!is.na(val)) {
+        grid::grid.text(as.character(val), x, y,
+                        gp = grid::gpar(fontsize = 11, col = "black"))
+        if (isTRUE(sig_mat[i, j])) {
+          grid::grid.rect(x, y, width, height,
+                          gp = grid::gpar(col = "black", fill = NA, lwd = 2))
+        }
+      }
     },
     top_annotation = col_anno_sub,
     left_annotation = row_anno,
@@ -321,10 +367,10 @@ muscle_cols = n_cols[!grepl("during|post_10_min", n_cols)]
 muscle_df = named_features_with_n %>% dplyr::filter(tissue == "muscle")
 blood_adi_df = named_features_with_n %>% dplyr::filter(tissue %in% c("blood", "adipose"))
 
-ht_muscle = .make_ht(muscle_df, use_cols = muscle_cols)
-ht_blood_adi = .make_ht(blood_adi_df)
+ht_muscle = .make_ht(muscle_df, use_cols = muscle_cols, sig_df = sig_wide)
+ht_blood_adi = .make_ht(blood_adi_df, sig_df = sig_wide)
 
-png("n_named_features_muscle.png", width = 14, height = 14, units = "in", res = 150)
+png("outputs/n_named_features_muscle.png", width = 14, height = 14, units = "in", res = 150)
 ComplexHeatmap::draw(
   ht_muscle,
   heatmap_legend_list = list(pct_lg, assay_lg, tissue_lg, na_lg),
@@ -333,7 +379,9 @@ ComplexHeatmap::draw(
 )
 dev.off()
 
-png("n_named_features_blood_adipose.png", width = 14, height = 14, units = "in", res = 150)
+#we split this into 2 because the figure would be too large otherwise and the text would be unreadable. 
+
+png("outputs/n_named_features_blood_adipose.png", width = 14, height = 14, units = "in", res = 150)
 ComplexHeatmap::draw(
   ht_blood_adi,
   heatmap_legend_list = list(pct_lg, assay_lg, tissue_lg, na_lg),
@@ -341,4 +389,109 @@ ComplexHeatmap::draw(
   heatmap_legend_side = "left"
 )
 dev.off()
+```
+
+
+## Sample Count Distributions
+
+Distribution of observed sample counts for SCION-imputed features (muscle phosphoproteomics).
+```{r, eval = FALSE, fig.width = 8, fig.height = 5}
+imputed_data = MotrpacHumanPreSuspensionData::load_qc(selected_tissues = "muscle", selected_omes = "prot-ph")
+imputed_features = rownames(imputed_data$muscle$`prot-ph`$qc_imputed)
+imputed_group_stats = all_group_stats %>% filter(
+  feature_id %in% imputed_features,
+  tissue == "muscle"
+)
+plot_group_stats_histogram(
+  imputed_group_stats,
+  title = "Distribution of observed sample counts for SCION-imputed features",
+  subtitle = "Muscle phosphoproteomics (prot-ph); each observation is one feature × group × timepoint"
+)
+ggsave("outputs/scion_imputation_n_histogram.png", width = 8, height = 5, units = "in", dpi = 600)
+```
+
+Distribution of observed sample counts across all proteomic and phosphoproteomic features, faceted by tissue × assay.
+```{r, eval = TRUE, fig.width = 12, fig.height = 8}
+prot_group_stats = all_group_stats %>% filter(ome %in% c("prot-pr", "prot-ph"))
+plot_group_stats_histogram(
+  prot_group_stats,
+  title = "Distribution of observed sample counts across all (phospho)proteomic features. N<3 are removed from further analysis",
+  subtitle = "Each panel is one tissue × assay combination; each observation is one feature × group × timepoint",
+  vline = 3,
+  facet_vars = vars(tissue, ome)
+)
+ggsave("outputs/all_prot_n_histogram.png", width = 12, height = 8, units = "in", dpi = 600)
+```
+
+Slight modification to this figure. We want stacked barcharts for sig features and non-sig. features. 
+
+For a feature to be considered "significant" we include any comparison involved in the exercise delta-delta comparison. This means, for example, for a comparison of PGC1a at resistance at 3.5 hr, the RE group at 3.5 hour, the RE pre-exercise group, and 
+
+We include both `exericse_with_controls` and `Endur_vs_Resist`
+
+```{r, include = FALSE}
+significant_prot_pr_ph_features = load_differential_analysis(
+  selected_omes = c("prot-pr", "prot-ph"),
+  selected_tissues = "all",
+  single_matrix = TRUE
+) %>%
+  dplyr::filter(contrast_type %in% c("exercise_with_controls", "Endur_vs_Resist"),
+                adj_p_value < 0.05) %>%
+  dplyr::select(feature_id, tissue, assay, contrast) %>%
+  dplyr::distinct() %>%
+  dplyr::mutate(
+    terms = stringr::str_extract_all(
+      gsub("group_timepoint", "", contrast),
+      "ADU[A-Za-z]+\\.[\\w\\.]+"
+    )
+  ) %>%
+  tidyr::unnest(terms) %>%
+  dplyr::group_by(feature_id, tissue, assay, contrast) %>%
+  dplyr::mutate(
+    randomGroupCode = stringr::str_split_fixed(terms, "\\.", 2)[, 1],
+    Timepoint = stringr::str_split_fixed(terms, "\\.", 2)[, 2]
+  ) %>%
+  dplyr::ungroup() %>%
+  dplyr::rename(ome = assay) %>%
+  dplyr::select(feature_id, tissue, ome, randomGroupCode, Timepoint) %>%
+  dplyr::distinct()
+
+sig_prot_pr_ph_stats = all_group_stats %>%
+  dplyr::semi_join(significant_prot_pr_ph_features,
+                   by = c("feature_id", "tissue", "ome", "randomGroupCode", "Timepoint"))
+
+non_sig_prot_pr_ph_stats = all_group_stats %>%
+  dplyr::anti_join(significant_prot_pr_ph_features,
+                   by = c("feature_id", "tissue", "ome", "randomGroupCode", "Timepoint"))
+```
+
+```{r, eval = TRUE, fig.width = 12, fig.height = 8}
+plot_sig_nonsig_histogram(
+  sig_prot_pr_ph_stats,
+  non_sig_prot_pr_ph_stats,
+  title = "Observed sample counts for significant vs. non-significant (phospho)proteomic features",
+  subtitle = "Each panel is one tissue × assay; each observation is one feature × group × timepoint",
+  vline = 3
+)
+ggsave("outputs/sig_nonsig_prot_n_histogram.png", width = 12, height = 8, units = "in", dpi = 600)
+```
+
+Same figure restricted to the specifically named features in the manuscript, across all omes.
+```{r, eval = TRUE, fig.width = 14, fig.height = 10}
+group_recode = c(Control = "ADU_CON", Endur = "ADU_EE", Resist = "ADU_RE")
+named_features_long = named_features_with_n %>%
+  tidyr::pivot_longer(
+    cols = matches("^(Control|Endur|Resist)_"),
+    names_to = c("Group", "Timepoint"),
+    names_pattern = "^(Control|Endur|Resist)_(.*)",
+    values_to = "Count"
+  ) %>%
+  mutate(randomGroupCode = group_recode[Group]) %>%
+  filter(!is.na(Count))
+plot_ome_stats_histogram(
+  named_features_long,
+  title = "Distribution of observed sample counts for features highlighted in the manuscript",
+  subtitle = "Each color is one assay; each observation is one feature × group × timepoint"
+)
+ggsave("outputs/named_all_omes_n_histogram.png", width = 10, height = 5, units = "in", dpi = 600)
 ```

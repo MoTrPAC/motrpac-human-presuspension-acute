@@ -10,6 +10,10 @@ library(MotrpacHumanPreSuspensionAnalysis)
 library(MotrpacHumanPreSuspensionData)
 library(dplyr)
 library(ggplot2)
+library(tidyr)
+library(patchwork)
+library(tibble)
+library(biomaRt)
 
 source(here::here("revisions/landscape/sex_sensitivity_analysis/sex_sensitivity_helpers.R"))
 ```
@@ -20,7 +24,7 @@ The cohort is 72% female, yet the manuscript fails to analyze whether molecular 
 
 ## Draft Reviewer Response
 
-We thank the reviewer for raising this important point. We acknowledge that the cohort composition (72% female) warrants careful consideration of potential sex-specific effects on the molecular responses we report. In our primary analysis, sex was included as a covariate, which accounts for baseline sex differences across the full dataset but does not directly test whether the exercise-induced response differs between males and females. To address this concern, we performed a supplementary sex-stratified sensitivity analysis in which we estimated exercise-induced log fold-changes separately for male and female participants across each group-timepoint combination. This analysis was restricted to tissue-assay platforms where at least three participants of each sex were present in every group-timepoint cell, to ensure estimates were not unduly driven by individual observations. This limits our sensitivity analysis to metabolomics and transcriptomics for every tissue. 
+We thank the reviewer for raising this important point. We acknowledge that the cohort composition (72% female) warrants careful consideration of potential sex-specific effects on the molecular responses we report. In our primary analysis, sex was included as a covariate, which does not directly test whether the exercise-induced response differs between males and females. To address this concern, we performed a supplementary sex-stratified sensitivity analysis in which we estimated exercise-induced log fold-changes in male and female group-timepoint combinations. This analysis was restricted to tissue-assay platforms where at least three participants of each sex were present in every group-timepoint cell, to ensure estimates were not unduly driven by individual observations. This limits our sensitivity analysis to metabolomics and transcriptomics for every tissue. 
 
 For the specific molecular features highlighted in the manuscript — including key transcripts (e.g., NR4A1, PPARGC1A, MYC, FOXO1/3) and metabolites (e.g., lactate, leucine, isoleucine, glutamic acid) — the direction and approximate magnitude of exercise-induced change were consistent between male and female participants, supporting the generalizability of our primary findings. We note that the reduced per-sex sample sizes yield wider confidence intervals and lower statistical power than the full-cohort analysis, so this sex-stratified analysis should be interpreted as descriptive and hypothesis-generating rather than confirmatory. We have added a dedicated section to the manuscript describing this analysis and its limitations, and have updated the limitations section to explicitly discuss the unbalanced sex composition of the cohort.
 
@@ -40,6 +44,8 @@ Therefore, I am proposing we describe these to reviewers + clarify that any resu
 The sex-based differential analysis is described in `MotrpacHumanPreSuspensionAnalysis/data-raw/generate_differential_analysis.R`. Because there are many more parameters to estimate, I am no longer adjusting for initial clinical site, bc the model matrix will not be full rank. 
 
 ### What does the data look like in the first place?
+
+Let's start by visualizing the distribution of Male vs Female participants per group and timepoint first. 
 
 So I'm going to start with the same initial filtering criteria we use in the landscape. Each cell must have at least 3 observations, e.g. every sex-group-timepoint must have 3 male participants + 3 female. 
 
@@ -80,7 +86,9 @@ qc_norm_counts = lapply(seq_len(nrow(samples_per_plat)), function(row) {
     )
 }) %>%
   dplyr::bind_rows() %>%
-  dplyr::select(tissue, assay, randomGroupCode, Sex, Timepoint, n, vialLabels)
+  dplyr::select(tissue, assay, randomGroupCode, Sex, Timepoint, n, vialLabels) %>%
+  dplyr::filter(!grepl("metab", assay) | assay == "metab-u-hilicpos") 
+
 
 qualifying_omes_tissues = qc_norm_counts %>%
   dplyr::filter(randomGroupCode != "ADUControl") %>%
@@ -90,18 +98,113 @@ qualifying_omes_tissues = qc_norm_counts %>%
   dplyr::distinct(tissue, assay)
 ```
 
+## Discusison for metab platform to include. 
 
-If we don't include controls - see filter just above. we CAN do adipose. If we require >3 for EVERY cell, this limits our conclusions that we can make. 
+Because there are multiple metabolomics platforms, I choose to visualize just Hilic Positive, although the metab platforms generally are very similar in terms of n. 
 
-```{r}
-qualifying_omes_tissues %>%
-  dplyr::mutate(assay = dplyr::case_when(
-    grepl("metab", assay) ~ "metab",
-    TRUE ~ assay
-  )) %>%
-  dplyr::distinct()
+
+# Sex Distribution by Timepoint and Group
+
+Visualize # of participants per sex-group-timepoint. 
+
+
+```{r, include = FALSE}
+timepoint_short = c(
+  "pre_exercise"      = "Pre",
+  "during_20_min"     = "D20",
+  "during_40_min"     = "D40",
+  "post_10_min"       = "P10",
+  "post_15_30_45_min" = "P1545",
+  "post_3.5_4_hr"     = "P35",
+  "post_24_hr"        = "P24"
+)
+
+group_colors = c(EE = "#d95f02", RE = "#1b9e77", CON = "#7570b3")
+sex_colors   = c(Female = "#E87461", Male = "#5B9BD5")
+
+sex_dist_plot = qc_norm_counts %>%
+  dplyr::mutate(
+    Group = dplyr::recode(randomGroupCode,
+                          "ADUEndur" = "EE", "ADUResist" = "RE", "ADUControl" = "CON"),
+    Group = factor(Group, levels = c("EE", "RE", "CON")),
+    tp = dplyr::recode(as.character(Timepoint), !!!timepoint_short),
+    tp = factor(tp, levels = unname(timepoint_short)),
+    Ome = dplyr::case_when(
+      grepl("metab", assay)  ~ "Metabolomics",
+      assay == "prot-ph"     ~ "Phosphoproteomics",
+      assay %in% c("prot-pr", "prot-ol") ~ "Proteomics",
+      grepl("rna", assay)    ~ "Transcriptomics",
+      grepl("atac", assay)   ~ "ATAC",
+      grepl("methyl", assay) ~ "Methylation",
+      TRUE ~ assay
+    )
+  )
+
 ```
 
+```{r sex-dist-plot, fig.width = 14, fig.height = 5}
+ggplot(sex_dist_plot, aes(x = tp, y = n, fill = Sex)) +
+  geom_col(position = "dodge", color = "black", linewidth = 0.25, width = 0.75) +
+  geom_text(
+    aes(label = n),
+    position = position_dodge(width = 0.75),
+    vjust = -0.35,
+    size = 2.5
+  ) +
+  facet_grid(Ome ~ tissue + Group, scales = "free_y") +
+  scale_fill_manual(values = sex_colors) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.18))) +
+  labs(
+    x = "Timepoint", y = "N samples",
+    title = "Sample count by sex, tissue, exercise group, and timepoint"
+  ) +
+  theme_bw(base_size = 10) +
+  theme(
+    strip.text       = element_text(size = 7, face = "bold"),
+    axis.text.x      = element_text(size = 8, angle = 40, hjust = 1),
+    panel.grid.minor = element_blank(),
+    legend.position  = "bottom"
+  )
+```
+
+
+# Targeted Data Overview: Sample-Level PCA by Sex
+
+```{r pca-sex, fig.width = 14, fig.height = 5, message = FALSE, warning = FALSE}
+tp_levels = c("pre_exercise", "during_20_min", "during_40_min",
+              "post_10_min", "post_15_30_45_min", "post_3.5_4_hr", "post_24_hr")
+tp_colors_pca = MotrpacHumanPreSuspensionAnalysis::HUMAN_ACUTE_TIMEPOINT_COLORS
+tp_colors_pca = tp_colors_pca[tp_levels]
+
+pca_plots = list()
+
+for (i in seq_len(nrow(qualifying_omes_tissues))) {
+  tiss = qualifying_omes_tissues$tissue[i]
+  ome  = qualifying_omes_tissues$assay[i]
+  
+  ome_data = all_dataset[[tiss]][[ome]]
+  if (is.null(ome_data)) next
+  
+  p = make_pca_panel(tiss, ome, ome_data, tp_levels, tp_colors_pca)
+  if (!is.null(p)) {
+    if (is.null(pca_plots[[tiss]])) pca_plots[[tiss]] = list()
+    pca_plots[[tiss]][[ome]] = p
+  }
+}
+
+for (tiss in names(pca_plots)) {
+  panels = pca_plots[[tiss]]
+  print(
+    patchwork::wrap_plots(panels, ncol = min(5, length(panels))) +
+      patchwork::plot_layout(guides = "collect") +
+      patchwork::plot_annotation(
+        title = tiss,
+        theme = theme(plot.title = element_text(size = 12, face = "bold"))
+      ) &
+      theme(legend.position = "bottom")
+  )
+}
+```
 
 ```{r, include = FALSE}
 config = jsonlite::fromJSON("~/config.json")
@@ -119,79 +222,13 @@ read_sex_diff = lapply(sex_differential_analysis, function(f) {
     dplyr::mutate(tissue = tissue)
 }) %>%
   dplyr::bind_rows()
-```
-
-```{r, fig.width = 14, fig.height = 3}
-direct_m_vs_f = read_sex_diff %>%
-  dplyr::filter((grepl("Male", contrast) & grepl("Female", contrast)))
-
-plot_mvsf_da_matrix(direct_m_vs_f)
-```
-
-**Note:** The lower % of DA features relative to the main analysis is also relfecting reduced statistical power due to lower n and ability to estimate proper point estimates of sex-group-timepoint. 
-
-Also notably: One change that I made for some iterations of the figures is that I no longer plot the "overall" logFC for two main reasons
-1. We don't include all of the same covariates in the sex-stratified analysis as the "overall" model. 
-
-```{r, include = FALSE}
-sex_direct_da_annotated = direct_m_vs_f %>%
-  dplyr::mutate(contrast_short = gsub("sex_group_timepoint|[()|]", "", contrast),
-                contrast_left = stringr::str_split_fixed(contrast_short, " - ", 2)[,1],
-                randomGroupCode = stringr::str_split_fixed(contrast_left, "\\.", 3)[,2],
-                Timepoint = sub("^[^.]+\\.[^.]+\\.", "", contrast_left)) %>%
-  dplyr::select(-contrast_left) %>%
-  dplyr::mutate(Timepoint = factor(Timepoint,
-                                   levels = c("pre_exercise",
-                                              "during_20_min",
-                                              "during_40_min",
-                                              "post_10_min",
-                                              "post_15_30_45_min",
-                                              "post_3.5_4_hr",
-                                              "post_24_hr"))) %>%
-  dplyr::rename(platform = assay) %>%
-  dplyr::mutate(assay = ifelse(grepl("metab", platform), "metab", platform)) %>%
-  dplyr::select(tissue, assay, platform, feature_id, logFC, CI.L, CI.R, adj_p_value, randomGroupCode, Timepoint)
 
 precawg_analysis = load_differential_analysis(single_matrix = TRUE) %>%
   dplyr::filter(contrast_type == "exercise_with_controls") %>%
   dplyr::select(tissue, assay, feature_id, logFC, CI.L, CI.R, adj_p_value, randomGroupCode, Timepoint)
 
-precawg_and_m_vs_f_diff = precawg_analysis %>%
-  right_join(sex_direct_da_annotated,
-             by = c("tissue", "assay", "feature_id", "randomGroupCode", "Timepoint"),
-             suffix = c("_precawg", "_sex_diff")) 
-```
+# this is the set of plots where I visualize the log FC for male and female participants separately. Not including the direct comparison of male and female exercise group changes. 
 
-
-```{r, fig.width=10, fig.height=4}
-plot_precawg_mvsf_matrix(precawg_and_m_vs_f_diff)
-```
-
-
-There is a distinct difference in the Male and Female blood RE, especially at 3.5
-```{r}
-annotated_differences = precawg_and_m_vs_f_diff %>% 
-    left_join(HUMAN_FEATURE_TO_GENE %>% filter(assay == "transcript-rna-seq"), by = c("feature_id", "assay")) 
-
-sig_differences = annotated_differences %>%
-  dplyr::filter(Timepoint == "post_3.5_4_hr",
-                randomGroupCode == "ADUResist",
-                assay == "transcript-rna-seq",
-                tissue == "blood",
-                adj_p_value_precawg < 0.05 & adj_p_value_sex_diff < 0.05)
-write.csv(sig_differences, "outputs/sig_differences_blood_RE_P35_rna.csv", row.names = FALSE)
-
-all_blood_transcripts = unique(annotated_differences %>% dplyr::filter(assay == "transcript-rna-seq", tissue == "blood") %>% pull(gene_symbol)) %>% as.character()
-
-ora_results = run_ORA(
-  input = sig_differences$gene_symbol %>% as.character(),
-  background = all_blood_transcripts
-)
-write.csv(ora_results, "outputs/ora_blood_RE_P35_rna.csv", row.names = FALSE)
-ora_results %>% dplyr::filter(collection != "CELLMARKER") %>% select(set_short, adj_p_value) %>% head(20)
-```
-
-```{r, include = FALSE}
 sex_single_da_annotated = read_sex_diff %>%
   dplyr::filter(!(grepl("Male", contrast) & grepl("Female", contrast))) %>%
   dplyr::mutate(contrast_short = gsub("sex_group_timepoint|[()|]", "", contrast),
@@ -210,17 +247,157 @@ sex_single_da_annotated = read_sex_diff %>%
                                               "post_24_hr"))) %>%
   dplyr::rename(platform = assay) %>%
   dplyr::mutate(assay = ifelse(grepl("metab", platform), "metab", platform)) %>%
-  dplyr::select(tissue, assay, platform, feature_id, logFC, CI.L, CI.R, adj_p_value, sex_comparison, randomGroupCode, Timepoint)
-
-precawg_and_sex_diff = precawg_analysis %>%
-  right_join(sex_single_da_annotated,
-             by = c("tissue", "assay", "feature_id", "randomGroupCode", "Timepoint"),
-             suffix = c("_precawg", "_sex_diff")) 
+  dplyr::select(tissue, assay, platform, feature_id, logFC, CI.L, CI.R, adj_p_value, sex_comparison, randomGroupCode, Timepoint) %>%
+  dplyr::left_join(
+    precawg_analysis %>% dplyr::select(tissue, feature_id, Timepoint, randomGroupCode, pre_cawg_adj_p = adj_p_value),
+    by = c("tissue", "Timepoint", "randomGroupCode", "feature_id")
+  )
 ```
+
+# Male vs. Female logFC Scatter
+
+Per-facet correlation using significant features only, computed per Group × Timepoint.
+Note: correlations are of logFC point estimates (exercise vs. pre-exercise) restricted
+to EE and RE; control-group comparisons are excluded given the low per-sex n in controls
+makes those point estimates unreliable.
+
+```{r scatter-prep}
+scatter_wide = sex_single_da_annotated %>%
+  dplyr::select(tissue, assay, platform, feature_id, randomGroupCode, Timepoint,
+                sex_comparison, logFC, CI.L, CI.R, adj_p_value, pre_cawg_adj_p) %>%
+  tidyr::pivot_wider(
+    names_from  = sex_comparison,
+    values_from = c(logFC, CI.L, CI.R, adj_p_value)
+  ) %>%
+  dplyr::filter(!is.na(logFC_Male), !is.na(logFC_Female)) %>%
+  dplyr::mutate(
+    Ome = dplyr::case_when(
+      grepl("metab", assay)              ~ "Metabolomics",
+      assay == "prot-ph"                 ~ "Phosphoproteomics",
+      assay %in% c("prot-pr", "prot-ol") ~ "Proteomics",
+      grepl("rna",  assay)               ~ "Transcriptomics",
+      TRUE ~ assay
+    ),
+    Ome = factor(Ome, levels = c("Transcriptomics", "Proteomics",
+                                 "Phosphoproteomics", "Metabolomics")),
+    Group = dplyr::recode(randomGroupCode,
+                          "ADUEndur" = "EE", "ADUResist" = "RE", "ADUControl" = "CON"),
+    Group = factor(Group, levels = c("EE", "RE", "CON"))
+  )
+
+scatter_cor = scatter_wide %>%
+  dplyr::filter(!is.na(pre_cawg_adj_p) & pre_cawg_adj_p < 0.05, Group != "CON") %>%
+  dplyr::group_by(Ome, tissue, Group, Timepoint) %>%
+  dplyr::summarise(
+    r = round(cor(logFC_Female, logFC_Male,
+                  method = "pearson", use = "complete.obs"), 3),
+    n_sig = dplyr::n(),
+    .groups = "drop"
+  )
+print(scatter_cor)
+```
+
+```{r scatter-plots, fig.width = 10, fig.height = 12}
+# One plot per tissue × ome, faceted by Timepoint × Group (EE/RE only).
+scatter_sig = scatter_wide %>%
+  dplyr::filter(!is.na(pre_cawg_adj_p) & pre_cawg_adj_p < 0.05, Group != "CON")
+
+tissue_ome_combos = scatter_sig %>%
+  dplyr::distinct(tissue, Ome) %>%
+  dplyr::arrange(tissue, Ome)
+
+for (i in seq_len(nrow(tissue_ome_combos))) {
+  tiss     = tissue_ome_combos$tissue[i]
+  ome_type = tissue_ome_combos$Ome[i]
+  p = .make_sex_scatter(tiss, ome_type, scatter_sig, scatter_cor)
+  if (!is.null(p)) print(p)
+}
+```
+
+---
+
+```{r, include = FALSE}
+sex_direct_da_annotated = read_sex_diff %>%
+  dplyr::filter((grepl("Male", contrast) & grepl("Female", contrast))) %>%
+  dplyr::mutate(contrast_short = gsub("sex_group_timepoint|[()|]", "", contrast),
+                contrast_left = stringr::str_split_fixed(contrast_short, " - ", 2)[,1],
+                randomGroupCode = stringr::str_split_fixed(contrast_left, "\\.", 3)[,2],
+                Timepoint = sub("^[^.]+\\.[^.]+\\.", "", contrast_left)) %>%
+  dplyr::select(-contrast_left) %>%
+  dplyr::mutate(Timepoint = factor(Timepoint,
+                                   levels = c("pre_exercise",
+                                              "during_20_min",
+                                              "during_40_min",
+                                              "post_10_min",
+                                              "post_15_30_45_min",
+                                              "post_3.5_4_hr",
+                                              "post_24_hr"))) %>%
+  dplyr::rename(platform = assay) %>%
+  dplyr::mutate(assay = ifelse(grepl("metab", platform), "metab", platform)) %>%
+  dplyr::select(tissue, assay, platform, feature_id, logFC, CI.L, CI.R, adj_p_value, randomGroupCode, Timepoint)
+#precawg_analysis is the direct load_da call above. 
+precawg_and_m_vs_f_diff = precawg_analysis %>%
+  dplyr::right_join(sex_direct_da_annotated,
+                    by = c("tissue", "assay", "feature_id", "randomGroupCode", "Timepoint"),
+                    suffix = c("_precawg", "_sex_diff")) 
+```
+
+
+```{r, fig.width=10, fig.height=4}
+plot_precawg_mvsf_matrix(precawg_and_m_vs_f_diff)
+```
+
+There is a distinct difference in the Male and Female blood RE, especially at 3.5 - So what's going on there? The correlation above for that timepoint looks like it's very high, so why are there so many significant M vs F features at that timepoint? 
+
+```{r blood-re-p35-scatter, fig.width = 6, fig.height = 5}
+highlight_ids = precawg_and_m_vs_f_diff %>%
+  dplyr::filter(tissue == "blood",
+                randomGroupCode == "ADUResist",
+                Timepoint == "post_3.5_4_hr",
+                adj_p_value_sex_diff < 0.05) %>%
+  dplyr::pull(feature_id)
+
+blood_re_p35 = scatter_wide %>%
+  dplyr::filter(tissue == "blood",
+                Group == "RE",
+                Timepoint == "post_3.5_4_hr",
+                pre_cawg_adj_p < 0.05)
+
+blood_re_p35_cor = scatter_cor %>%
+  dplyr::filter(tissue == "blood", Group == "RE", Timepoint == "post_3.5_4_hr")
+
+p = .make_sex_scatter("blood", "Transcriptomics", blood_re_p35, blood_re_p35_cor,
+                      highlight_ids = highlight_ids)
+if (!is.null(p)) print(p)
+```
+
+```{r}
+annotated_differences = precawg_and_m_vs_f_diff %>% 
+  left_join(HUMAN_FEATURE_TO_GENE %>% filter(assay == "transcript-rna-seq"), by = c("feature_id", "assay")) 
+
+sig_differences = annotated_differences %>%
+  dplyr::filter(Timepoint == "post_3.5_4_hr",
+                randomGroupCode == "ADUResist",
+                assay == "transcript-rna-seq",
+                tissue == "blood",
+                adj_p_value_precawg < 0.05 & adj_p_value_sex_diff < 0.05)
+write.csv(sig_differences, "outputs/sig_differences_blood_RE_P35_rna.csv", row.names = FALSE)
+
+all_blood_transcripts = unique(annotated_differences %>% dplyr::filter(assay == "transcript-rna-seq", tissue == "blood") %>% pull(gene_symbol)) %>% as.character()
+
+ora_results = run_ORA(
+  input = sig_differences$gene_symbol %>% as.character(),
+  background = all_blood_transcripts
+)
+write.csv(ora_results, "outputs/ora_blood_RE_P35_rna.csv", row.names = FALSE)
+ora_results %>% dplyr::filter(collection != "CELLMARKER") %>% dplyr::select(set_short, adj_p_value) %>% head(20)
+```
+
+
 
 # Transcripts included in PreCAWG Analysis
 
-Essentially trying to answer - are we ignoring sexual dimorophism and actually only showing off results that correspond to the female phenotype
+Essentially trying to answer - are we ignoring sexual dimorphism and actually only showing off results that correspond to the female phenotype
 
 ```{r, results = "asis"}
 manuscript_transcripts = c("NR4A1", "PPARGC1A", "MYC", "CCN1", "FOXO1", "FOXO3")
@@ -265,29 +442,73 @@ for (feat in manuscript_metabs) {
 ```
 
 
-## Top M vs F DA features
+# X/Y Linked Features
 
-**Disclaimer:** Features shown here are ranked by their minimum adjusted p-value across all group-timepoint combinations, meaning a feature qualifies as "top" if it is significantly male-vs-female differential at **any single timepoint**. This does not imply that the feature shows a consistently large or significant male-vs-female difference across the entire time series — the remaining timepoints may show similar responses in both sexes. 
+Identify features mapped to chromosomes X or Y in the sex DA. 
 
-```{r, include = FALSE}
-top_mvsf_features = direct_m_vs_f %>%
-  dplyr::group_by(feature_id) %>%
-  dplyr::slice_min(adj_p_value, n = 1, with_ties = FALSE) %>%
-  dplyr::ungroup() %>%
-  dplyr::filter(adj_p_value < 0.05) %>%
-  dplyr::arrange(adj_p_value)
+```{r xy-annotation, message = FALSE, warning = FALSE}
+# Get chromosome annotations for all RNA-seq features in the sex DA
+rna_features = read_sex_diff %>%
+  dplyr::filter(grepl("rna", assay)) %>%
+  dplyr::distinct(feature_id)
+
+# Join gene symbols via HUMAN_FEATURE_TO_GENE
+rna_gene_map = HUMAN_FEATURE_TO_GENE %>%
+  dplyr::filter(assay == "transcript-rna-seq") %>%
+  dplyr::select(feature_id, gene_symbol) %>%
+  dplyr::distinct()
+
+rna_features = rna_features %>%
+  dplyr::left_join(rna_gene_map, by = "feature_id")
+
+ensembl = tryCatch(
+  biomaRt::useEnsembl("ensembl", dataset = "hsapiens_gene_ensembl"),
+  error = function(e) {
+    message("biomaRt unavailable, skipping chromosome annotation: ", e$message)
+    NULL
+  }
+)
+
+chrom_annotation = NULL
+if (!is.null(ensembl)) {
+  chrom_annotation = biomaRt::getBM(
+    attributes = c("hgnc_symbol", "chromosome_name"),
+    filters    = "hgnc_symbol",
+    values     = rna_features$gene_symbol[!is.na(rna_features$gene_symbol)],
+    mart       = ensembl
+  ) %>%
+    dplyr::filter(chromosome_name %in% c(as.character(1:22), "X", "Y")) %>%
+    dplyr::distinct(hgnc_symbol, chromosome_name)
+}
 ```
 
-```{r, results = "asis"}
-for (feat in top_mvsf_features$feature_id[1:5]) {
-  tryCatch({
-    cat("\n\n###", feat, "\n\n")
-    print(sex_differences_single_feature(feat))
-    print(sex_differences_logfc_feature(feat))
-  }, error = function(e) {
-    message("Skipping ", feat, ": ", conditionMessage(e))
-  })
-}
+```{r xy-summary, eval = !is.null(chrom_annotation)}
+sex_diff_rna_chrom = precawg_and_m_vs_f_diff %>%
+  dplyr::filter(grepl("rna", assay)) %>%
+  dplyr::left_join(rna_gene_map, by = "feature_id") %>%
+  dplyr::left_join(chrom_annotation,
+                   by = c("gene_symbol" = "hgnc_symbol")) %>%
+  dplyr::mutate(
+    chrom_class = dplyr::case_when(
+      chromosome_name == "X"  ~ "chrX",
+      chromosome_name == "Y"  ~ "chrY",
+      !is.na(chromosome_name) ~ "Autosomal",
+      TRUE                    ~ "Unknown"
+    )
+  )
+
+# Proportion sig by chromosome class
+chrom_summary = sex_diff_rna_chrom %>%
+  dplyr::filter(chrom_class != "Unknown") %>%
+  dplyr::group_by(tissue, Timepoint, randomGroupCode, chrom_class) %>%
+  dplyr::summarise(
+    n_total    = dplyr::n(),
+    n_sig      = sum(adj_p_value_sex_diff < 0.05, na.rm = TRUE),
+    pct_sig    = round(100 * n_sig / n_total, 1),
+    .groups = "drop"
+  )
+print(chrom_summary)
+
 ```
 
 

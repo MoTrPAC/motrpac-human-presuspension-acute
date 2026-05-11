@@ -2,136 +2,6 @@
 # All output figures and files should be written to the outputs/ subdirectory.
 
 # ── Matrix plots ──────────────────────────────────────────────────────────────
-
-plot_mvsf_da_matrix = function(direct_m_vs_f) {
-
-  timepoint_short = c(
-    "pre_exercise" = "Pre",
-    "during_20_min" = "D20",
-    "during_40_min" = "D40",
-    "post_10_min" = "P10",
-    "post_15_30_45_min" = "P1545",
-    "post_3.5_4_hr" = "P35",
-    "post_24_hr" = "P24"
-  )
-
-  mvsf_annotated = direct_m_vs_f %>%
-    dplyr::mutate(
-      contrast_short = gsub("sex_group_timepoint|[()|]", "", contrast),
-      contrast_left = stringr::str_split_fixed(contrast_short, " - ", 2)[,1],
-      randomGroupCode = stringr::str_split_fixed(contrast_left, "\\.", 3)[,2],
-      Timepoint = sub("^[^.]+\\.[^.]+\\.", "", contrast_left),
-      Timepoint = dplyr::recode(Timepoint, !!!timepoint_short),
-      Timepoint = factor(Timepoint, levels = unname(timepoint_short))
-    ) %>%
-    dplyr::select(-contrast_left, -contrast_short)
-
-  mvsf_slice = mvsf_annotated %>%
-    dplyr::mutate(
-      Ome = dplyr::case_when(
-        assay %in% c("prot-ol", "prot-pr") ~ "Proteomics",
-        assay == "prot-ph" ~ "Phosphoproteomics",
-        grepl("metab", assay) ~ "Metabolomics",
-        grepl("rna", assay) ~ "Transcriptomics",
-        grepl("atac", assay) ~ "Chromatin Accessibility (ATAC)",
-        grepl("methyl", assay) ~ "Methylation",
-        TRUE ~ assay
-      ),
-      Ome = factor(Ome, levels = c("Chromatin Accessibility (ATAC)",
-                                   "Transcriptomics",
-                                   "Proteomics",
-                                   "Phosphoproteomics",
-                                   "Metabolomics",
-                                   "Methylation")),
-      Group = dplyr::recode(randomGroupCode,
-                            "ADUEndur" = "EE", "ADUResist" = "RE", "ADUControl" = "CON"),
-      Group = factor(Group, levels = c("EE", "RE", "CON"))
-    ) %>%
-    dplyr::group_by(Ome, tissue, Group, Timepoint) %>%
-    dplyr::summarize(
-      num_feat = dplyr::n(),
-      percent_sig_fdr = 100 * sum(adj_p_value < 0.05) / dplyr::n(),
-      num_sig_fdr005 = sum(adj_p_value < 0.05),
-      .groups = "drop"
-    )
-
-  col_order = expand.grid(
-    tissue = sort(unique(mvsf_slice$tissue)),
-    Timepoint = unname(timepoint_short),
-    Group = c("EE", "RE"),
-    stringsAsFactors = FALSE
-  ) %>%
-    dplyr::mutate(col = paste(Group, Timepoint, tissue, sep = "_")) %>%
-    dplyr::pull(col)
-
-  mvsf_perc = mvsf_slice %>%
-    dplyr::select(Ome, tissue, Timepoint, percent_sig_fdr, Group) %>%
-    tidyr::pivot_wider(values_from = percent_sig_fdr,
-                       names_from = c("Group", "Timepoint", "tissue")) %>%
-    dplyr::arrange(Ome) %>%
-    dplyr::select(Ome, dplyr::any_of(col_order)) %>%
-    tibble::column_to_rownames(var = "Ome") %>%
-    as.matrix()
-
-  mvsf_num = mvsf_slice %>%
-    dplyr::select(Ome, tissue, Timepoint, num_sig_fdr005, Group) %>%
-    tidyr::pivot_wider(values_from = num_sig_fdr005,
-                       names_from = c("Group", "Timepoint", "tissue")) %>%
-    dplyr::arrange(Ome) %>%
-    dplyr::select(Ome, dplyr::any_of(col_order)) %>%
-    tibble::column_to_rownames(var = "Ome") %>%
-    as.matrix()
-
-  tp_colors = MotrpacHumanPreSuspensionAnalysis::HUMAN_ACUTE_TIMEPOINT_COLORS
-  tp_colors = tp_colors[names(tp_colors) %in% names(timepoint_short)]
-  names(tp_colors) = timepoint_short[names(tp_colors)]
-
-  extra_Group_colors = c(EE = "#d95f02", RE = "#1b9e77", CON = "#7570b3")
-  ann_colors = list(
-    Tissue = MotrpacHumanPreSuspensionAnalysis::HUMAN_TISSUE_COLORS,
-    Group = extra_Group_colors,
-    Ome = MotrpacHumanPreSuspensionAnalysis::HUMAN_OME_COLORS,
-    Timepoint = tp_colors
-  )
-
-  annotation_data = rownames(mvsf_perc) %>%
-    as.data.frame() %>%
-    dplyr::rename(Ome = ".") %>%
-    dplyr::mutate(Ome = factor(Ome, levels = levels(mvsf_slice$Ome)))
-
-  annotation_col = colnames(mvsf_perc) %>%
-    as.data.frame() %>%
-    dplyr::rename(col = ".") %>%
-    tidyr::separate(col, into = c("Group", "Timepoint", "Tissue"), sep = "_") %>%
-    dplyr::mutate(Timepoint = factor(Timepoint, levels = unname(timepoint_short)))
-  rownames(annotation_col) = colnames(mvsf_perc)
-
-  n_ee_cols = sum(startsWith(colnames(mvsf_perc), "EE"))
-
-  ComplexHeatmap::pheatmap(
-    mvsf_perc,
-    heatmap_legend_param = list(title = "% features DA\n(Male vs Female)"),
-    border_color = "gray3",
-    scale = "none",
-    color = c("white", "#9e9ac8"),
-    cluster_cols = FALSE,
-    cluster_rows = FALSE,
-    annotation_row = annotation_data,
-    annotation_colors = ann_colors,
-    annotation_col = annotation_col,
-    show_rownames = FALSE,
-    show_colnames = FALSE,
-    annotation_names_col = FALSE,
-    display_numbers = as.matrix(mvsf_num),
-    number_color = "black",
-    fontsize_number = 15,
-    angle_col = "90",
-    gaps_col = n_ee_cols,
-    na_col = "white"
-  )
-}
-
-
 plot_precawg_mvsf_matrix = function(precawg_and_sex_diff) {
 
   timepoint_short = c(
@@ -723,4 +593,123 @@ forest_plot_sex_logfc = function(feature,
   }
 
   return(g)
+}
+
+
+# ── PCA panel ─────────────────────────────────────────────────────────────────
+
+make_pca_panel = function(tiss, ome, ome_data, tp_levels, tp_colors_pca) {
+  meta = ome_data[["sample_metadata"]] %>%
+    dplyr::mutate(vialLabel = as.character(vialLabel))
+  if (nrow(meta) < 6) return(NULL)
+
+  mat = ome_data[["qc_norm"]]
+  if (is.null(mat)) return(NULL)
+  mat = mat[, colnames(mat) %in% meta$vialLabel, drop = FALSE]
+  if (ncol(mat) < 6) return(NULL)
+
+  mat[!is.finite(as.matrix(mat))] = NA
+  mat = mat[rowSums(is.na(mat)) == 0, , drop = FALSE]
+  if (nrow(mat) < 10 || ncol(mat) < 5) return(NULL)
+
+  pca_res = prcomp(t(mat), scale = TRUE, center = TRUE)
+  pct_var = pca_res$sdev^2 / sum(pca_res$sdev^2) * 100
+
+  pca_df = as.data.frame(pca_res$x[, 1:2]) %>%
+    tibble::rownames_to_column("vialLabel") %>%
+    dplyr::left_join(
+      meta %>% dplyr::select(vialLabel, Sex, randomGroupCode, Timepoint),
+      by = "vialLabel"
+    ) %>%
+    dplyr::mutate(
+      Group = dplyr::recode(randomGroupCode,
+                            "ADUEndur" = "EE", "ADUResist" = "RE", "ADUControl" = "CON"),
+      Timepoint = factor(Timepoint, levels = tp_levels)
+    )
+
+  ome_label = dplyr::case_when(
+    grepl("metab", ome)              ~ "Metab",
+    ome == "prot-ph"                 ~ "Phos",
+    ome %in% c("prot-pr", "prot-ol") ~ "Prot",
+    grepl("rna", ome)                ~ "RNA",
+    grepl("atac", ome)               ~ "ATAC",
+    grepl("methyl", ome)             ~ "Methyl",
+    TRUE                             ~ ome
+  )
+
+  ggplot(pca_df, aes(x = PC1, y = PC2, color = Timepoint, shape = Group)) +
+    geom_point(size = 2.8, alpha = 0.85) +
+    stat_ellipse(
+      aes(x = PC1, y = PC2, group = Sex, linetype = Sex),
+      inherit.aes = FALSE,
+      type = "norm",
+      linewidth = 0.7,
+      color = "black"
+    ) +
+    scale_color_manual(values = tp_colors_pca, drop = FALSE, name = "Timepoint") +
+    scale_shape_manual(values = c(EE = 16, RE = 17, CON = 15), name = "Group") +
+    scale_linetype_manual(values = c(Female = "solid", Male = "dashed"), name = "Sex (ellipse)") +
+    labs(
+      title = ome_label,
+      x = paste0("PC1 (", round(pct_var[1], 1), "%)"),
+      y = paste0("PC2 (", round(pct_var[2], 1), "%)")
+    ) +
+    theme_bw(base_size = 10) +
+    theme(
+      panel.grid.minor = element_blank(),
+      plot.title       = element_text(size = 9, face = "bold")
+    )
+}
+
+
+# ── Sex scatter ───────────────────────────────────────────────────────────────
+
+.make_sex_scatter = function(tiss, ome_type, data, cor_df, highlight_ids = NULL) {
+  df = data %>% dplyr::filter(tissue == tiss, Ome == ome_type)
+  if (nrow(df) == 0) return(NULL)
+
+  cor_sub = cor_df %>% dplyr::filter(tissue == tiss, Ome == ome_type)
+
+  lim = max(abs(c(df$logFC_Female, df$logFC_Male)), na.rm = TRUE) * 1.05
+
+  df = df %>%
+    dplyr::mutate(highlight = !is.null(highlight_ids) & feature_id %in% highlight_ids)
+
+  ggplot(df, aes(x = logFC_Female, y = logFC_Male)) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "grey50", linewidth = 0.4) +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "grey50", linewidth = 0.4) +
+    geom_abline(slope = 1, intercept = 0, linetype = "dotted",
+                color = "grey30", linewidth = 0.5) +
+    geom_errorbar(
+      aes(ymin = CI.L_Male, ymax = CI.R_Male),
+      width = 0, alpha = 0.3, linewidth = 0.35, color = "grey40"
+    ) +
+    geom_errorbarh(
+      aes(xmin = CI.L_Female, xmax = CI.R_Female),
+      height = 0, alpha = 0.3, linewidth = 0.35, color = "grey40"
+    ) +
+    geom_smooth(method = "lm", se = FALSE, color = "steelblue", linewidth = 0.7) +
+    geom_point(data = ~ dplyr::filter(.x, !highlight), alpha = 0.8, size = 1.5, color = "grey30") +
+    geom_point(data = ~ dplyr::filter(.x, highlight), alpha = 0.9, size = 1.5, color = "yellow") +
+    geom_text(
+      data = cor_sub,
+      aes(label = paste0("r=", r, " (n=", n_sig, ")")),
+      x = -Inf, y = Inf,
+      hjust = -0.05, vjust = 1.4,
+      size = 2.8, fontface = "italic",
+      inherit.aes = FALSE
+    ) +
+    coord_fixed(ratio = 1, xlim = c(-lim, lim), ylim = c(-lim, lim)) +
+    facet_grid(Timepoint ~ Group) +
+    labs(
+      title = paste0(tiss, " — ", ome_type),
+      x     = "logFC (Female participants)",
+      y     = "logFC (Male participants)"
+    ) +
+    theme_bw(base_size = 11) +
+    theme(
+      panel.grid.minor = element_blank(),
+      strip.text       = element_text(size = 9, face = "bold"),
+      legend.position  = "bottom"
+    )
 }

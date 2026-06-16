@@ -14,6 +14,7 @@ library(tidyr)
 library(patchwork)
 library(tibble)
 library(biomaRt)
+library(here)
 
 source(here::here("revisions/landscape/sex_sensitivity_analysis/sex_sensitivity_helpers.R"))
 ```
@@ -211,6 +212,8 @@ config = jsonlite::fromJSON("~/config.json")
 repo_local_dir = config$precovid_repo_path
 sex_differential_analysis = list.files(file.path(repo_local_dir, "data", "tmp", "freeze_DA"),
                                        full.names = TRUE)
+sex_differential_analysis = sex_differential_analysis[grep(".txt", sex_differential_analysis)]
+
 
 read_sex_diff = lapply(sex_differential_analysis, function(f) {
   tissue = dplyr::case_when(
@@ -285,16 +288,57 @@ scatter_wide = sex_single_da_annotated %>%
     Group = factor(Group, levels = c("EE", "RE", "CON"))
   )
 
-scatter_cor = scatter_wide %>%
-  dplyr::filter(!is.na(pre_cawg_adj_p) & pre_cawg_adj_p < 0.05, Group != "CON") %>%
+scatter_sig_features = scatter_wide %>%
+  dplyr::filter(!is.na(pre_cawg_adj_p) & pre_cawg_adj_p < 0.05, Group != "CON")
+
+scatter_cor = scatter_sig_features %>%
   dplyr::group_by(Ome, tissue, Group, Timepoint) %>%
   dplyr::summarise(
-    r = round(cor(logFC_Female, logFC_Male,
-                  method = "pearson", use = "complete.obs"), 3),
     n_sig = dplyr::n(),
+    Pearsons_R = round(cor(logFC_Female, logFC_Male, method = "pearson", use = "complete.obs"), 3),
+    slope = {
+      complete = !is.na(logFC_Female) & !is.na(logFC_Male)
+      if (sum(complete) >= 2) coef(lm(logFC_Male[complete] ~ logFC_Female[complete]))[2] else NA_real_
+    },
+    intercept = {
+      complete = !is.na(logFC_Female) & !is.na(logFC_Male)
+      if (sum(complete) >= 2) coef(lm(logFC_Male[complete] ~ logFC_Female[complete]))[1] else NA_real_
+    },
     .groups = "drop"
+  ) %>%
+  dplyr::mutate(dplyr::across(c(Ome, tissue, Group, Timepoint), as.character))
+
+# Overall correlation pooling all significant features across every tissue,
+# ome, group, and timepoint included in the DA.
+overall_cor = scatter_sig_features %>%
+  dplyr::summarise(
+    Ome = "All", tissue = "All", Group = "All", Timepoint = "All",
+    n_sig = dplyr::n(),
+    Pearsons_R = round(cor(logFC_Female, logFC_Male, method = "pearson", use = "complete.obs"), 3),
+    slope = {
+      complete = !is.na(logFC_Female) & !is.na(logFC_Male)
+      if (sum(complete) >= 2) coef(lm(logFC_Male[complete] ~ logFC_Female[complete]))[2] else NA_real_
+    },
+    intercept = {
+      complete = !is.na(logFC_Female) & !is.na(logFC_Male)
+      if (sum(complete) >= 2) coef(lm(logFC_Male[complete] ~ logFC_Female[complete]))[1] else NA_real_
+    }
   )
-print(scatter_cor)
+
+scatter_cor = dplyr::bind_rows(scatter_cor, overall_cor)
+
+knitr::kable(
+  dplyr::bind_rows(
+    scatter_cor %>%
+      dplyr::filter(tissue != "All", n_sig > 100) %>%
+      dplyr::arrange(tissue, Ome, Group, Timepoint),
+    scatter_cor %>% dplyr::filter(tissue == "All")
+  ),
+  digits = 3,
+  col.names = c("Ome", "Tissue", "Group", "Timepoint", "N sig", "Pearson's R", "Slope", "Intercept"),
+  caption = "Male vs Female logFC correlations (significant preCAWG features, n > 100; final row is the overall correlation across all tissues and omes)"
+)
+write.csv(scatter_cor, here::here("revisions/landscape/sex_sensitivity_analysis/outputs/m_vs_f_response_correlation.csv"), row.names = FALSE)
 ```
 
 ```{r scatter-plots, fig.width = 10, fig.height = 12}
@@ -344,35 +388,78 @@ precawg_and_m_vs_f_diff = precawg_analysis %>%
 
 
 ```{r, fig.width=10, fig.height=4}
-plot_precawg_mvsf_matrix(precawg_and_m_vs_f_diff)
+plot_precawg_mvsf_matrix(precawg_and_m_vs_f_diff %>% filter(tissue != "adipose"))
 ```
 
-There is a distinct difference in the Male and Female blood RE, especially at 3.5 - So what's going on there? The correlation above for that timepoint looks like it's very high, so why are there so many significant M vs F features at that timepoint? 
 
-```{r blood-re-p35-scatter, fig.width = 6, fig.height = 5}
+```{r blood-scatter, fig.width = 9, fig.height = 11}
+post_timepoints = c("post_10_min", "post_15_30_45_min", "post_3.5_4_hr")
+
+# Top 10 most significant (smallest sex-difference p-value) features from RE at post 3.5/4 hr;
+# label this same set in every panel.
 highlight_ids = precawg_and_m_vs_f_diff %>%
   dplyr::filter(tissue == "blood",
+                assay == "transcript-rna-seq",
                 randomGroupCode == "ADUResist",
-                Timepoint == "post_3.5_4_hr",
-                adj_p_value_sex_diff < 0.05) %>%
+                Timepoint == "post_3.5_4_hr") %>%
+  dplyr::slice_min(adj_p_value_sex_diff, n = 10, with_ties = FALSE) %>%
   dplyr::pull(feature_id)
 
-blood_re_p35 = scatter_wide %>%
+tp_labels = c(
+  "post_10_min"       = "P10M",
+  "post_15_30_45_min" = "P15-45M",
+  "post_3.5_4_hr"     = "P3.5/4H"
+)
+
+prettify_facets = function(df) {
+  df %>%
+    dplyr::mutate(
+      Timepoint = factor(dplyr::recode(as.character(Timepoint), !!!tp_labels),
+                         levels = unname(tp_labels)),
+      Group = factor(Group, levels = c("EE", "RE"))
+    )
+}
+
+blood_post = scatter_wide %>%
   dplyr::filter(tissue == "blood",
-                Group == "RE",
-                Timepoint == "post_3.5_4_hr",
-                pre_cawg_adj_p < 0.05)
+                Group %in% c("EE", "RE"),
+                Timepoint %in% post_timepoints,
+                pre_cawg_adj_p < 0.05) %>%
+  prettify_facets()
 
-blood_re_p35_cor = scatter_cor %>%
-  dplyr::filter(tissue == "blood", Group == "RE", Timepoint == "post_3.5_4_hr")
+blood_post_cor = scatter_cor %>%
+  dplyr::filter(tissue == "blood", Group %in% c("EE", "RE"), Timepoint %in% post_timepoints) %>%
+  prettify_facets()
 
-p = .make_sex_scatter("blood", "Transcriptomics", blood_re_p35, blood_re_p35_cor,
+p = .make_sex_scatter("blood", "Transcriptomics", blood_post, blood_post_cor,
                       highlight_ids = highlight_ids)
-if (!is.null(p)) print(p)
+if (!is.null(p)) {
+  p = p + labs(
+    title = "Male vs. female transcriptional response to exercise in blood"
+  )
+  print(p)
+  ggsave(here::here("revisions/landscape/sex_sensitivity_analysis/outputs/scatter_blood_EE_RE_post.png"),
+         plot = p, width = 9, height = 11, dpi = 900, units = "in")
+}
 ```
 
+**Figure legend.** *Sex-stratified transcriptional response to acute exercise in blood.*
+Exercise-induced log fold-changes (logFC, post-exercise relative to pre-exercise) were
+estimated separately in male and female participants and are plotted against one another for
+blood transcripts: female logFC on the x-axis and male logFC on the y-axis. Panels are arranged
+by post-exercise timepoint (rows: P10M, 10 min post; P15-45M, 15/30/45 min post; P3.5/4H,
+3.5/4 h post) and exercise mode (columns: EE, endurance exercise; RE, resistance exercise).
+Each point is a transcript that was significant in the primary, sex-combined PreCAWG
+differential analysis (BH-adjusted *p* < 0.05); horizontal and vertical bars show the 95%
+confidence intervals of the female and male logFC estimates, respectively. The dotted diagonal
+is the line of identity (equal response in both sexes) and the blue line is the ordinary
+least-squares fit; the Pearson correlation (*r*), the number of features (*n*), and the
+regression equation are annotated in each panel. Labeled transcripts are the 10 features with
+the smallest sex-difference adjusted *p*-values in resistance exercise at the 3.5/4 h timepoint,
+shown in every panel for reference. Dashed grey lines mark zero logFC.
+
 ```{r}
-annotated_differences = precawg_and_m_vs_f_diff %>% 
+annotated_differences = precawg_and_m_vs_f_diff %>%
   left_join(HUMAN_FEATURE_TO_GENE %>% filter(assay == "transcript-rna-seq"), by = c("feature_id", "assay")) 
 
 sig_differences = annotated_differences %>%
@@ -399,8 +486,19 @@ ora_results %>% dplyr::filter(collection != "CELLMARKER") %>% dplyr::select(set_
 
 Essentially trying to answer - are we ignoring sexual dimorphism and actually only showing off results that correspond to the female phenotype
 
+**Figure legend.** *Male and female responses for manuscript-highlighted transcripts (e.g., PPARGC1A, CCN1).*
+For each highlighted transcript, the mean normalized abundance (± 95% confidence interval) is
+shown at each timepoint for female (red), male (blue), and all (overall, black) participants,
+faceted by tissue–assay (rows) and exercise group (columns: CON, control; EE, endurance; RE,
+resistance). Timepoints: Pre, pre-exercise; D20M/D40M, 20/40 min during exercise; P10M, 10 min
+post; P15-45M, 15/30/45 min post; P3.5/4H, 3.5/4 h post; P24H, 24 h post. Concordant male and
+female trajectories indicate that the reported response for these features is not driven by the
+female-majority composition of the cohort. Per-sex sample sizes are reduced relative to the
+full-cohort analysis, so confidence intervals are wider and these panels should be interpreted
+as descriptive.
+
 ```{r, results = "asis"}
-manuscript_transcripts = c("NR4A1", "PPARGC1A", "MYC", "CCN1", "FOXO1", "FOXO3")
+manuscript_transcripts = c("NR4A1", "PPARGC1A", "MYC", "CCN1")
 relevant_feature_ids = HUMAN_FEATURE_TO_GENE %>%
   dplyr::filter(assay == "transcript-rna-seq",
                 gene_symbol %in% manuscript_transcripts) %>%
@@ -416,6 +514,7 @@ for (feat in relevant_feature_ids) {
   })
 }
 ```
+
 
 For PGC1a specifically we highlight just the muscle, its not really mentioned as much in the context of other tissues in the landscape. 
 ```{r, results = "asis"}
@@ -508,7 +607,143 @@ chrom_summary = sex_diff_rna_chrom %>%
     .groups = "drop"
   )
 print(chrom_summary)
+```
 
+# Investigating effect size differences
+
+One question was to ask if the observed larger effect size in males is actually just due to a general correlation with things like 'workload' or 'appendicular FFM' or cell type changes. 
+
+```{r sex model fit analysis}
+sex_differential_analysis_fit = list.files(file.path(repo_local_dir, "data", "tmp", "freeze_DA"),
+                                           full.names = TRUE)
+sex_differential_analysis_fit = sex_differential_analysis_fit[grep(".rds", sex_differential_analysis_fit)]
+
+clinical_dxa = MotrpacBicQC::dl_read_gcp(path = "gs://motrpac-data-hub/human-precovid/phenotype/human-precovid-sed-adu/raw/data_sets/human-precovid-sed-adu_clinical_dxa_analysis_ds_redacted_v1.0.txt",
+                                         tmpdir = tempdir())
+
+cell_type_cols = c("T.cells", "B.cells", "NK.cells", "Monocytes", "Neutrophils")
+
+cell_type_metadata = read.csv(file.path(here(),
+                                        "revisions",
+                                        "landscape",
+                                        "cellular_deconvolution",
+                                        "cibersort_with_metadata.csv")) %>%
+  dplyr::select(vialLabel, dplyr::all_of(cell_type_cols))
+
+# Total lean: TOTAL_LEAN
+# FFM: TOTAL_LEAN + TOTAL_BMC
+# Appendicular lean mass: ARMS_LEAN + LEGS_LEAN
+# Appendicular FFM: ARMS_LEAN + LEGS_LEAN + ARMS_BMC + LEGS_BMC
+dxa_body_comp_cols = c("Total_lean", "FFM", "App_lean", "App_FFM")
+
+dxa_body_comp = clinical_dxa %>%
+  dplyr::filter(visitcode == "ADU_SCP") %>%
+  dplyr::transmute(
+    pid = as.character(pid),
+    Total_lean = TOTAL_LEAN,
+    FFM = TOTAL_LEAN + TOTAL_BMC,
+    App_lean = ARMS_LEAN + LEGS_LEAN,
+    App_FFM = ARMS_LEAN + LEGS_LEAN + ARMS_BMC + LEGS_BMC
+  )
+
+# join DXA (pid-keyed) to vialLabels via pheno, then scale
+dxa_by_vial = pheno$data %>%
+  dplyr::transmute(vialLabel = as.character(vialLabel), pid = as.character(pid)) %>%
+  dplyr::inner_join(dxa_body_comp, by = "pid") %>%
+  dplyr::select(vialLabel, dplyr::all_of(dxa_body_comp_cols)) %>%
+  dplyr::mutate(dplyr::across(dplyr::all_of(dxa_body_comp_cols), scale))
+
+colnames(dxa_by_vial) = c("vialLabel", dxa_body_comp_cols)
+```
+
+```{r blood-residual-celltype-correlation}
+blood_fit_path = sex_differential_analysis_fit[grep("blood", sex_differential_analysis_fit)]
+blood_fit = readRDS(blood_fit_path)
+
+# residuals: features x samples → transpose to samples x features
+resid_mat = t(blood_fit$residuals)
+
+all_meta_cols = c(cell_type_cols, dxa_body_comp_cols)
+
+combined_metadata = cell_type_metadata %>%
+  dplyr::mutate(vialLabel = as.character(vialLabel)) %>%
+  dplyr::full_join(
+    dxa_by_vial %>% dplyr::mutate(vialLabel = as.character(vialLabel)),
+    by = "vialLabel"
+  )
+
+shared_samples = intersect(rownames(resid_mat), combined_metadata$vialLabel)
+resid_sub = resid_mat[shared_samples, , drop = FALSE]
+
+meta_sub = combined_metadata %>%
+  dplyr::filter(vialLabel %in% shared_samples) %>%
+  tibble::column_to_rownames("vialLabel") %>%
+  .[shared_samples, , drop = FALSE]
+
+# per covariate: Pearson r for each feature, then average across features
+cor_summary = lapply(all_meta_cols, function(col) {
+  col_vec = meta_sub[, col]
+  r_vals = apply(resid_sub, 2, function(feat_vec) {
+    cor(feat_vec, col_vec, method = "pearson", use = "complete.obs")
+  })
+  data.frame(
+    variable = col,
+    group = dplyr::if_else(col %in% cell_type_cols, "Cell type", "Body composition"),
+    mean_abs_r = mean(abs(r_vals), na.rm = TRUE),
+    median_abs_r = median(abs(r_vals), na.rm = TRUE),
+    stringsAsFactors = FALSE
+  )
+}) %>%
+  dplyr::bind_rows()
+```
+
+```{r blood-residual-workload}
+clinical_workload = MotrpacHumanPreSuspensionData::cln_curated_acute_bout$data
+
+workload_by_vial = pheno$data %>%
+  dplyr::transmute(vialLabel = as.character(vialLabel),
+                   pid = as.character(pid),
+                   randomGroupCode) %>%
+  dplyr::inner_join(
+    clinical_workload %>% dplyr::transmute(pid = as.character(pid),
+                                           watts_avg, totalbody_volume),
+    by = "pid"
+  )
+
+# EE: per-feature r between watts_avg and residuals across EE samples
+ee_vials = workload_by_vial %>%
+  dplyr::filter(randomGroupCode == "ADUEndur", !is.na(watts_avg),
+                vialLabel %in% rownames(resid_mat))
+ee_resid = resid_mat[ee_vials$vialLabel, , drop = FALSE]
+ee_watts = setNames(ee_vials$watts_avg, ee_vials$vialLabel)
+
+ee_r_vals = apply(ee_resid, 2, function(feat_vec) {
+  cor(feat_vec, ee_watts[names(feat_vec)], method = "pearson", use = "complete.obs")
+})
+
+# RE: per-feature r between totalbody_volume and residuals across RE samples
+re_vials = workload_by_vial %>%
+  dplyr::filter(randomGroupCode == "ADUResist", !is.na(totalbody_volume),
+                vialLabel %in% rownames(resid_mat))
+re_resid = resid_mat[re_vials$vialLabel, , drop = FALSE]
+re_vol = setNames(re_vials$totalbody_volume, re_vials$vialLabel)
+
+re_r_vals = apply(re_resid, 2, function(feat_vec) {
+  cor(feat_vec, re_vol[names(feat_vec)], method = "pearson", use = "complete.obs")
+})
+
+workload_cor_summary = data.frame(
+  variable = c("watts_avg (EE)", "totalbody_volume (RE)"),
+  group = "Workload",
+  mean_abs_r = c(mean(abs(ee_r_vals), na.rm = TRUE), mean(abs(re_r_vals), na.rm = TRUE)),
+  median_abs_r = c(median(abs(ee_r_vals), na.rm = TRUE), median(abs(re_r_vals), na.rm = TRUE)),
+  stringsAsFactors = FALSE
+)
+
+all_cor_summary = dplyr::bind_rows(cor_summary, workload_cor_summary)
+
+knitr::kable(all_cor_summary, digits = 3,
+             caption = "Mean per-feature Pearson r: blood RNA-seq residuals vs. all covariates")
 ```
 
 

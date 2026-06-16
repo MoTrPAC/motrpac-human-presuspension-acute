@@ -121,6 +121,7 @@ for(tissue in names(qc_data)){
 }
 ```
 
+
 RNAseq + Olink are pretty easy because there is no missingness and just the one platform
 ```{r}
 named_features_rna_ol = motrpac_named_features %>%
@@ -168,6 +169,29 @@ head(named_features_with_n)
 # write.csv(named_features_with_n,
 #           file = "outputs/named_features_w_n.csv",
 #           row.names = FALSE)
+```
+
+```{r n-value-distribution}
+n_vals_long = dplyr::bind_rows(named_features_rna_ol, named_features_metab, named_features_prot) 
+
+summary(named_features_prot$n)
+print(summary(n_vals_long$n))
+
+ggplot(n_vals_long, aes(x = n)) +
+  geom_histogram(binwidth = 1, fill = "steelblue", color = "white", linewidth = 0.2) +
+  facet_wrap(~assay, scales = "free_y") +
+  labs(
+    title = "Distribution of sample counts (n) across named features",
+    x = "n (samples per feature × group × timepoint)",
+    y = "Count"
+  ) +
+  theme_bw(base_size = 11) +
+  theme(
+    strip.text = element_text(size = 9),
+    axis.text = element_text(size = 10),
+    axis.title = element_text(size = 11),
+    plot.title = element_text(size = 12)
+  )
 ```
 
 ```{r}
@@ -410,19 +434,6 @@ plot_group_stats_histogram(
 ggsave("outputs/scion_imputation_n_histogram.png", width = 8, height = 5, units = "in", dpi = 600)
 ```
 
-Distribution of observed sample counts across all proteomic and phosphoproteomic features, faceted by tissue × assay.
-```{r, eval = TRUE, fig.width = 12, fig.height = 8}
-prot_group_stats = all_group_stats %>% filter(ome %in% c("prot-pr", "prot-ph"))
-plot_group_stats_histogram(
-  prot_group_stats,
-  title = "Distribution of observed sample counts across all (phospho)proteomic features. N<3 are removed from further analysis",
-  subtitle = "Each panel is one tissue × assay combination; each observation is one feature × group × timepoint",
-  vline = 3,
-  facet_vars = vars(tissue, ome)
-)
-ggsave("outputs/all_prot_n_histogram.png", width = 12, height = 8, units = "in", dpi = 600)
-```
-
 Slight modification to this figure. We want stacked barcharts for sig features and non-sig. features. 
 
 For a feature to be considered "significant" we include any comparison involved in the exercise delta-delta comparison. This means, for example, for a comparison of PGC1a at resistance at 3.5 hr, the RE group at 3.5 hour, the RE pre-exercise group, and 
@@ -473,7 +484,7 @@ plot_sig_nonsig_histogram(
   subtitle = "Each panel is one tissue × assay; each observation is one feature × group × timepoint",
   vline = 3
 )
-ggsave("outputs/sig_nonsig_prot_n_histogram.png", width = 12, height = 8, units = "in", dpi = 600)
+ggsave("outputs/sig_nonsig_prot_n_histogram.png", width = 10, height = 8, units = "in", dpi = 600)
 ```
 
 Same figure restricted to the specifically named features in the manuscript, across all omes.

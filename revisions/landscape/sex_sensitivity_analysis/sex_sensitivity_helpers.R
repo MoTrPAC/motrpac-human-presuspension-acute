@@ -446,156 +446,6 @@ sex_differences_logfc_feature = function(feature,
   return(g)
 }
 
-
-forest_plot_sex_logfc = function(feature,
-                                 differential_analysis_results = precawg_and_sex_diff,
-                                 sig_mvsf = NULL,
-                                 selected_tissues = "all",
-                                 output_file = NULL,
-                                 scale_factor = 1,
-                                 include_legend = TRUE,
-                                 legend_position = "right",
-                                 verbose = TRUE) {
-
-  feature_info = MotrpacHumanPreSuspensionAnalysis::HUMAN_FEATURE_TO_GENE %>%
-    dplyr::filter(tolower(feature_id) == tolower(feature) |
-                    tolower(gene_symbol) == tolower(feature) |
-                    tolower(refmet_name) == tolower(feature)) %>%
-    dplyr::semi_join(MotrpacHumanPreSuspensionAnalysis::HUMAN_FEATURE_TO_GENE, by = "gene_symbol") %>%
-    dplyr::mutate(feature_id = dplyr::case_when(
-      !is.na(refmet_name) ~ refmet_name,
-      TRUE ~ feature_id
-    ))
-
-  gene_symbol_options = as.character(unique(feature_info$gene_symbol))
-  refmet_options = as.character(unique(feature_info$refmet_name))
-  label_options = union(gene_symbol_options, refmet_options)
-  label_options = label_options[!is.na(label_options)]
-  feature_label = label_options[1]
-
-  if (length(label_options) > 1 & verbose) {
-    message("if there are multiple gene symbols or refmet names corresponding
-            to the input, the first is chosen for the purpose of labeling, use caution")
-  }
-
-  data_filtered = differential_analysis_results %>%
-    dplyr::filter(feature_id %in% feature_info$feature_id) %>%
-    dplyr::filter(if (all(selected_tissues == "all")) TRUE else tissue %in% selected_tissues)
-
-  if (nrow(data_filtered) == 0) {
-    stop("No data corresponds to your requested feature.")
-  }
-
-  timepoint_recode = c(
-    "pre_exercise"      = "Pre",
-    "during_20_min"     = "D20M",
-    "during_40_min"     = "D40M",
-    "post_10_min"       = "P10M",
-    "post_15_30_45_min" = "P15-45M",
-    "post_3.5_4_hr"     = "P3.5/4H",
-    "post_24_hr"        = "P24H"
-  )
-  timepoint_levels = c("Pre", "D20M", "D40M", "P10M", "P15-45M", "P3.5/4H", "P24H")
-  group_recode = c("ADUControl" = "CON", "ADUEndur" = "EE", "ADUResist" = "RE")
-  group_levels = c("CON", "EE", "RE")
-
-  plot_data = data_filtered %>%
-    dplyr::select(tissue, platform, feature_id, randomGroupCode, Timepoint,
-                  Sex = sex_comparison,
-                  logFC = logFC_sex_diff,
-                  CI_low = CI.L_sex_diff,
-                  CI_high = CI.R_sex_diff) %>%
-    dplyr::mutate(
-      tissue = stringr::str_to_sentence(tissue),
-      Timepoint = dplyr::recode(as.character(Timepoint), !!!timepoint_recode),
-      Timepoint = factor(Timepoint, levels = timepoint_levels),
-      Group = dplyr::recode(randomGroupCode, !!!group_recode),
-      Group = factor(Group, levels = group_levels),
-      tissue_assay = stringr::str_c(tissue, " ", platform),
-      Sex = factor(Sex, levels = c("Female", "Male"))
-    ) %>%
-    dplyr::arrange(Group, Timepoint) %>%
-    dplyr::mutate(label = factor(paste0(Group, " | ", Timepoint),
-                                 levels = rev(unique(paste0(Group, " | ", Timepoint)))))
-
-  sig_rows = NULL
-  if (!is.null(sig_mvsf)) {
-    sig_rows = sig_mvsf %>%
-      dplyr::filter(feature_id %in% feature_info$feature_id) %>%
-      dplyr::filter(if (all(selected_tissues == "all")) TRUE else tissue %in% selected_tissues) %>%
-      dplyr::filter(adj_p_value_sex_diff < 0.05) %>%
-      dplyr::mutate(
-        tissue = stringr::str_to_sentence(tissue),
-        Timepoint = dplyr::recode(as.character(Timepoint), !!!timepoint_recode),
-        Group = dplyr::recode(randomGroupCode, !!!group_recode),
-        tissue_assay = stringr::str_c(tissue, " ", platform),
-        label = paste0(Group, " | ", Timepoint)
-      ) %>%
-      dplyr::inner_join(
-        plot_data %>% dplyr::select(tissue_assay, label) %>% dplyr::distinct(),
-        by = c("tissue_assay", "label")
-      ) %>%
-      dplyr::mutate(y = as.numeric(factor(label, levels = levels(plot_data$label)))) %>%
-      dplyr::select(tissue_assay, label, y) %>%
-      dplyr::distinct()
-  }
-
-  series_colors = c("Female" = "#E87461", "Male" = "#5B9BD5")
-  sc = scale_factor * 0.7
-
-  g = ggplot(plot_data, aes(y = label, x = logFC, color = Sex)) +
-    geom_vline(xintercept = 0, linewidth = 0.4 * sc, linetype = "dashed", color = "grey50") +
-    { if (!is.null(sig_rows) && nrow(sig_rows) > 0)
-        geom_rect(
-          data = sig_rows,
-          aes(ymin = y - 0.47, ymax = y + 0.47, xmin = -Inf, xmax = Inf),
-          inherit.aes = FALSE,
-          fill = NA,
-          color = "black",
-          linewidth = 0.6 * sc
-        )
-    } +
-    geom_pointrange(
-      aes(xmin = CI_low, xmax = CI_high),
-      size = 0.25 * sc,
-      linewidth = 0.5 * sc,
-      position = position_dodge(width = 0.5)
-    ) +
-    scale_color_manual(values = series_colors, name = "Sex") +
-    facet_wrap(~ tissue_assay, scales = "free_y") +
-    ggtitle(feature_label) +
-    xlab("logFC") +
-    theme_bw() +
-    theme(
-      axis.title.y = element_blank(),
-      axis.text.y = element_text(size = 9 * sc, color = "black"),
-      axis.text.x = element_text(size = 9 * sc, color = "black"),
-      axis.title.x = element_text(size = 10 * sc),
-      plot.title = element_text(size = 12 * sc, face = "bold"),
-      strip.text = element_text(size = 9 * sc),
-      panel.grid.major.y = element_blank(),
-      panel.grid.minor = element_blank(),
-      legend.position = if (include_legend) legend_position else "none",
-      legend.text = element_text(size = 9 * sc),
-      legend.title = element_text(size = 10 * sc),
-      axis.ticks = element_line(linewidth = 0.3 * sc),
-      panel.border = element_rect(linewidth = 0.3 * sc),
-      plot.margin = margin(0.1, 0.1, 0.1, 0.1, "in")
-    )
-
-  if (!is.null(output_file)) {
-    n_panels = length(unique(plot_data$tissue_assay))
-    n_rows = length(unique(plot_data$label))
-    ggsave(g, filename = output_file,
-           height = max(3, 0.3 * n_rows + 1.5) * sc,
-           width = (3.5 + 2.5 * n_panels) * sc,
-           dpi = 600, units = "in")
-  }
-
-  return(g)
-}
-
-
 # ── PCA panel ─────────────────────────────────────────────────────────────────
 
 make_pca_panel = function(tiss, ome, ome_data, tp_levels, tp_colors_pca) {
@@ -664,7 +514,7 @@ make_pca_panel = function(tiss, ome, ome_data, tp_levels, tp_colors_pca) {
 
 # ── Sex scatter ───────────────────────────────────────────────────────────────
 
-.make_sex_scatter = function(tiss, ome_type, data, cor_df, highlight_ids = NULL) {
+.make_sex_scatter = function(tiss, ome_type, data, cor_df, highlight_ids = NULL, n_label = 10) {
   df = data %>% dplyr::filter(tissue == tiss, Ome == ome_type)
   if (nrow(df) == 0) return(NULL)
 
@@ -675,7 +525,40 @@ make_pca_panel = function(tiss, ome, ome_data, tp_levels, tp_colors_pca) {
   df = df %>%
     dplyr::mutate(highlight = !is.null(highlight_ids) & feature_id %in% highlight_ids)
 
-  ggplot(df, aes(x = logFC_Female, y = logFC_Male)) +
+  lm_labels = df %>%
+    dplyr::group_by(Timepoint, Group) %>%
+    dplyr::summarize(
+      slope_val = tryCatch(coef(lm(logFC_Male ~ logFC_Female))[2], error = function(e) NA_real_),
+      intercept_val = tryCatch(coef(lm(logFC_Male ~ logFC_Female))[1], error = function(e) NA_real_),
+      .groups = "drop"
+    ) %>%
+    dplyr::mutate(
+      eq_label = dplyr::case_when(
+        is.na(slope_val) ~ "",
+        intercept_val >= 0 ~ paste0("y=", sprintf("%.2f", slope_val), "x+", sprintf("%.2f", intercept_val)),
+        TRUE ~ paste0("y=", sprintf("%.2f", slope_val), "x", sprintf("%.2f", intercept_val))
+      )
+    )
+
+  label_df = NULL
+  if (!is.null(highlight_ids) && length(highlight_ids) > 0) {
+    gene_map = MotrpacHumanPreSuspensionAnalysis::HUMAN_FEATURE_TO_GENE %>%
+      dplyr::select(feature_id, gene_symbol, refmet_name) %>%
+      dplyr::distinct()
+
+    label_df = df %>%
+      dplyr::filter(highlight) %>%
+      dplyr::left_join(gene_map, by = "feature_id") %>%
+      dplyr::mutate(
+        label = dplyr::coalesce(gene_symbol, refmet_name, feature_id),
+        dist = sqrt(logFC_Female^2 + logFC_Male^2)
+      ) %>%
+      dplyr::group_by(Timepoint, Group) %>%
+      dplyr::slice_max(dist, n = n_label, with_ties = FALSE) %>%
+      dplyr::ungroup()
+  }
+
+  p = ggplot(df, aes(x = logFC_Female, y = logFC_Male)) +
     geom_hline(yintercept = 0, linetype = "dashed", color = "grey50", linewidth = 0.4) +
     geom_vline(xintercept = 0, linetype = "dashed", color = "grey50", linewidth = 0.4) +
     geom_abline(slope = 1, intercept = 0, linetype = "dotted",
@@ -689,14 +572,21 @@ make_pca_panel = function(tiss, ome, ome_data, tp_levels, tp_colors_pca) {
       height = 0, alpha = 0.3, linewidth = 0.35, color = "grey40"
     ) +
     geom_smooth(method = "lm", se = FALSE, color = "steelblue", linewidth = 0.7) +
-    geom_point(data = ~ dplyr::filter(.x, !highlight), alpha = 0.8, size = 1.5, color = "grey30") +
-    geom_point(data = ~ dplyr::filter(.x, highlight), alpha = 0.9, size = 1.5, color = "yellow") +
+    geom_point(alpha = 0.8, size = 1.5, color = "grey30") +
     geom_text(
       data = cor_sub,
-      aes(label = paste0("r=", r, " (n=", n_sig, ")")),
+      aes(label = paste0("r=", Pearsons_R, " (n=", n_sig, ")")),
       x = -Inf, y = Inf,
-      hjust = -0.05, vjust = 1.4,
-      size = 2.8, fontface = "italic",
+      hjust = -0.05, vjust = 1.2,
+      size = 5, fontface = "italic",
+      inherit.aes = FALSE
+    ) +
+    geom_text(
+      data = lm_labels,
+      aes(label = eq_label),
+      x = -Inf, y = Inf,
+      hjust = -0.05, vjust = 2.4,
+      size = 5, fontface = "italic",
       inherit.aes = FALSE
     ) +
     coord_fixed(ratio = 1, xlim = c(-lim, lim), ylim = c(-lim, lim)) +
@@ -710,6 +600,25 @@ make_pca_panel = function(tiss, ome, ome_data, tp_levels, tp_colors_pca) {
     theme(
       panel.grid.minor = element_blank(),
       strip.text       = element_text(size = 9, face = "bold"),
+      axis.title       = element_text(size = 15),
+      axis.text        = element_text(size = 12),
       legend.position  = "bottom"
     )
+
+  if (!is.null(label_df) && nrow(label_df) > 0) {
+    p = p + ggrepel::geom_text_repel(
+      data = label_df,
+      aes(x = logFC_Female, y = logFC_Male, label = label),
+      size = 3.5,
+      fontface = "bold",
+      bg.color = "white",
+      bg.r = 0.15,
+      max.overlaps = 30,
+      segment.size = 0.3,
+      segment.color = "grey40",
+      inherit.aes = FALSE
+    )
+  }
+
+  p
 }

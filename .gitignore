@@ -4,3 +4,5 @@
 .Ruserdata
 *.DS_Store
 CLAUDE*
+sandbox/
+revisions/landscape/cellular_deconvolution/cibersort_with_metadata.csv

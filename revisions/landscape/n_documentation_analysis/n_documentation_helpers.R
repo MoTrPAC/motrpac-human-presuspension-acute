@@ -121,9 +121,11 @@ plot_sig_nonsig_histogram = function(sig_df, nonsig_df, title, subtitle = NULL,
     theme(
       plot.title = element_text(size = 14, face = "bold"),
       plot.subtitle = element_text(size = 11, color = "grey40"),
-      axis.title = element_text(size = 12),
-      axis.text = element_text(size = 11),
+      axis.title = element_text(size = 14),
+      axis.text = element_text(size = 13),
+      legend.text = element_text(size = 13),
       panel.grid.major.y = element_line(color = "grey90", linewidth = 0.4),
-      plot.margin = margin(10, 16, 10, 10)
+      plot.margin = margin(10, 16, 10, 10),
+      legend.position = "bottom"
     )
 }

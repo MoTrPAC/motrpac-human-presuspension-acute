@@ -35,29 +35,29 @@ ee_vs_re = load_differential_analysis(selected_omes = "all",
                                       selected_tissues = "all",
                                       single_matrix = TRUE) 
 ee_re_sig = ee_vs_re %>%
-  filter(contrast_type == "Endur_vs_Resist") %>%
-  select(tissue, assay, feature_id, Timepoint, adj_p_value, logFC)
+  dplyr::filter(contrast_type == "Endur_vs_Resist") %>%
+  dplyr::select(tissue, assay, feature_id, Timepoint, adj_p_value, logFC)
 
 ee_re_wide = ee_vs_re %>%
-  filter(contrast_type == "exercise_with_controls") %>%
-  select(tissue, assay, feature_id, Timepoint, randomGroupCode, logFC, adj_p_value) %>%
+  dplyr::filter(contrast_type == "exercise_with_controls") %>%
+  dplyr::select(tissue, assay, feature_id, Timepoint, randomGroupCode, logFC, adj_p_value) %>%
   pivot_wider(names_from = c("randomGroupCode"),
               values_from = c("logFC", "adj_p_value")) %>%
   merge(., ee_re_sig, by = c("tissue", "assay", "feature_id", "Timepoint")) %>%
-  mutate(sig_contrast = ifelse(adj_p_value < 0.05, "Sig", "Non-Sig"),
+  dplyr::mutate(sig_contrast = ifelse(adj_p_value < 0.05, "Sig", "Non-Sig"),
          sig_ee_single = ifelse(adj_p_value_ADUEndur < 0.05, "Sig", "Non-Sig"),
          sig_re_single = ifelse(adj_p_value_ADUResist < 0.05, "Sig", "Non-Sig"))
 
 categorized = ee_re_wide %>%
-  mutate(
-    Significant_in = case_when(
+  dplyr::mutate(
+    Significant_in = dplyr::case_when(
       sig_contrast == "Sig" & sig_ee_single == "Sig" & sig_re_single == "Non-Sig" ~ "Only EE",
       sig_contrast == "Sig" & sig_ee_single == "Non-Sig" & sig_re_single == "Sig" ~ "Only RE",
       sig_contrast == "Sig" & sig_ee_single == "Sig" & sig_re_single == "Sig" ~ "Both Groups",
       sig_contrast == "Sig" & sig_ee_single == "Non-Sig" & sig_re_single == "Non-Sig" ~ "Neither",
       TRUE ~ "Not RE vs EE Hit"
     ),
-    border_color = case_when(
+    border_color = dplyr::case_when(
       sig_contrast == "Sig" ~ "black",
       Significant_in == "Only EE" ~ HUMAN_EXERCISE_GROUP_COLORS[["ADUEndur"]],
       Significant_in == "Only RE" ~ HUMAN_EXERCISE_GROUP_COLORS[["ADUResist"]],
@@ -66,10 +66,10 @@ categorized = ee_re_wide %>%
       TRUE ~ "grey"
     )
   ) %>%
-  group_by(tissue, feature_id) %>%
+  dplyr::group_by(tissue, feature_id) %>%
   #so for a given tissue, we just squash timepoints by picking the most significant one. 
-  slice_min(adj_p_value) %>%
-  ungroup()
+  dplyr::slice_min(adj_p_value) %>%
+  dplyr::ungroup()
 
 ggplot_re_ee = ggplot() +
   #adding axis plots to clearly identify quadrants
@@ -77,12 +77,12 @@ ggplot_re_ee = ggplot() +
   geom_vline(xintercept = 0, color = "black") +
   geom_hline(yintercept = 0, color = "black") +
   geom_point(
-    data = categorized %>% filter(sig_contrast != "Sig"),
+    data = categorized %>% dplyr::filter(sig_contrast != "Sig"),
     aes(x = logFC_ADUEndur, y = logFC_ADUResist),
     color = "grey", size = 0.5, shape = 20
   ) +
   geom_point(
-    data = categorized %>% filter(sig_contrast == "Sig"),
+    data = categorized %>% dplyr::filter(sig_contrast == "Sig"),
     aes(x = logFC_ADUEndur, y = logFC_ADUResist, fill = Significant_in),
     color = "black", size = 1.5, shape = 21, stroke = 0.4
   ) +
@@ -115,27 +115,27 @@ This chunk of code is a quick detour for text in the manuscript - corresponding
 to what is now figure 3E
 ```{r}
 oppositional = ee_re_wide %>% 
-  filter(adj_p_value_ADUEndur < 0.05 & adj_p_value_ADUResist < 0.05) %>%
-  filter(sign(logFC_ADUEndur) != sign(logFC_ADUResist))
+  dplyr::filter(adj_p_value_ADUEndur < 0.05 & adj_p_value_ADUResist < 0.05) %>%
+  dplyr::filter(sign(logFC_ADUEndur) != sign(logFC_ADUResist))
 ```
 
 ```{r}
 upset_list = lapply(unique(categorized$tissue), function(tissue) {
   #getting this into a format ready for an upset plot
   df_tiss = categorized %>%
-    filter(tissue == !!tissue) %>%
+    dplyr::filter(tissue == !!tissue) %>%
     #we're also newly adding assay to try to make stacked barplots
-    select(feature_id, assay, sig_contrast, sig_ee_single, sig_re_single) %>%
-    distinct() %>%
-    mutate(across(c(sig_contrast, sig_ee_single, sig_re_single), ~ . == "Sig")) %>%
-    rename(
+    dplyr::select(feature_id, assay, sig_contrast, sig_ee_single, sig_re_single) %>%
+    dplyr::distinct() %>%
+    dplyr::mutate(dplyr::across(c(sig_contrast, sig_ee_single, sig_re_single), ~ . == "Sig")) %>%
+    dplyr::rename(
       EE_vs_RE = sig_contrast,
       EE_vs_Ctrl = sig_ee_single,
       RE_vs_Ctrl = sig_re_single
     ) %>%
     #so we notably remove the triple negative--those not significant in any 
     #modality specific, and also the re vs ee. 
-    filter(EE_vs_RE | EE_vs_Ctrl | RE_vs_Ctrl)
+    dplyr::filter(EE_vs_RE | EE_vs_Ctrl | RE_vs_Ctrl)
   
   #custom colors. Notably, if theres an intersection that one tissue has
   #but not another, it doesn't run at all. so i have to add thing specially
@@ -211,7 +211,7 @@ print(combined_upset_plot)
 ```{r}
 final_plot = ggplot_re_ee / combined_upset_plot + plot_layout(heights = c(1.5, 1.2))
 
-pdf(file = file.path(here(), "data", "tmp", "figures", "figure3a_re_vs_ee.pdf"),
+pdf(file = file.path("figure3a_re_vs_ee.pdf"),
     width = 12, height = 8)
 print(final_plot)
 dev.off()
@@ -222,7 +222,7 @@ Okay now lets do some ORA here
 ```{r}
 all_ora_results = data.frame()
 for(tissue in tissue_available_list()){
-  unique_assays = categorized %>% filter(tissue == !!tissue) %>% pull(assay) %>% unique()
+  unique_assays = categorized %>% dplyr::filter(tissue == !!tissue) %>% dplyr::pull(assay) %>% unique()
   for(assay in unique_assays){
     #we're not going to do refmet or ptm-sea type stuff here. 
     if(assay == "metab" | assay == "prot-ph") next
@@ -234,14 +234,14 @@ for(tissue in tissue_available_list()){
       
       #to make the background for the ORA. 
       all_results = categorized %>% 
-        filter(tissue == !!tissue,
+        dplyr::filter(tissue == !!tissue,
                assay == !!assay) %>%
-        left_join(HUMAN_FEATURE_TO_GENE, by = c("feature_id", "assay")) %>%
-        filter(!is.na(gene_symbol))
+        dplyr::left_join(HUMAN_FEATURE_TO_GENE, by = c("feature_id", "assay")) %>%
+        dplyr::filter(!is.na(gene_symbol))
       
       #significant in the certain group we want. 
       sig_results = all_results %>% 
-        filter(Significant_in == groups,
+        dplyr::filter(Significant_in == groups,
                adj_p_value < 0.1)
       
       message(paste(tissue, groups, assay, nrow(sig_results)))
@@ -257,7 +257,7 @@ for(tissue in tissue_available_list()){
       ora_results = run_ORA(input = significant,
                             background = all_feats) 
       ora_formatted = ora_results %>%
-        mutate(
+        dplyr::mutate(
           tissue = !!tissue,
           assay = assay,
           contrast = filler_contrast,
@@ -271,7 +271,7 @@ for(tissue in tissue_available_list()){
 }
 
 all_ora_results = all_ora_results %>%
-  mutate(z.std = case_when(
+  dplyr::mutate(z.std = dplyr::case_when(
     z.std == "Inf" ~ 15,
     TRUE ~ z.std
   ),
@@ -286,18 +286,24 @@ So here we make the actual figure and set colors and stuff
 #           row.names = FALSE)
 #okay just take n from ea group in a really brute force way
 all_ora_results_figure = all_ora_results %>%
-  filter(tissue == "muscle") %>%
-  group_by(contrast) %>%
-  arrange(adj_p_value, .by_group = TRUE) %>%
-  slice_head(n = 15) %>%
-  ungroup() %>%
-  filter(adj_p_value < 0.05) %>%
-  mutate(neg_log10_p = -log10(p_value))
+  dplyr::filter(tissue == "muscle") %>%
+  dplyr::group_by(contrast) %>%
+  dplyr::arrange(adj_p_value, .by_group = TRUE) %>%
+  dplyr::slice_head(n = 15) %>%
+  dplyr::ungroup() %>%
+  dplyr::filter(adj_p_value < 0.05) %>%
+  #strip the database prefix (e.g. GOCC_, HALLMARK_) off the set name, then cap at
+  #35 characters with a trailing ... if longer
+  dplyr::mutate(neg_log10_p = -log10(p_value),
+                set_short = stringr::str_remove(set, paste0("^", database, "_")),
+                set_short = ifelse(nchar(set_short) > 35,
+                                   paste0(substr(set_short, 1, 35), "..."),
+                                   set_short))
 
 #by default these arrange themselves alphabetically so instead we just 
 #force them to get arranged by contrast like they were before. 
 ordered_sets = all_ora_results_figure %>%
-  pull(set_short) 
+  dplyr::pull(set_short) 
 
 contrast_colors = c(
   "EE" = HUMAN_EXERCISE_GROUP_COLORS[["ADUEndur"]],
@@ -311,9 +317,9 @@ enrichmap(all_ora_results_figure,
           contrast_column = "contrast", 
           padj_column = "adj_p_value",
           colors = c("white", "#543483"),
-          filename = file.path(here(), "data", "tmp", "figures", "re_ee_only_enrichments.pdf"),
-          width = 12, 
-          height = 10,
+          filename = file.path("Fig3b_re_ee_only_enrichments.pdf"),
+          width = 7.5, 
+          height = 7.5,
           heatmap_args = list(
             column_title = "Muscle \n Transcriptomics",
             row_order = ordered_sets,
@@ -345,7 +351,7 @@ The goal of this is:
 
 camera_tp_group = CAMERA_RESULTS %>%
   dplyr::mutate(contrast_left = stringr::str_split_fixed(contrast_short, " - ", 2)[,1],
-                randomGroupCode = case_when(
+                randomGroupCode = dplyr::case_when(
                   contrast_type == "Endur_vs_Resist" ~ "ADUEndur - ADUResist",
                   TRUE ~ paste0("ADU", stringr::str_split_fixed(contrast_left, "\\.", 2)[,1])
                 ),
@@ -353,49 +359,49 @@ camera_tp_group = CAMERA_RESULTS %>%
   dplyr::select(-contrast_left) 
 
 enrich_results = camera_tp_group %>%
-  filter(contrast_type == "Endur_vs_Resist") %>%
-  select(tissue, assay, set_id, set_short, adj_p_value, contrast_short, t, randomGroupCode, Timepoint)
+  dplyr::filter(contrast_type == "Endur_vs_Resist") %>%
+  dplyr::select(tissue, assay, set_id, set_short, adj_p_value, contrast_short, t, randomGroupCode, Timepoint)
 #-----------------------------------------------------------------------------------------------------
 #ok so i made this code to become wide -> merge -> pull in overall RE-EE sig for each group
 #for a different thing, but the wide -> long code can definitely be improved/trimmed. 
 #not really worth worrying about too much yet. 
 enrich_wide = camera_tp_group %>%
-  filter(contrast_type == "exercise_with_controls") %>%
-  select(tissue, assay, set_id, set_short,  Timepoint, randomGroupCode, t, adj_p_value) %>%
+  dplyr::filter(contrast_type == "exercise_with_controls") %>%
+  dplyr::select(tissue, assay, set_id, set_short,  Timepoint, randomGroupCode, t, adj_p_value) %>%
   pivot_wider(names_from = c("randomGroupCode"),
               values_from = c("t", "adj_p_value")) %>%
   merge(., enrich_results, by = c("tissue", "assay", "set_id", "set_short", "Timepoint")) 
 
 # potential_pathways = 
 interesting_pathways = readxl::read_excel(path = file.path(here(), "figures", "landscape", "curated_pathways.xlsx"),
-                                          sheet = "5") %>% pull(set_id)
+                                          sheet = "5") %>% dplyr::pull(set_id)
 
 enrich_wide$set_short = as.character(enrich_wide$set_short)
 selected_pathways_long = enrich_wide %>%
   #filter to desired pathways
   #currently we're only keep transcript bc trying to do multiple assays is too messy
-  filter(set_id %in% interesting_pathways, assay %in% c("transcript-rna-seq")) %>%
+  dplyr::filter(set_id %in% interesting_pathways, assay %in% c("transcript-rna-seq")) %>%
   #i need to have a better way to organize set_short bc this is not it 
-  mutate(set_short = ifelse(
+  dplyr::mutate(set_short = ifelse(
     nchar(set_short) > 35,
     paste0(substr(set_short, 1, 35), "..."),
     set_short
   ))%>%  
-  rename(t_overall = t, adj_p_value_overall = adj_p_value) %>%
+  dplyr::rename(t_overall = t, adj_p_value_overall = adj_p_value) %>%
   pivot_longer(
     cols = c(t_ADUResist, t_ADUEndur, adj_p_value_ADUResist, adj_p_value_ADUEndur),
     names_to = c(".value", "condition"),
     names_pattern = "(t|adj_p_value)_(ADUResist|ADUEndur)"
   ) %>%
-  mutate(outline = ifelse(adj_p_value < 0.05, "signif", "nonsignif"), #significant within single group
+  dplyr::mutate(outline = ifelse(adj_p_value < 0.05, "signif", "nonsignif"), #significant within single group
          shape = ifelse(t > 0, "Upregulated", "Downregulated"), #up or down within single group
          tile_filt = ifelse(adj_p_value_overall < 0.05, "Adj P <= 0.05", "Adj P > 0.05"), #significant across groups
          size = abs(t), #size based on absolute 
-         condition = recode(condition,
+         condition = dplyr::recode(condition,
                             "t_ADUResist" = "ADUResist",
                             "t_ADUEndur" = "ADUEndur")) %>%
-  arrange(desc(size)) %>%
-  mutate(Timepoint_labels = case_when(
+  dplyr::arrange(dplyr::desc(size)) %>%
+  dplyr::mutate(Timepoint_labels = dplyr::case_when(
     Timepoint == "post_10_min" ~ "P10M",
     Timepoint == "post_15_30_45_min" ~ "P15-45M",
     Timepoint == "post_3.5_4_hr" ~ "P3.5/4H",

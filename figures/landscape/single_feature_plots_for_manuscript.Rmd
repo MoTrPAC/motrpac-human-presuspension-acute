@@ -139,12 +139,6 @@ plotobject3 <- MotrpacHumanPreSuspensionAnalysis::plot_single_feature(feature = 
 #Figure 5F: EE-RE diverging single features
 ```{r}
 #=============================================
-`ENSG00000257298.1`<-plot_single_feature(feature="ENSG00000257298.1",
-                                         selected_tissues = "muscle", 
-                                         selected_omes = "transcript-rna-seq",
-                                         color_time_labels = F,
-                                         include_legend = F) + ggtitle("lncRNA")
-
 BCKDHB<-plot_single_feature(feature="BCKDHB",
                             selected_tissues = "muscle", 
                             selected_omes = "transcript-rna-seq",
@@ -156,14 +150,20 @@ CAR6_0<-plot_single_feature(feature="CAR 6:0",
                             selected_omes = "all",
                             color_time_labels = F,
                             include_legend = F)
-
-FHOD1<-plot_single_feature(feature="Q9Y613_S1078s",
+#this new plot is replacing the previous FHOD plot. 
+CBFA2T3<-plot_single_feature(feature="CBFA2T3",
                            selected_tissues = "muscle", 
-                           selected_omes = "prot-ph",
+                           selected_omes = "transcript-rna-seq",
                            color_time_labels = F,
                            include_legend = T)
 
-diverging_combo<-CAR6_0+BCKDHB+`ENSG00000257298.1`+FHOD1+plot_layout(ncol = 2, guides='collect') &
+LRRC14B<-plot_single_feature(feature="LRRC14B",
+                             selected_tissues = "muscle", 
+                             selected_omes = "transcript-rna-seq",
+                             color_time_labels = F,
+                             include_legend = T)
+
+diverging_combo<-CAR6_0+BCKDHB+CBFA2T3+LRRC14B+plot_layout(ncol = 2, guides='collect') &
   theme(legend.position='bottom',      
         legend.spacing.x = unit(0.01 * sc, "in"),
         legend.spacing.y = unit(0.1 * sc, "in"),
@@ -172,23 +172,26 @@ diverging_combo<-CAR6_0+BCKDHB+`ENSG00000257298.1`+FHOD1+plot_layout(ncol = 2, g
   )
 
 ggsave(
-  diverging_combo, filename = paste0(here(),"/data/tmp/landscape_Fig5_single_plot_diverging_features.pdf"),
+  diverging_combo, filename = paste0("Fig3D_single_plot_diverging_features.pdf"),
   height = 2*2.2 * sc, width = 2*2.45 * sc, dpi = 600, units = "in"
 )
 ```
 #FigureS5
 ```{r}
-CBFA2T3 <-plot_single_feature(feature="CBFA2T3",
-                              selected_tissues = "muscle", 
-                              selected_omes = "transcript-rna-seq",
-                              color_time_labels = F,
-                              include_legend = F) 
-
-DHTKD1<-plot_single_feature(feature="DHTKD1",
+#this new plot is replacing the previous CBFA2T3 plot; they swapped places
+FHOD1<-plot_single_feature(feature="Q9Y613_S1078s",
+                           selected_tissues = "muscle", 
+                           selected_omes = "prot-ph",
+                           color_time_labels = F,
+                           include_legend = T)
+#and ZBTB4 replaces DHTKD1?
+ZBTB4<-plot_single_feature(feature="ZBTB4",
                             selected_tissues = "muscle", 
                             selected_omes = "transcript-rna-seq",
                             color_time_labels = F,
                             include_legend = F) 
+
+
 MYOG<-plot_single_feature(feature="MYOG",
                           selected_tissues = "muscle", 
                           selected_omes = "transcript-rna-seq",
@@ -206,21 +209,21 @@ MYOT<-plot_single_feature(feature="Q9UBF9_T145t",
                           selected_omes = "prot-ph",
                           color_time_labels = F,
                           include_legend = T)
+#there was also a swap with LRRC14B <-> lncRNA for main <->extended 
+`ENSG00000257298.1`<-plot_single_feature(feature="ENSG00000257298.1",
+                                         selected_tissues = "muscle", 
+                                         selected_omes = "transcript-rna-seq",
+                                         color_time_labels = F,
+                                         include_legend = F) + ggtitle("lncRNA")
 
-LRRC14B<-plot_single_feature(feature="LRRC14B",
-                             selected_tissues = "muscle", 
-                             selected_omes = "transcript-rna-seq",
-                             color_time_labels = F,
-                             include_legend = T)
-
-diverging_combo_supp<-CBFA2T3+DHTKD1+MYOG+NOL3+MYOT+LRRC14B+plot_layout(ncol = 2, guides='collect') &
+diverging_combo_supp<-FHOD1+MYOG+ZBTB4+NOL3+MYOT+`ENSG00000257298.1`+plot_layout(ncol = 2, guides='collect') &
   theme(legend.position='bottom',      legend.spacing.x = unit(0.01 * sc, "in"),
         legend.spacing.y = unit(0.1 * sc, "in"),
         legend.box.spacing = unit(0.01 * sc, "in"),
         legend.key.size = unit(0.1 * sc, "in"),)
 
 ggsave(
-  diverging_combo_supp, filename = paste0(here(),"/data/tmp/landscape_figS5_single_plot_diverging_suppC.pdf"),
+  diverging_combo_supp, filename = paste0("figED4_single_plot_diverging.pdf"),
   height = 3*2.2 * sc + (0.1*sc/3), width = 2*2.45 * sc, dpi = 600, units = "in"
 )
 

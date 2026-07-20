@@ -120,7 +120,9 @@ timepoint_short = c(
   "post_24_hr"        = "P24"
 )
 
-group_colors = c(EE = "#d95f02", RE = "#1b9e77", CON = "#7570b3")
+group_colors = MotrpacHumanPreSuspensionAnalysis::HUMAN_EXERCISE_GROUP_COLORS
+names(group_colors) = dplyr::recode(names(group_colors),
+                                    "ADUEndur" = "EE", "ADUResist" = "RE", "ADUControl" = "CON")
 sex_colors   = c(Female = "#E87461", Male = "#5B9BD5")
 
 sex_dist_plot = qc_norm_counts %>%
@@ -288,6 +290,10 @@ scatter_wide = sex_single_da_annotated %>%
     Group = factor(Group, levels = c("EE", "RE", "CON"))
   )
 
+# Exported for downstream deep dives (e.g. adipose_concordance_deep_dive.Rmd).
+saveRDS(scatter_wide,
+        here::here("revisions/landscape/sex_sensitivity_analysis/outputs/scatter_wide.rds"))
+
 scatter_sig_features = scatter_wide %>%
   dplyr::filter(!is.na(pre_cawg_adj_p) & pre_cawg_adj_p < 0.05, Group != "CON")
 
@@ -383,7 +389,11 @@ sex_direct_da_annotated = read_sex_diff %>%
 precawg_and_m_vs_f_diff = precawg_analysis %>%
   dplyr::right_join(sex_direct_da_annotated,
                     by = c("tissue", "assay", "feature_id", "randomGroupCode", "Timepoint"),
-                    suffix = c("_precawg", "_sex_diff")) 
+                    suffix = c("_precawg", "_sex_diff"))
+
+# Exported for downstream deep dives (e.g. adipose_concordance_deep_dive.Rmd).
+saveRDS(precawg_and_m_vs_f_diff,
+        here::here("revisions/landscape/sex_sensitivity_analysis/outputs/precawg_and_m_vs_f_diff.rds"))
 ```
 
 
@@ -438,8 +448,8 @@ if (!is.null(p)) {
     title = "Male vs. female transcriptional response to exercise in blood"
   )
   print(p)
-  ggsave(here::here("revisions/landscape/sex_sensitivity_analysis/outputs/scatter_blood_EE_RE_post.png"),
-         plot = p, width = 9, height = 11, dpi = 900, units = "in")
+  ggsave(here::here("revisions/landscape/sex_sensitivity_analysis/outputs/scatter_blood_EE_RE_post.pdf"),
+         plot = p, width = 9, height = 11, units = "in")
 }
 ```
 
@@ -518,7 +528,13 @@ for (feat in relevant_feature_ids) {
 
 For PGC1a specifically we highlight just the muscle, its not really mentioned as much in the context of other tissues in the landscape. 
 ```{r, results = "asis"}
-print(sex_differences_single_feature("PPARGC1A", selected_tissues = "muscle", output_file = "outputs/PPARGC1A.png"))
+print(sex_differences_single_feature("PPARGC1A", selected_tissues = "muscle", output_file = "outputs/PPARGC1A.pdf"))
+print(sex_differences_single_feature("PPARGC1A", selected_tissues = "all", output_file = "outputs/PPARGC1A_all_tissues.pdf"))
+
+```
+```{r, results = "asis"}
+# see above - ENSG00000142871.18 is CCN1 but i only want the transcript
+print(sex_differences_single_feature("ENSG00000142871.18", selected_tissues = c("muscle", "adipose"), output_file = "outputs/CCN1.pdf"))
 ```
 
 
@@ -613,7 +629,7 @@ print(chrom_summary)
 
 One question was to ask if the observed larger effect size in males is actually just due to a general correlation with things like 'workload' or 'appendicular FFM' or cell type changes. 
 
-```{r sex model fit analysis}
+```{r sex model fit analysis, eval = FALSE}
 sex_differential_analysis_fit = list.files(file.path(repo_local_dir, "data", "tmp", "freeze_DA"),
                                            full.names = TRUE)
 sex_differential_analysis_fit = sex_differential_analysis_fit[grep(".rds", sex_differential_analysis_fit)]
@@ -656,7 +672,7 @@ dxa_by_vial = pheno$data %>%
 colnames(dxa_by_vial) = c("vialLabel", dxa_body_comp_cols)
 ```
 
-```{r blood-residual-celltype-correlation}
+```{r blood-residual-celltype-correlation, eval = FALSE}
 blood_fit_path = sex_differential_analysis_fit[grep("blood", sex_differential_analysis_fit)]
 blood_fit = readRDS(blood_fit_path)
 
@@ -697,7 +713,7 @@ cor_summary = lapply(all_meta_cols, function(col) {
   dplyr::bind_rows()
 ```
 
-```{r blood-residual-workload}
+```{r blood-residual-workload, eval = FALSE}
 clinical_workload = MotrpacHumanPreSuspensionData::cln_curated_acute_bout$data
 
 workload_by_vial = pheno$data %>%

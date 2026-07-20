@@ -1,6 +1,62 @@
 # Helper functions for sex_sensitivity_analysis.Rmd
 # All output figures and files should be written to the outputs/ subdirectory.
 
+# Pick a readable (black/white) text color for a given background hex, by luminance.
+.text_on = function(hex) {
+  rgb = grDevices::col2rgb(hex) / 255
+  lum = 0.299 * rgb[1] + 0.587 * rgb[2] + 0.114 * rgb[3]
+  if (lum > 0.55) "black" else "white"
+}
+
+# Build coloured facet strips for the single-feature panels: exercise-group columns
+# use the canonical group palette, tissue rows use the canonical tissue palette (both
+# shared with the other figure scripts). When every panel shares a single ome, that ome
+# is dropped from the right-side row strips and returned in the title instead, since it
+# is redundant when identical across all rows.
+.sex_feature_strip_spec = function(plot_data, label_map, sc) {
+
+  group_pal = MotrpacHumanPreSuspensionAnalysis::HUMAN_EXERCISE_GROUP_COLORS
+  names(group_pal) = dplyr::recode(names(group_pal),
+                                   "ADUEndur" = "EE", "ADUResist" = "RE", "ADUControl" = "CON")
+  tissue_pal = MotrpacHumanPreSuspensionAnalysis::HUMAN_TISSUE_COLORS
+
+  resolve_grp = function(v) {
+    v = dplyr::recode(as.character(v), !!!label_map)
+    if (v %in% names(group_pal)) unname(group_pal[v]) else "grey85"
+  }
+  resolve_tissue = function(v) {
+    key = tolower(as.character(v))
+    if (key %in% names(tissue_pal)) unname(tissue_pal[key]) else "grey85"
+  }
+
+  # The single-feature panels key the ome on `assay`; the logFC panels use `platform`.
+  ome_col = if ("assay" %in% names(plot_data)) plot_data$assay else plot_data$platform
+  omes_present = unique(ifelse(grepl("metab", ome_col), "metab", as.character(ome_col)))
+  single_ome = length(omes_present) == 1
+  row_var = if (single_ome) "tissue" else "tissue_assay"
+
+  col_levels = levels(droplevels(as.factor(plot_data$randomGroupCode)))
+  row_levels = levels(droplevels(as.factor(plot_data[[row_var]])))
+  col_cols = vapply(col_levels, resolve_grp, character(1))
+  row_cols = if (single_ome) vapply(row_levels, resolve_tissue, character(1))
+             else rep("grey85", length(row_levels))
+
+  strip = ggh4x::strip_themed(
+    background_x = lapply(col_cols, function(cc) ggplot2::element_rect(fill = cc, colour = "grey20")),
+    background_y = lapply(row_cols, function(cc) ggplot2::element_rect(fill = cc, colour = "grey20")),
+    text_x = lapply(col_cols, function(cc) ggplot2::element_text(colour = .text_on(cc), face = "bold", size = 8 * sc)),
+    text_y = lapply(row_cols, function(cc) ggplot2::element_text(colour = .text_on(cc), face = "bold", size = 8 * sc))
+  )
+
+  list(
+    strip = strip,
+    facet_formula = stats::as.formula(paste0(row_var, " ~ randomGroupCode")),
+    title = function(feature_label) {
+      if (single_ome) paste0(feature_label, " — ", omes_present) else feature_label
+    }
+  )
+}
+
 # ── Matrix plots ──────────────────────────────────────────────────────────────
 plot_precawg_mvsf_matrix = function(precawg_and_sex_diff) {
 
@@ -74,7 +130,11 @@ plot_precawg_mvsf_matrix = function(precawg_and_sex_diff) {
   tp_colors = tp_colors[names(tp_colors) %in% names(timepoint_short)]
   names(tp_colors) = timepoint_short[names(tp_colors)]
 
-  extra_Group_colors = c(EE = "#d95f02", RE = "#1b9e77", CON = "#7570b3")
+  # Match the canonical exercise-group palette used across the other figure scripts,
+  # remapped from the ADU* keys to the EE/RE/CON labels used in this annotation.
+  extra_Group_colors = MotrpacHumanPreSuspensionAnalysis::HUMAN_EXERCISE_GROUP_COLORS
+  names(extra_Group_colors) = dplyr::recode(names(extra_Group_colors),
+                                            "ADUEndur" = "EE", "ADUResist" = "RE", "ADUControl" = "CON")
 
   annotation_col = colnames(da_feat_perc) %>%
     as.data.frame() %>%
@@ -127,9 +187,9 @@ plot_precawg_mvsf_matrix = function(precawg_and_sex_diff) {
 
   out_dir = here::here("revisions/landscape/sex_sensitivity_analysis/outputs/")
   dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
-  out_file = file.path(out_dir, "precawg_mvsf_matrix.png")
+  out_file = file.path(out_dir, "precawg_mvsf_matrix.pdf")
 
-  png(out_file, width = 14, height = 5, units = "in", res = 150)
+  pdf(out_file, width = 14, height = 5)
   ComplexHeatmap::draw(ht, merge_legends = TRUE,
                        heatmap_legend_side = "right",
                        annotation_legend_side = "right")
@@ -261,10 +321,13 @@ sex_differences_single_feature = function(feature,
       series = factor(series, levels = c("Female", "Male", "Overall"))
     )
 
-  series_colors = c("Female" = "#E87461", "Male" = "#5B9BD5", "Overall" = "black")
+  series_colors = c(MotrpacHumanPreSuspensionAnalysis::HUMAN_SEX_COLORS[c("Female", "Male")],
+                    "Overall" = "black")
   label_map = c("ADUControl" = "CON", "ADUEndur" = "EE", "ADUResist" = "RE")
 
   sc = scale_factor * 0.7
+
+  strip_spec = .sex_feature_strip_spec(plot_data, label_map, sc)
 
   g = ggplot(plot_data, aes(x = Timepoint, color = series, group = series)) +
     geom_line(aes(y = Mean), linewidth = 0.5 * sc) +
@@ -276,10 +339,11 @@ sex_differences_single_feature = function(feature,
       alpha = 0.6
     ) +
     scale_color_manual(values = series_colors) +
-    facet_grid(tissue_assay ~ randomGroupCode,
-               scales = "free_y",
-               labeller = labeller(randomGroupCode = label_map)) +
-    ggtitle(feature_label) +
+    ggh4x::facet_grid2(strip_spec$facet_formula,
+                       scales = "free_y",
+                       labeller = labeller(randomGroupCode = label_map),
+                       strip = strip_spec$strip) +
+    ggtitle(strip_spec$title(feature_label)) +
     ylab("log2(normalized value)") +
     scale_y_continuous(labels = scales::label_number(accuracy = 0.1)) +
     theme_bw() +
@@ -385,10 +449,12 @@ sex_differences_logfc_feature = function(feature,
       series = factor(series, levels = c("Female", "Male"))
     )
 
-  series_colors = c("Female" = "#E87461", "Male" = "#5B9BD5")
+  series_colors = MotrpacHumanPreSuspensionAnalysis::HUMAN_SEX_COLORS[c("Female", "Male")]
   label_map = c("ADUControl" = "CON", "ADUEndur" = "EE", "ADUResist" = "RE")
 
   sc = scale_factor * 0.7
+
+  strip_spec = .sex_feature_strip_spec(plot_data, label_map, sc)
 
   g = ggplot(plot_data, aes(x = Timepoint, color = series, group = series)) +
     geom_hline(yintercept = 0, linewidth = 0.3 * sc, linetype = "dashed", color = "grey60") +
@@ -401,10 +467,11 @@ sex_differences_logfc_feature = function(feature,
       alpha = 0.6
     ) +
     scale_color_manual(values = series_colors) +
-    facet_grid(tissue_assay ~ randomGroupCode,
-               scales = "free_y",
-               labeller = labeller(randomGroupCode = label_map)) +
-    ggtitle(feature_label) +
+    ggh4x::facet_grid2(strip_spec$facet_formula,
+                       scales = "free_y",
+                       labeller = labeller(randomGroupCode = label_map),
+                       strip = strip_spec$strip) +
+    ggtitle(strip_spec$title(feature_label)) +
     ylab("logFC") +
     scale_y_continuous(labels = scales::label_number(accuracy = 0.1)) +
     theme_bw() +
@@ -558,6 +625,46 @@ make_pca_panel = function(tiss, ome, ome_data, tp_levels, tp_colors_pca) {
       dplyr::ungroup()
   }
 
+  # Color the facet strips with the canonical timepoint (rows) and exercise-group
+  # (columns) palettes used across the other figure scripts. Timepoint labels may be
+  # raw ("post_3.5_4_hr") or prettified ("P3.5/4H"); both resolve to the same color.
+  tp_pal = MotrpacHumanPreSuspensionAnalysis::HUMAN_ACUTE_TIMEPOINT_COLORS
+  tp_label_to_raw = c(
+    "Pre" = "pre_exercise",
+    "D20" = "during_20_min", "D20M" = "during_20_min",
+    "D40" = "during_40_min", "D40M" = "during_40_min",
+    "P10" = "post_10_min", "P10M" = "post_10_min",
+    "P1545" = "post_15_30_45_min", "P15-45M" = "post_15_30_45_min",
+    "P35" = "post_3.5_4_hr", "P3.5/4H" = "post_3.5_4_hr",
+    "P24" = "post_24_hr", "P24H" = "post_24_hr"
+  )
+  group_pal = MotrpacHumanPreSuspensionAnalysis::HUMAN_EXERCISE_GROUP_COLORS
+  names(group_pal) = dplyr::recode(names(group_pal),
+                                   "ADUEndur" = "EE", "ADUResist" = "RE", "ADUControl" = "CON")
+
+  resolve_tp = function(v) {
+    v = as.character(v)
+    if (v %in% names(tp_pal)) return(unname(tp_pal[v]))
+    if (v %in% names(tp_label_to_raw)) return(unname(tp_pal[tp_label_to_raw[v]]))
+    "grey85"
+  }
+  resolve_grp = function(v) {
+    v = as.character(v)
+    if (v %in% names(group_pal)) return(unname(group_pal[v])) else "grey85"
+  }
+
+  row_vals = levels(droplevels(as.factor(df$Timepoint)))
+  col_vals = levels(droplevels(as.factor(df$Group)))
+  row_cols = vapply(row_vals, resolve_tp, character(1))
+  col_cols = vapply(col_vals, resolve_grp, character(1))
+
+  strip_spec = ggh4x::strip_themed(
+    background_x = lapply(col_cols, function(cc) ggplot2::element_rect(fill = cc, colour = "grey20")),
+    background_y = lapply(row_cols, function(cc) ggplot2::element_rect(fill = cc, colour = "grey20")),
+    text_x = lapply(col_cols, function(cc) ggplot2::element_text(colour = .text_on(cc), face = "bold")),
+    text_y = lapply(row_cols, function(cc) ggplot2::element_text(colour = .text_on(cc), face = "bold"))
+  )
+
   p = ggplot(df, aes(x = logFC_Female, y = logFC_Male)) +
     geom_hline(yintercept = 0, linetype = "dashed", color = "grey50", linewidth = 0.4) +
     geom_vline(xintercept = 0, linetype = "dashed", color = "grey50", linewidth = 0.4) +
@@ -590,7 +697,7 @@ make_pca_panel = function(tiss, ome, ome_data, tp_levels, tp_colors_pca) {
       inherit.aes = FALSE
     ) +
     coord_fixed(ratio = 1, xlim = c(-lim, lim), ylim = c(-lim, lim)) +
-    facet_grid(Timepoint ~ Group) +
+    ggh4x::facet_grid2(Timepoint ~ Group, strip = strip_spec) +
     labs(
       title = paste0(tiss, " — ", ome_type),
       x     = "logFC (Female participants)",

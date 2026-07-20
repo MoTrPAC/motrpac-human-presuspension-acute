@@ -1,0 +1,2 @@
+"tissue","assay","feature_id","logFC_precawg","CI.L_precawg","CI.R_precawg","adj_p_value_precawg","randomGroupCode","Timepoint","platform","logFC_sex_diff","CI.L_sex_diff","CI.R_sex_diff","adj_p_value_sex_diff"
+"adipose","metab","N-Acetylglutamic acid",0.759562927836328,0.42022743787742,1.09889841779524,0.00391906910051561,"ADUEndur","post_3.5_4_hr","metab-u-hilicpos",1.51603165194449,0.696820157060271,2.33524314682871,0.0374267049284915

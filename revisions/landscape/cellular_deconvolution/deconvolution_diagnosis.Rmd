@@ -210,6 +210,7 @@ cbc_raw = MotrpacHumanPreSuspensionData::cln_raw_local_lab_results$data
 # Excluding CBC neutrophil values ≤5 (2 suspected erroneous samples)
 p_filtered = plot_cbc_vs_cibersortx(blood_metadata, cbc_raw, filter_lt5 = TRUE)
 print(p_filtered)
+ggsave("cbc_vs_cibersortx_filtered.pdf", plot = p_filtered, width = 7, height = 5)
 ```
 
 ```{r}
@@ -234,14 +235,13 @@ See `DA_with_cell_types.R` to see how I'm implementing DA models with additional
 
 The DA is not staged anywhere but was put in the repo_local_dir part. 
 ```{r}
-finished_da_with_cell_types = read.csv(file.path(repo_local_dir, "data", "tmp",
+finished_da_with_cell_types = read.csv(file.path(repo_local_dir, "data", "tmp", "freeze_DA",
                                                  "human-precovid-sed-adu_t04-blood-rna_transcript-rna-seq_da_dream-acute-cell_types_v1.3.txt"),
                                        sep = "\t")
 existing_motrpac_da = load_differential_analysis(selected_omes = "transcript-rna-seq",
                                                  selected_tissues = "blood",
                                                  single_matrix = TRUE) %>%
   dplyr::select(feature_id, z.std, logFC, contrast)
-
 
 combined_da = finished_da_with_cell_types %>%
   dplyr::select(feature_id, z.std, logFC, contrast) %>%
@@ -256,21 +256,57 @@ combined_da = finished_da_with_cell_types %>%
 ```
 
 ```{r}
+timepoint_short = c(
+  "pre_exercise"      = "Pre",
+  "during_20_min"     = "D20",
+  "during_40_min"     = "D40",
+  "post_10_min"       = "P10",
+  "post_15_30_45_min" = "P15-45",
+  "post_3.5_4_hr"     = "P35",
+  "post_24_hr"        = "P24"
+)
+
+group_colors = MotrpacHumanPreSuspensionAnalysis::HUMAN_EXERCISE_GROUP_COLORS
+names(group_colors) = dplyr::recode(names(group_colors),
+                                    "ADUEndur" = "EE", "ADUResist" = "RE", "ADUControl" = "CON")
+
+timepoint_colors = MotrpacHumanPreSuspensionAnalysis::HUMAN_ACUTE_TIMEPOINT_COLORS
+names(timepoint_colors) = dplyr::recode(names(timepoint_colors), !!!as.list(timepoint_short))
+
+# White strip text on dark fills, black on light fills
+.contrast_text = function(fills) {
+  rgb_mat = grDevices::col2rgb(fills) / 255
+  luminance = 0.299 * rgb_mat[1, ] + 0.587 * rgb_mat[2, ] + 0.114 * rgb_mat[3, ]
+  ifelse(luminance < 0.55, "white", "black")
+}
+
 .plot_covariate_corr = function(da, metric, outfile) {
   x_col = paste0(metric, ".no_cell_type")
   y_col = paste0(metric, ".cell_type")
 
   plot_df = da %>%
     dplyr::filter(!is.na(.data[[x_col]]), !is.na(.data[[y_col]]),
-                  randomGroupCode %in% c("ADUEndur", "ADUResist"))
+                  randomGroupCode %in% c("ADUEndur", "ADUResist")) %>%
+    dplyr::mutate(
+      group = dplyr::recode(as.character(randomGroupCode),
+                            "ADUEndur" = "EE", "ADUResist" = "RE", "ADUControl" = "CON"),
+      timepoint = dplyr::recode(as.character(Timepoint), !!!as.list(timepoint_short))
+    ) %>%
+    dplyr::mutate(
+      group = factor(group, levels = intersect(c("EE", "RE", "CON"), group)),
+      timepoint = factor(timepoint, levels = unname(timepoint_short[timepoint_short %in% timepoint]))
+    )
 
   corr_labels = plot_df %>%
-    dplyr::group_by(randomGroupCode, Timepoint) %>%
+    dplyr::group_by(group, timepoint) %>%
     dplyr::summarise(
       r = cor(.data[[x_col]], .data[[y_col]], use = "complete.obs"),
       .groups = "drop"
     ) %>%
     dplyr::mutate(label = paste0("R = ", round(r, 2)))
+
+  col_fills = unname(timepoint_colors[levels(plot_df$timepoint)])
+  row_fills = unname(group_colors[levels(plot_df$group)])
 
   p = plot_df %>%
     ggplot(aes(x = .data[[x_col]], y = .data[[y_col]])) +
@@ -280,7 +316,15 @@ combined_da = finished_da_with_cell_types %>%
               aes(x = -Inf, y = Inf, label = label),
               hjust = -0.15, vjust = 1.5,
               size = 3.5, inherit.aes = FALSE) +
-    facet_grid(randomGroupCode ~ Timepoint) +
+    ggh4x::facet_grid2(
+      group ~ timepoint,
+      strip = ggh4x::strip_themed(
+        background_x = lapply(col_fills, function(f) element_rect(fill = f, color = "grey20")),
+        background_y = lapply(row_fills, function(f) element_rect(fill = f, color = "grey20")),
+        text_x = lapply(.contrast_text(col_fills), function(c) element_text(color = c, size = 11, face = "bold")),
+        text_y = lapply(.contrast_text(row_fills), function(c) element_text(color = c, size = 11, face = "bold"))
+      )
+    ) +
     labs(
       x = paste0(metric, " (no cell type covariate)"),
       y = paste0(metric, " (with cell type covariate)"),
@@ -290,15 +334,14 @@ combined_da = finished_da_with_cell_types %>%
     theme(
       axis.text = element_text(size = 10),
       axis.title = element_text(size = 12),
-      title = element_text(size = 13),
-      strip.text = element_text(size = 9)
+      title = element_text(size = 13)
     )
-  ggsave(outfile, width = 8, height = 4)
+  ggsave(outfile, plot = p, width = 8, height = 4)
   p
 }
 
-print(.plot_covariate_corr(combined_da, "z.std", "cell_type_covariate_inclusion.png"))
-print(.plot_covariate_corr(combined_da, "logFC", "cell_type_covariate_inclusion_logFC.png"))
+print(.plot_covariate_corr(combined_da, "z.std", "cell_type_covariate_inclusion.pdf"))
+print(.plot_covariate_corr(combined_da, "logFC", "cell_type_covariate_inclusion_logFC.pdf"))
 ```
 
 **Figure legend.** *Effect of adding deconvolution-derived cell-type covariates on the blood
@@ -306,7 +349,8 @@ RNA-seq differential analysis.* Per-transcript exercise effect estimates (logFC)
 original model (x-axis) are plotted against estimates from the model that additionally includes
 the z-scored coarse cell-type fractions (T cells, B cells, NK cells, monocytes, and neutrophils)
 as numeric covariates (y-axis). Each point is a transcript; panels are faceted by exercise group
-(rows: ADUEndur, endurance; ADUResist, resistance) and post-exercise timepoint (columns). The
+(rows: EE, endurance exercise; RE, resistance exercise) and timepoint (columns: D20/D40, 20/40 min
+during exercise; P10/P1545/P35/P24, 10 min, 15-45 min, 3.5-4 hr, and 24 hr post exercise). The
 dashed red line is the line of identity (identical estimates from both models) and the Pearson
 correlation (*R*) is annotated in each panel. Estimates falling tightly along the identity line
 indicate that accounting for cellular composition did not substantively alter the estimated

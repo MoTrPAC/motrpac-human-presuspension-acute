@@ -1,0 +1,10 @@
+"Ome","Group","Timepoint","n_sig","Pearsons_R","sign_conc","slope"
+"Transcriptomics","EE","post_15_30_45_min",57,0.930057775684807,0.964912280701754,1.15128559995354
+"Transcriptomics","EE","post_3.5_4_hr",3,0.938932018292693,1,0.921625077192583
+"Transcriptomics","EE","post_24_hr",3,0.75208136776354,1,1.85510424780261
+"Transcriptomics","RE","post_15_30_45_min",34,0.867296027040394,1,1.2992127219822
+"Transcriptomics","RE","post_3.5_4_hr",31,-0.0847758609797947,0.967741935483871,-0.065989212887661
+"Metabolomics","EE","post_15_30_45_min",1,NA,1,NA
+"Metabolomics","EE","post_3.5_4_hr",52,-0.073928406096663,1,-0.177800773414071
+"Metabolomics","EE","post_24_hr",1,NA,1,NA
+"Metabolomics","RE","post_15_30_45_min",1,NA,1,NA

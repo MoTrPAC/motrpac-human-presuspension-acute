@@ -1,0 +1,444 @@
+---
+title: "Adipose male-female concordance across timepoints"
+output: html_document
+date: "2026-06-25"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(MotrpacHumanPreSuspensionAnalysis)
+library(MotrpacHumanPreSuspensionData)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(patchwork)
+library(tibble)
+library(here)
+
+source(here::here("revisions/landscape/sex_sensitivity_analysis/sex_sensitivity_helpers.R"))
+
+out_dir = here::here("revisions/landscape/sex_sensitivity_analysis/outputs")
+dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
+```
+
+## Motivation
+
+This is a focused companion to `sex_sensitivity_analysis.Rmd`. The summary matrix in
+that document deliberately drops adipose (`tissue != "adipose"`), and the per-tissue
+scatter deep dive there is built around blood. Adipose, however, shows the single most
+*timepoint-dependent* sex concordance pattern in the whole dataset, so it deserves its own
+treatment.
+
+In the existing overall correlation table
+(`outputs/m_vs_f_response_correlation.csv`), the adipose transcriptome looks like this:
+
+| Group | Timepoint | n sig | Pearson r |
+|-------|-----------|------:|----------:|
+| EE | P15-45M | 57 | 0.93 |
+| RE | P15-45M | 34 | 0.87 |
+| RE | P3.5/4H | 31 | **-0.09** |
+| EE | P3.5/4H | 3 | 0.94 (n=3) |
+| EE | P24H | 3 | 0.75 (n=3) |
+
+So at the early post-exercise window (P15-45M) male and female adipose responses are highly
+concordant in both exercise modes, but by 3.5/4 h the resistance-exercise concordance has
+collapsed to essentially zero. The questions this document addresses:
+
+1. **Across timepoints, how concordant are the male and female adipose responses?**
+2. **Which features drive the divergence at the discordant cells?**
+
+The two adipose platforms that clear the per-sex sample-size threshold are transcriptomics and
+metabolomics, so both are carried through here: the concordance table and scatters below report
+each ome separately, and the divergent-feature sections drill into the most discordant cell for
+each.
+
+Everything here is descriptive and hypothesis-generating: the per-sex sample sizes are small, so
+single discordant cells should be read as candidates for follow-up, not confirmed dimorphism.
+
+## Concordance metrics used here
+
+For a given ome × exercise group × timepoint we take every adipose feature (transcript or
+metabolite) that was significant in
+the primary (sex-combined) PreCAWG differential analysis (BH-adjusted *p* < 0.05) and compare the
+sex-stratified exercise logFC of females vs. males. We summarize agreement with three
+complementary statistics:
+
+- **Pearson's r** — do the two sexes rank features the same way (direction + relative magnitude)?
+- **Sign concordance** — the fraction of features for which both sexes move in the same direction.
+
+```{r concordance-helpers}
+
+sign_concordance = function(x, y) {
+  ok = is.finite(x) & is.finite(y)
+  x = x[ok]; y = y[ok]
+  if (length(x) == 0) return(NA_real_)
+  mean(sign(x) == sign(y))
+}
+
+# concordance summary per Group x Timepoint; expects logFC_Female / logFC_Male columns
+concordance_table = function(df_wide) {
+  df_wide %>%
+    dplyr::group_by(Ome, Group, Timepoint) %>%
+    dplyr::summarise(
+      n_sig      = dplyr::n(),
+      Pearsons_R = cor(logFC_Female, logFC_Male, use = "complete.obs"),
+      sign_conc  = sign_concordance(logFC_Female, logFC_Male),
+      slope      = tryCatch(coef(lm(logFC_Male ~ logFC_Female))[2],
+                            error = function(e) NA_real_),
+      .groups = "drop"
+    )
+}
+```
+
+## Loading the pre-computed sex-stratified tables
+
+The sex-stratified tables are built once in `sex_sensitivity_analysis.Rmd` and exported as RDS
+(`scatter_wide.rds`, one row per feature with male/female logFC; `precawg_and_m_vs_f_diff.rds`,
+the direct male-vs-female sex-difference contrast joined to PreCAWG). Here we just load them and
+restrict to adipose. The object loaded into `precawg_and_sex_diff` is named to match the default
+argument of `sex_differences_logfc_feature()`.
+
+```{r load-rds}
+scatter_wide = readRDS(file.path(out_dir, "scatter_wide.rds")) %>%
+  dplyr::filter(tissue == "adipose")
+
+precawg_and_sex_diff = readRDS(file.path(out_dir, "precawg_and_m_vs_f_diff.rds")) %>%
+  dplyr::filter(tissue == "adipose")
+```
+
+# 1. What adipose data can we actually assess?
+
+Before interpreting concordance we need to know how many male and female participants
+contribute to each adipose group × timepoint. Thin cells produce fragile concordance estimates.
+
+```{r adipose-sample-counts, fig.width = 11, fig.height = 4}
+adipose_qc = MotrpacHumanPreSuspensionData::load_qc(selected_tissues = "adipose")[["adipose"]]
+
+pheno_meta = MotrpacHumanPreSuspensionData::pheno$data %>%
+  dplyr::select(vialLabel, Sex, randomGroupCode, Timepoint) %>%
+  dplyr::mutate(vialLabel = as.character(vialLabel))
+
+adipose_counts = lapply(names(adipose_qc), function(ome) {
+  mat = adipose_qc[[ome]][["qc_norm"]]
+  if (is.null(mat)) return(NULL)
+  tibble::tibble(vialLabel = as.character(colnames(mat)), assay = ome)
+}) %>%
+  dplyr::bind_rows() %>%
+  dplyr::inner_join(pheno_meta, by = "vialLabel") %>%
+  dplyr::filter(!grepl("metab", assay) | assay == "metab-u-hilicpos") %>%
+  dplyr::group_by(assay, randomGroupCode, Timepoint, Sex) %>%
+  dplyr::summarise(n = dplyr::n(), .groups = "drop")
+
+timepoint_short = c(
+  "pre_exercise"      = "Pre",
+  "during_20_min"     = "D20",
+  "during_40_min"     = "D40",
+  "post_10_min"       = "P10",
+  "post_15_30_45_min" = "P15-45",
+  "post_3.5_4_hr"     = "P3.5/4",
+  "post_24_hr"        = "P24"
+)
+sex_colors = c(Female = "#E87461", Male = "#5B9BD5")
+
+adipose_counts_plot = adipose_counts %>%
+  dplyr::filter(randomGroupCode != "ADUControl") %>%
+  dplyr::mutate(
+    Group = dplyr::recode(randomGroupCode, "ADUEndur" = "EE", "ADUResist" = "RE"),
+    tp = factor(dplyr::recode(as.character(Timepoint), !!!timepoint_short),
+                levels = unname(timepoint_short)),
+    Ome = dplyr::case_when(
+      grepl("metab", assay) ~ "Metabolomics",
+      grepl("rna", assay)   ~ "Transcriptomics",
+      assay == "prot-ph"    ~ "Phosphoproteomics",
+      assay %in% c("prot-pr", "prot-ol") ~ "Proteomics",
+      TRUE ~ assay
+    )
+  )
+
+ggplot(adipose_counts_plot, aes(x = tp, y = n, fill = Sex)) +
+  geom_col(position = "dodge", color = "black", linewidth = 0.25, width = 0.75) +
+  geom_text(aes(label = n), position = position_dodge(width = 0.75),
+            vjust = -0.35, size = 3) +
+  geom_hline(yintercept = 3, linetype = "dashed", color = "grey40") +
+  facet_grid(Ome ~ Group, scales = "free_y") +
+  scale_fill_manual(values = sex_colors) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.18))) +
+  labs(x = "Timepoint", y = "N participants",
+       title = "Adipose per-sex sample sizes by exercise group and timepoint",
+       subtitle = "Dashed line = minimum of 3 per sex used as the inclusion threshold") +
+  theme_bw(base_size = 11) +
+  theme(strip.text = element_text(size = 10, face = "bold"),
+        axis.text = element_text(size = 10, color = "black"),
+        axis.text.x = element_text(angle = 35, hjust = 1),
+        panel.grid.minor = element_blank(),
+        legend.position = "bottom")
+
+ggsave(file.path(out_dir, "adipose_sample_counts.pdf"),
+       width = 11, height = 4)
+```
+
+**Read this first.** Any concordance value computed in a cell where `qualifies == FALSE`
+(or where the significant-feature count is in the single digits) should be read as
+suggestive only.
+
+# 2. Concordance by timepoint
+
+```{r concordance-core}
+adipose_sig = scatter_wide %>%
+  dplyr::filter(!is.na(pre_cawg_adj_p), pre_cawg_adj_p < 0.05, Group %in% c("EE", "RE"))
+
+adipose_concordance = concordance_table(adipose_sig) %>%
+  dplyr::arrange(Ome, Group, Timepoint)
+
+knitr::kable(
+  adipose_concordance %>%
+    dplyr::transmute(
+      Ome, Group, Timepoint, n_sig,
+      `Pearson r`   = round(Pearsons_R, 2),
+      `Sign conc.`  = round(sign_conc, 2),
+      slope         = round(slope, 2)
+    ),
+  caption = "Adipose male-female concordance of exercise logFC (PreCAWG-significant features), per group and timepoint."
+)
+
+write.csv(adipose_concordance,
+          file.path(out_dir, "adipose_concordance_by_timepoint.csv"),
+          row.names = FALSE)
+```
+
+# 3. Per-timepoint male-vs-female logFC scatter
+
+The scatter makes the structure behind each correlation visible: at P15-45M the cloud hugs the
+identity line in both modes, whereas RE P3.5/4H is diffuse with no coherent direction. The most
+sex-divergent transcripts at RE P3.5/4H (smallest sex-difference adjusted *p*-value) are labeled
+in every panel for reference, following the blood scatter in `sex_sensitivity_analysis.Rmd`.
+
+```{r highlight-ids}
+# Top 10 most sex-divergent features at the discordant cell (RE, P3.5/4H).
+highlight_ids = precawg_and_sex_diff %>%
+  dplyr::filter(assay == "transcript-rna-seq",
+                randomGroupCode == "ADUResist",
+                Timepoint == "post_3.5_4_hr") %>%
+  dplyr::slice_min(adj_p_value_sex_diff, n = 10, with_ties = FALSE) %>%
+  dplyr::pull(feature_id)
+```
+
+```{r adipose-scatter, fig.width = 9, fig.height = 10}
+adipose_tp_labels = c(
+  "post_15_30_45_min" = "P15-45M",
+  "post_3.5_4_hr"     = "P3.5/4H",
+  "post_24_hr"        = "P24H"
+)
+
+prettify_adipose = function(df) {
+  df %>%
+    dplyr::mutate(
+      Timepoint = factor(dplyr::recode(as.character(Timepoint), !!!adipose_tp_labels),
+                         levels = unname(adipose_tp_labels)),
+      Group = factor(Group, levels = c("EE", "RE"))
+    )
+}
+
+scatter_post = adipose_sig %>%
+  dplyr::filter(Timepoint %in% names(adipose_tp_labels)) %>%
+  prettify_adipose()
+
+# minimal cor frame in the shape .make_sex_scatter() expects
+scatter_cor = adipose_concordance %>%
+  dplyr::mutate(tissue = "adipose", Pearsons_R = round(Pearsons_R, 3)) %>%
+  dplyr::filter(Timepoint %in% names(adipose_tp_labels)) %>%
+  prettify_adipose() %>%
+  dplyr::select(Ome, tissue, Group, Timepoint, n_sig, Pearsons_R)
+
+p_scatter = .make_sex_scatter("adipose", "Transcriptomics", scatter_post, scatter_cor,
+                              highlight_ids = highlight_ids)
+if (!is.null(p_scatter)) {
+  p_scatter = p_scatter +
+    labs(title = "Male vs. female transcriptional response to exercise in adipose")
+  print(p_scatter)
+  ggsave(file.path(out_dir, "scatter_adipose_EE_RE_post.pdf"),
+         plot = p_scatter, width = 9, height = 10, units = "in")
+}
+```
+
+**Figure legend.** *Sex-stratified adipose transcriptional response across post-exercise
+timepoints.* Each point is a transcript significant in the primary sex-combined PreCAWG
+differential analysis (BH-adjusted *p* < 0.05); female logFC on the x-axis, male logFC on the
+y-axis, with 95% CI bars. Rows are post-exercise timepoints, columns are exercise mode
+(EE, endurance; RE, resistance). The dotted diagonal is the line of identity and the blue line
+is the OLS fit. Labeled transcripts are the 10 most sex-divergent features in resistance exercise
+at 3.5/4 h, shown in every panel. Note the sparse EE P3.5/4H and P24H panels (n = 3 each), which
+should not be over-interpreted.
+
+## Metabolomics scatter
+
+The same scatter for the adipose metabolome. Metabolites are pooled across all targeted and
+untargeted platforms (`assay == "metab"`). Because the discordant window need not coincide with
+the transcriptomic one, the labeled metabolites are the most sex-divergent features at whichever
+post-exercise cell has the lowest male-female concordance (lowest Pearson *r* among cells with at
+least five significant metabolites).
+
+```{r metab-highlight-ids}
+# Data-driven pick of the most discordant post-exercise metabolomics cell, then label its
+# most sex-divergent metabolites (smallest sex-difference adjusted p) in every panel.
+metab_discordant = adipose_concordance %>%
+  dplyr::filter(Ome == "Metabolomics",
+                Timepoint %in% names(adipose_tp_labels),
+                n_sig >= 5) %>%
+  dplyr::arrange(Pearsons_R) %>%
+  dplyr::slice(1)
+
+metab_highlight_group = NA_character_
+metab_highlight_ids = character(0)
+if (nrow(metab_discordant) == 1) {
+  metab_highlight_group = dplyr::recode(metab_discordant$Group,
+                                        "EE" = "ADUEndur", "RE" = "ADUResist")
+  metab_highlight_ids = precawg_and_sex_diff %>%
+    dplyr::filter(assay == "metab",
+                  randomGroupCode == metab_highlight_group,
+                  Timepoint == metab_discordant$Timepoint) %>%
+    dplyr::slice_min(adj_p_value_sex_diff, n = 10, with_ties = FALSE) %>%
+    dplyr::pull(feature_id)
+}
+```
+
+```{r adipose-scatter-metab, fig.width = 9, fig.height = 10}
+p_scatter_metab = .make_sex_scatter("adipose", "Metabolomics", scatter_post, scatter_cor,
+                                    highlight_ids = metab_highlight_ids)
+if (!is.null(p_scatter_metab)) {
+  p_scatter_metab = p_scatter_metab +
+    labs(title = "Male vs. female metabolomic response to exercise in adipose")
+  print(p_scatter_metab)
+  ggsave(file.path(out_dir, "scatter_adipose_EE_RE_post_metab.pdf"),
+         plot = p_scatter_metab, width = 9, height = 10, units = "in")
+}
+```
+
+**Figure legend.** *Sex-stratified adipose metabolomic response across post-exercise timepoints.*
+As above, but each point is a metabolite significant in the primary sex-combined PreCAWG
+differential analysis (BH-adjusted *p* < 0.05), pooled across all adipose metabolomics platforms;
+female logFC on the x-axis, male logFC on the y-axis, with 95% CI bars. Labeled metabolites are
+the 10 most sex-divergent features at the most discordant post-exercise cell. As with the
+transcriptome, per-sex sample sizes are small and thin cells should be read as suggestive only.
+
+# 4. Which features diverge most?
+
+The labeled transcripts above are the features that move most differently between sexes at the
+discordant cell (RE, P3.5/4H): those that are both responsive (PreCAWG-significant) and
+significantly different between males and females. Their gene symbols, the size and direction of
+the sex difference (male minus female logFC), and the over-representation analysis below describe
+what is driving the loss of concordance.
+
+```{r divergent-features}
+annotated = precawg_and_sex_diff %>%
+  dplyr::left_join(
+    HUMAN_FEATURE_TO_GENE %>% dplyr::filter(assay == "transcript-rna-seq"),
+    by = c("feature_id", "assay")
+  )
+
+divergent = annotated %>%
+  dplyr::filter(assay == "transcript-rna-seq",
+                randomGroupCode == "ADUResist",
+                Timepoint == "post_3.5_4_hr",
+                adj_p_value_precawg < 0.05,
+                adj_p_value_sex_diff < 0.05) %>%
+  dplyr::arrange(adj_p_value_sex_diff)
+
+# Annotate gene location (chrX, chrY, chr1, ...) so any sex-chromosome enrichment
+# among the divergent features is obvious. Mapped by Ensembl gene ID (the rna-seq
+# feature identifier) rather than HGNC symbol; falls back to NA if biomaRt is
+# unavailable.
+divergent_ensembl = unique(as.character(divergent$ensembl_gene))
+divergent_ensembl = divergent_ensembl[!is.na(divergent_ensembl)]
+
+ensembl = tryCatch(
+  biomaRt::useEnsembl("ensembl", dataset = "hsapiens_gene_ensembl"),
+  error = function(e) {
+    message("biomaRt unavailable, skipping chromosome annotation: ", e$message)
+    NULL
+  }
+)
+
+chrom_annotation = NULL
+if (!is.null(ensembl) && length(divergent_ensembl) > 0) {
+  chrom_annotation = biomaRt::getBM(
+    attributes = c("ensembl_gene_id", "chromosome_name"),
+    filters    = "ensembl_gene_id",
+    values     = divergent_ensembl,
+    mart       = ensembl
+  ) %>%
+    dplyr::filter(chromosome_name %in% c(as.character(1:22), "X", "Y")) %>%
+    dplyr::distinct(ensembl_gene_id, chromosome_name)
+}
+
+divergent = divergent %>%
+  dplyr::mutate(ensembl_gene = as.character(ensembl_gene)) %>%
+  dplyr::left_join(
+    if (!is.null(chrom_annotation)) chrom_annotation else
+      data.frame(ensembl_gene_id = character(), chromosome_name = character()),
+    by = c("ensembl_gene" = "ensembl_gene_id")
+  ) %>%
+  dplyr::mutate(location = dplyr::if_else(is.na(chromosome_name),
+                                          NA_character_, paste0("chr", chromosome_name)))
+
+write.csv(divergent,
+          file.path(out_dir, "divergent_adipose_RE_P35_rna.csv"), row.names = FALSE)
+
+knitr::kable(
+  divergent %>%
+    dplyr::transmute(gene_symbol,
+                     location,
+                     `male-female logFC` = round(logFC_sex_diff, 2),
+                     adj_p_value_sex_diff = signif(adj_p_value_sex_diff, 2),
+                     adj_p_value_precawg = signif(adj_p_value_precawg, 2)) %>%
+    head(25),
+  caption = "Top adipose transcripts diverging between sexes in RE at 3.5/4 h post-exercise (male minus female logFC), with gene location."
+)
+```
+
+The three features lacking a gene symbol all map to a single repeat-rich window on the
+chr21 short arm (~8.2–8.4 Mb) and are annotated as near-identical lncRNAs similar to *YAM1*:
+
+| Ensembl ID | chr21 position (GRCh38) | Length | Biotype | Annotation |
+|---|---|---|---|---|
+| ENSG00000280614 | 8,393,419–8,394,341 | ~922 bp | lncRNA | "novel transcript, similar to YAM1" |
+| ENSG00000280800 | 8,210,384–8,211,306 | ~922 bp | lncRNA | "novel transcript, similar to YAM1" |
+| ENSG00000281181 | 8,437,629–8,438,551 | ~922 bp | lncRNA | "novel transcript, similar to YAM1" |
+
+## Which metabolites diverge most?
+
+The metabolomic analogue: metabolites that are both responsive (PreCAWG-significant) and
+significantly different between males and females at the most discordant metabolomics cell
+identified above. There is no chromosome annotation to add here, so we report the RefMet name,
+the platform the metabolite was measured on, and the size and direction of the sex difference
+(male minus female logFC).
+
+```{r divergent-metab}
+if (nrow(metab_discordant) == 1) {
+  divergent_metab = precawg_and_sex_diff %>%
+    dplyr::filter(assay == "metab",
+                  randomGroupCode == metab_highlight_group,
+                  Timepoint == metab_discordant$Timepoint,
+                  adj_p_value_precawg < 0.05,
+                  adj_p_value_sex_diff < 0.05) %>%
+    dplyr::arrange(adj_p_value_sex_diff)
+
+  write.csv(divergent_metab,
+            file.path(out_dir, "divergent_adipose_metab.csv"), row.names = FALSE)
+
+  knitr::kable(
+    divergent_metab %>%
+      dplyr::transmute(metabolite = feature_id,
+                       platform,
+                       `male-female logFC` = round(logFC_sex_diff, 2),
+                       adj_p_value_sex_diff = signif(adj_p_value_sex_diff, 2),
+                       adj_p_value_precawg = signif(adj_p_value_precawg, 2)) %>%
+      head(25),
+    caption = sprintf(
+      "Top adipose metabolites diverging between sexes in %s at %s (male minus female logFC).",
+      metab_discordant$Group, metab_discordant$Timepoint)
+  )
+} else {
+  cat("No adipose metabolomics cell cleared the minimum-feature threshold for a divergence table.")
+}
+```

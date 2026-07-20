@@ -32,7 +32,8 @@ lapply(differential_analysis_scripts, source)
 
 desired_ome = 'transcript-rna-seq'; tissue = 'blood'
 local_path = file.path(gitdir, "precovid-analyses", "data/tmp/") #just for output
-counts_data_path = .find_path_name(desired_ome = desired_ome, tissue = tissue, data_type = "rsem-genes-count")
+# counts_data_path = .find_path_name(desired_ome = desired_ome, tissue = tissue, data_type = "rsem-genes-count")
+counts_data_path = "gs://motrpac-data-hub/quant-id/human-precovid/v1.0/transcriptomics/t04-blood-rna/transcript-rna-seq/motrpac_human-precovid_t04-blood-rna_transcript-rna-seq_rsem-genes-count_v1.0.txt"
 raw_counts_input = MotrpacBicQC::dl_read_gcp(counts_data_path, sep = '\t', tmpdir = local_path)
 parsed_qc_norm = load_qc(selected_omes = desired_ome,
                          selected_tissues = tissue,

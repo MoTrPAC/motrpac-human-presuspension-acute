@@ -477,14 +477,18 @@ non_sig_prot_pr_ph_stats = all_group_stats %>%
 ```
 
 ```{r, eval = TRUE, fig.width = 12, fig.height = 8}
-plot_sig_nonsig_histogram(
+p_sig_nonsig_prot = plot_sig_nonsig_histogram(
   sig_prot_pr_ph_stats,
   non_sig_prot_pr_ph_stats,
   title = "Observed sample counts for significant vs. non-significant (phospho)proteomic features",
   subtitle = "Each panel is one tissue × assay; each observation is one feature × group × timepoint",
   vline = 3
 )
-ggsave("outputs/sig_nonsig_prot_n_histogram.png", width = 10, height = 8, units = "in", dpi = 600)
+p_sig_nonsig_prot
+
+pdf("outputs/sig_nonsig_prot_n_histogram.pdf", width = 10, height = 8)
+print(p_sig_nonsig_prot)
+dev.off()
 ```
 
 Same figure restricted to the specifically named features in the manuscript, across all omes.

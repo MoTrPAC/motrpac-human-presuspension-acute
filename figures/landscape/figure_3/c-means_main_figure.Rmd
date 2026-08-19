@@ -596,6 +596,140 @@ pdf("cluster_centroid_sparklines_with_labels_new_axes.pdf", width = total_width_
 print(final_combined_plot)
 dev.off()
 ```
+
+```{r figure 3F}
+# --- 1. Manual Selection Setup ---
+# Define exactly which clusters you want for each tissue here.
+# The names of the list must match the 'tissue' values in your dataframe.
+tissue_selections <- list(
+  "adipose"  = c(8),       
+  "blood" = c(7,9),    
+  "muscle"  = c(6,10,12,7)           # Add as many tissues as needed
+)
+
+# --- 2. Generate Plot List ---
+plot_list <- imap(tissue_selections, function(clusters, t_name) {
+  
+  is_first_plot <- t_name == names(tissue_selections)[1]
+  
+  plot_data <- center_df %>% 
+    filter(tissue == t_name, cluster %in% clusters)
+  
+  # --- SHARED LOCATION GREEDY ALGORITHM ---
+  
+  # 1. Rank every (Cluster, Contrast) pair by its "Peak Score".
+  #    We define Peak Score as the highest value this cluster reaches 
+  #    at this timepoint in ANY modality.
+  ranking_data <- plot_data %>%
+    group_by(cluster, contrast) %>%
+    summarise(peak_score = max(center, na.rm = TRUE), .groups = "drop") %>%
+    arrange(desc(peak_score))
+  
+  # 2. Iteratively select best timepoints, removing used Clusters & Timepoints
+  final_assignments <- tibble(cluster = character(), contrast = character())
+  
+  # Loop until we run out of options
+  while(nrow(ranking_data) > 0) {
+    # Pick the winner (highest remaining peak)
+    winner <- ranking_data %>% slice(1)
+    
+    # Save the assignment
+    final_assignments <- bind_rows(final_assignments, 
+                                   tibble(cluster = winner$cluster, contrast = winner$contrast))
+    
+    # ELIMINATE:
+    # Remove this cluster (it's assigned)
+    # Remove this contrast (it's taken - enforcing x-axis spread)
+    ranking_data <- ranking_data %>%
+      filter(cluster != winner$cluster, contrast != winner$contrast)
+  }
+  
+  # 3. Create Final Label Data
+  #    KEY CHANGE: Join assignment back to original plot_data.
+  #    This grabs the rows for ALL modalities at that specific contrast.
+  label_data <- plot_data %>%
+    inner_join(final_assignments, by = c("cluster", "contrast"))
+  
+  # --- END ALGORITHM ---
+  
+  cluster_color_map <- plot_data %>% 
+    distinct(cluster, cluster_color) %>% 
+    tibble::deframe()
+  
+  p_single <- ggplot(plot_data, aes(x = contrast, y = center, group = cluster)) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "grey50", linewidth = 0.25) +
+    
+    # 1. The Sparklines
+    geom_line(color = "black", linewidth = 0.85, alpha = 0.7) +
+    geom_line(aes(color = cluster), linewidth = 0.75, alpha = 0.9) +
+    
+    # 2. The Label Background (True Circle)
+    geom_point(data = label_data, aes(fill = cluster,y=center+0.3), 
+               shape = 21,          # Circle with outline
+               color = "black",     # Black outline
+               size = 1.2,            # Size of the circle (adjust as needed)
+               stroke = 0.2) +      # Thickness of the black outline
+    
+    # 3. The Label Number
+    geom_text(data = label_data, aes(label = cluster, y=center+0.3), 
+              color = "black",      # Number is always black
+              size = 0.8,             # Text size
+              fontface = "bold") +
+    
+    # Scales
+    scale_color_manual(values = cluster_color_map, guide = "none") +
+    scale_fill_manual(values = cluster_color_map, guide = "none") +
+    
+    # Formatting
+    coord_cartesian(ylim = c(-0.2, 2.55), clip = "off") + 
+    labs(x = NULL, y = NULL) + 
+    theme_bw(base_size = 8)
+  
+  p_single <- p_single + theme(
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5),
+    axis.ticks = element_blank(), 
+    axis.text = element_blank(), 
+    axis.title = element_blank(),
+    panel.grid = element_blank(), 
+    legend.position = "none",
+    panel.spacing = unit(0.01, "cm"), 
+    plot.margin = margin(0, 5, 0, 0), # Small right margin
+    
+    strip.background.x = element_rect(fill = HUMAN_TISSUE_COLORS[t_name], color = NA),
+    strip.text.x = element_text(face = "bold", size = 2,margin = margin(.01, 0, .01, 0, "cm")))
+  
+  
+  
+  if (is_first_plot) {
+    p_single <- p_single + 
+      facet_grid(modality ~ tissue, switch = "y") +
+      theme(
+        strip.text.y = element_text(size = 5, angle = 180), 
+        strip.background.y = element_blank()
+      )
+  } else {
+    p_single <- p_single + 
+      facet_grid(modality ~ tissue) +
+      theme(strip.text.y = element_blank(),
+            strip.background.y = element_blank())
+  }
+  
+  return(p_single)
+})
+
+# --- 3. Combine and Export ---
+sparklines_plot <- patchwork::wrap_plots(plot_list, nrow = 1)
+
+plot_width_in <- 0.5  
+plot_height_in <- 0.9 
+num_plots <- length(plot_list)
+total_width_in <- num_plots * plot_width_in
+
+pdf("cluster_centroid_sparklines_smart_spaced.pdf", width = total_width_in, height = plot_height_in)
+print(sparklines_plot)
+dev.off()
+```
+
 # Top ORA Enrichments of C-means Clusters
 This section identifies the top Over-Representation Analysis (ORA) gene sets from the C-means clusters (hard-clustered with probability > 0.3) and finds which sets are common across all three tissues.
 

@@ -231,7 +231,8 @@ print(p)
 
 ## Sparkline Plots
 This section generates a series of small, individual "sparkline" plots for each cluster group.
-```{r Sparklines figure 4C}
+```{r Sparklines Figure 4C}
+
 # ==============================================================================
 # 1. SETUP & CONFIGURATION
 # ==============================================================================
@@ -307,7 +308,7 @@ center_df <- center_df %>%
   dplyr::mutate(
     max_abs_contrast = as.character(max_abs_contrast),
     max_abs_contrast = dplyr::case_when(
-      tissue == "blood" & max_abs_contrast == "P10M" ~ "P15-45M",
+      tissue == "blood" & max_abs_contrast == "P10M" ~ "P15-45M", #trajectories with max deviation at P10 or P30 are grouped in blood
       TRUE ~ max_abs_contrast
     ),
     max_abs_contrast       = factor(max_abs_contrast, levels = unique(max_abs_contrast)),
@@ -379,6 +380,11 @@ center_df <- center_df %>%
 # 4. PLOTTING - SPARKLINE PANELS
 # ==============================================================================
 
+# Calculate global Y-limits across entire dataset to enforce identical y-scales
+global_y_min <- min(center_df$center, na.rm = TRUE)
+global_y_max <- max(center_df$center + 0.3, na.rm = TRUE) # Includes label height offset
+global_y_limits <- c(global_y_min, global_y_max)
+
 tissue_order   <- c("adipose", "blood", "muscle")
 contrast_order <- c("P15-45M", "P3.5/4H", "P24H")
 
@@ -438,6 +444,7 @@ plot_list <- pmap(
     
     # --- HARDCODED LABEL OVERRIDES ---
     # Move Blood Cluster 7 label to match Cluster 1 (or midpoint "P15-45M")
+    # This helps the labels not overlap. the hard coding affects labels, not data
     if (t == "blood" && "7" %in% final_assignments$cluster) {
       c1_contrast <- final_assignments %>% filter(cluster == "1") %>% pull(contrast)
       target_contrast <- if (length(c1_contrast) > 0) c1_contrast[1] else "P15-45M"
@@ -478,10 +485,13 @@ plot_list <- pmap(
         color = "black", size = 0.8, fontface = "bold"
       ) +
       
-      # Color & Scale definitions
+      # Color & Uniform Global Y-Scale
       scale_color_manual(values = cluster_color_map, guide = "none") +
       scale_fill_manual(values = cluster_color_map, guide = "none") +
-      scale_y_continuous(expand = expansion(mult = c(0.06, 0.14))) +
+      scale_y_continuous(
+        limits = global_y_limits,
+        expand = expansion(mult = c(0.06, 0.14))
+      ) +
       
       coord_cartesian(clip = "off") +
       labs(x = NULL, y = NULL) + 
@@ -582,11 +592,10 @@ plot_height_in <- 0.9
 num_plots      <- length(plot_list) 
 total_width_in <- num_plots * plot_width_in
 
-pdf("cluster_centroid_sparklines_with_labels.pdf", width = total_width_in, height = plot_height_in)
+pdf("cluster_centroid_sparklines_with_labels_new_axes.pdf", width = total_width_in, height = plot_height_in)
 print(final_combined_plot)
 dev.off()
 ```
-
 # Top ORA Enrichments of C-means Clusters
 This section identifies the top Over-Representation Analysis (ORA) gene sets from the C-means clusters (hard-clustered with probability > 0.3) and finds which sets are common across all three tissues.
 
@@ -1486,6 +1495,8 @@ This section uses the custom heatmap function to generate plots for specific pat
   return(unlist(desired_pathway, use.names = F))
 }
 ```
+
+
 
 
 ```{r prepare_heatmap_parameters}

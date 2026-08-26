@@ -1,0 +1,112 @@
+---
+title: "adipose_cmeans"
+output: html_document
+date: "2025-02-12"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(MotrpacHumanPreSuspensionAnalysis)
+library(MotrpacHumanPreSuspensionData)
+library(dplyr)
+library(here)
+
+repo_local_dir = file.path(here(), 
+                           "figures",
+                           "adipose")
+files_dir = file.path(repo_local_dir, "Files")
+cmeans_dir = file.path(repo_local_dir, "cmeans")
+
+source(file.path(cmeans_dir, "cmeans_helpers.R"))
+```
+
+The cell type markers ship as a list, but `path_to_gmt` reads GMT, so convert
+once here. Despite the extension, `ba_svf_markers_v2.rds` is a `save()` archive
+holding `ba_svf_list`, so it is read with `load()`.
+```{r celltype_gmt}
+load(file.path(files_dir, "ba_svf_markers_v2.rds"))
+#loads ba_svf_list into the environment
+
+celltype_gmt = file.path(files_dir, "ba_svf_markers_v2.gmt")
+
+# GMT rows are ragged (set, description, members...), which write.table
+# cannot emit.
+writeLines(
+  vapply(names(ba_svf_list),
+         function(set) {
+           paste(c(set, "ba_svf_markers_v2.rds", ba_svf_list[[set]]),
+                 collapse = "\t")
+         },
+         character(1)),
+  con = celltype_gmt
+)
+```
+
+So here want to do c-means results by modality, plot them, and do enrichment on all
+```{r}
+for(modality in c("Resist", "Endur")){
+  outdir = file.path(files_dir, "c_means_adipose", modality)
+  dir.create(outdir, recursive = TRUE, showWarnings = FALSE)
+  
+  modality_clusters = run_cmeans(selected_tissues = "adipose",
+                                 selected_omes = c("transcript-rna-seq", "metab"),
+                                 modality = modality)
+  
+  write.csv(modality_clusters[["adipose"]]$membership,
+            file = paste0(outdir, "/", modality, "_specific_clusts.csv"),
+            row.names = TRUE)
+  
+  plot_cmeans(modality_clusters[["adipose"]],
+              modality = modality,
+              min_membership = 0.3,
+              filename = paste0(outdir, "/", modality, "_specific_clusts.pdf"))
+  
+  ORA = run_cluster_ORA(modality_clusters,
+                        selected_omes = c("transcript-rna-seq", "metab"),
+                        selected_tissues = "adipose") %>%
+    arrange(adj_p_value)
+  write.csv(ORA,
+            file = paste0(outdir, "/", modality, "_specific_enrichments.csv"),
+            row.names = FALSE)
+  
+  # Markers are gene symbols, so transcripts only. overlap_cutoff = 0 because
+  # most of a marker set falls outside the clustered background.
+  celltype_ORA = run_cluster_ORA(modality_clusters,
+                                 selected_omes = "transcript-rna-seq",
+                                 selected_tissues = "adipose",
+                                 path_to_gmt = celltype_gmt,
+                                 overlap_cutoff = 0) %>%
+    arrange(adj_p_value)
+  write.csv(celltype_ORA,
+            file = paste0(outdir, "/", modality, "_specific_celltype_enrichments.csv"),
+            row.names = FALSE)
+  
+  celltype_block = celltype_ORA %>%
+    transmute(block = "Cell type",
+              set_label = unname(CELLTYPE_LABELS[as.character(set)]),
+              cluster, p_value, adj_p_value)
+  if (anyNA(celltype_block$set_label))
+    stop("CELLTYPE_LABELS is missing an entry for one of the marker sets.")
+  
+  refmet_block = ORA %>%
+    filter(collection == "REFMET") %>%
+    transmute(block = "Metabolite class",
+              set_label = as.character(set_short),
+              cluster, p_value, adj_p_value)
+  
+  heatmap_parts = build_cluster_bubble_heatmap(bind_rows(celltype_block,
+                                                         refmet_block))
+  
+  panel_title = paste0(MODALITY_LABELS[modality],
+                       " (Transcriptomics + Metabolomics)")
+  
+  save_combined_panel(
+    traj_plot = plot_cmeans_facets(modality_clusters[["adipose"]],
+                                   modality = modality,
+                                   min_membership = 0.3),
+    heatmap_parts = heatmap_parts,
+    filename = paste0(outdir, "/", modality, "_specific_cmeans_enrichment_panel.pdf"),
+    title = panel_title)
+  
+}
+```

@@ -28,7 +28,7 @@ output: html_document
 # Load all required packages for the session.
 session_packages <- c('pheatmap', 'limma', 'UpSetR', 'ComplexHeatmap', 'gprofiler2',
                       'plier', 'cluster', 'readxl','qvalue', 'reshape2', 'ggh4x','ggVennDiagram','ggpattern',
-                      'MASS', 'splitstackshape', 'MotrpacBicQC', 'tidyverse', 
+                      'MASS', 'splitstackshape', 'MotrpacBicQC', 'tidyverse', 'here',
                       'powerjoin','MotrpacHumanPreSuspensionAnalysis','variancePartition','patchwork','ggbeeswarm','circlize', 'forcats',
                       'grid','gridExtra')
 
@@ -231,18 +231,12 @@ print(p)
 
 ## Sparkline Plots
 This section generates a series of small, individual "sparkline" plots for each cluster group.
-```{r Sparklines figure 3C}
-# --- USER CONFIGURATION ---
-contrast_recode_map <- c(
-  "Pre" = "pre_exercise",
-  "P10M" = "post_10_min",
-  "P15-45M" = "post_15_30_45_min",
-  "P3.5/4H" = "post_3.5_4_hr",
-  "P24H" = "post_24_hr"
-)
-ordered_contrast_levels <- names(contrast_recode_map)
+```{r Sparklines Figure 4C}
 
-# --- Load Required Libraries ---
+# ==============================================================================
+# 1. SETUP & CONFIGURATION
+# ==============================================================================
+
 library(dplyr)
 library(tidyr)
 library(forcats)
@@ -251,116 +245,331 @@ library(purrr)
 library(RColorBrewer)
 library(patchwork)
 
-# --- 1-5. Data Preparation (Unchanged) ---
-# (This code is identical to before and is included for completeness)
+# Contrast level mapping
+contrast_recode_map <- c(
+  "Pre"     = "pre_exercise",
+  "P10M"    = "post_10_min",
+  "P15-45M" = "post_15_30_45_min",
+  "P3.5/4H" = "post_3.5_4_hr",
+  "P24H"    = "post_24_hr"
+)
+ordered_contrast_levels <- names(contrast_recode_map)
+
+
+# ==============================================================================
+# 2. DATA PREPARATION & CENTROID PROCESSING
+# ==============================================================================
+
 tissues <- c("muscle", "adipose", "blood")
 all_tissue_dfs <- list()
+
 for (t in tissues) {
   centers <- FCM_CLUSTERS[[t]]$centers
   colnames(centers) <- sub("group_timepointADU([^ ]+) .*", "\\1", colnames(centers))
+  
   pre_ex <- matrix(data = 0, nrow = nrow(centers), ncol = 2L)
   colnames(pre_ex) <- c("Endur.pre_exercise", "Resist.pre_exercise")
   centers <- cbind(pre_ex, centers)
+  
   col_order <- c(grep("Endur", colnames(centers)), grep("Resist", colnames(centers)))
   centers <- centers[, col_order]
-  df_temp <- centers %>% as.data.frame() %>% tibble::rownames_to_column("cluster") %>%
+  
+  df_temp <- centers %>%
+    as.data.frame() %>%
+    tibble::rownames_to_column("cluster") %>%
     tidyr::pivot_longer(cols = -cluster, names_to = "contrast", values_to = "center") %>%
-    dplyr::mutate(modality = ifelse(grepl("Endur", contrast), "EE", "RE"), contrast = sub("[^.]+\\.", "", contrast), tissue = t)
+    dplyr::mutate(
+      modality = ifelse(grepl("Endur", contrast), "EE", "RE"),
+      contrast = sub("[^.]+\\.", "", contrast),
+      tissue   = t
+    )
+  
   all_tissue_dfs[[t]] <- df_temp
 }
+
+# Merge and calculate max magnitude timepoints
 center_df <- dplyr::bind_rows(all_tissue_dfs) %>%
   dplyr::mutate(contrast = forcats::fct_recode(contrast, !!!contrast_recode_map)) %>%
-  dplyr::mutate(contrast = factor(contrast, levels = ordered_contrast_levels), across(.cols = c(cluster, modality, tissue), .fns = ~ factor(.x, levels = unique(.x)))) %>%
-  dplyr::rowwise() %>% dplyr::ungroup()
+  dplyr::mutate(
+    contrast = factor(contrast, levels = ordered_contrast_levels),
+    across(.cols = c(cluster, modality, tissue), .fns = ~ factor(.x, levels = unique(.x)))
+  ) %>%
+  dplyr::rowwise() %>%
+  dplyr::ungroup()
+
 center_df <- center_df %>%
   dplyr::group_by(tissue, cluster) %>%
-  dplyr::mutate(max_abs_idx = which.max(abs(center)), max_abs_contrast = contrast[max_abs_idx], max_abs_sign = ifelse(center[max_abs_idx] >= 0, "Positive", "Negative")) %>%
+  dplyr::mutate(
+    max_abs_idx      = which.max(abs(center)),
+    max_abs_contrast = contrast[max_abs_idx],
+    max_abs_sign     = ifelse(center[max_abs_idx] >= 0, "Positive", "Negative")
+  ) %>%
   dplyr::ungroup() %>%
-  dplyr::mutate(max_abs_contrast = as.character(max_abs_contrast), max_abs_contrast = dplyr::case_when(tissue == "blood" & max_abs_contrast == "P10M" ~ "P15-45M", TRUE ~ max_abs_contrast),
-                max_abs_contrast = factor(max_abs_contrast, levels = unique(max_abs_contrast)), max_abs_contrast_group = paste(max_abs_contrast, max_abs_sign, sep = "_"),
-                max_abs_contrast_group = factor(max_abs_contrast_group, levels = unique(max_abs_contrast_group)))
-user_palette_map <- c("P3.5/4H_Negative" = "Reds", "P3.5/4H_Positive" = "Greens", "P15-45M_Positive" = "Blues", "P24H_Positive" = "Purples", "P15-45M_Negative" = "Oranges", "P24H_Negative" = "YlOrBr")
-all_groups_in_data <- levels(center_df$max_abs_contrast_group); unmapped_groups <- setdiff(all_groups_in_data, names(user_palette_map))
-if (length(unmapped_groups) > 0) { warning(paste("Found unmapped groups, assigning 'Greys' palette:", paste(unmapped_groups, collapse = ", "))); default_map <- rep("Greys", length(unmapped_groups)); names(default_map) <- unmapped_groups } else { default_map <- c() }
+  dplyr::mutate(
+    max_abs_contrast = as.character(max_abs_contrast),
+    max_abs_contrast = dplyr::case_when(
+      tissue == "blood" & max_abs_contrast == "P10M" ~ "P15-45M", #trajectories with max deviation at P10 or P30 are grouped in blood
+      TRUE ~ max_abs_contrast
+    ),
+    max_abs_contrast       = factor(max_abs_contrast, levels = unique(max_abs_contrast)),
+    max_abs_contrast_group = paste(max_abs_contrast, max_abs_sign, sep = "_"),
+    max_abs_contrast_group = factor(max_abs_contrast_group, levels = unique(max_abs_contrast_group))
+  )
+
+
+# ==============================================================================
+# 3. COLOR PALETTE GENERATION
+# ==============================================================================
+
+user_palette_map <- c(
+  "P3.5/4H_Negative" = "Reds",
+  "P3.5/4H_Positive" = "Greens",
+  "P15-45M_Positive" = "Blues",
+  "P24H_Positive"    = "Purples",
+  "P15-45M_Negative" = "Oranges",
+  "P24H_Negative"    = "YlOrBr"
+)
+
+all_groups_in_data <- levels(center_df$max_abs_contrast_group)
+unmapped_groups <- setdiff(all_groups_in_data, names(user_palette_map))
+
+if (length(unmapped_groups) > 0) {
+  warning(paste("Found unmapped groups, assigning 'Greys' palette:", paste(unmapped_groups, collapse = ", ")))
+  default_map <- rep("Greys", length(unmapped_groups))
+  names(default_map) <- unmapped_groups
+} else {
+  default_map <- c()
+}
+
 group_palette_map <- c(user_palette_map, default_map)
-color_lookup_df <- center_df %>% distinct(tissue, cluster, max_abs_contrast_group) %>% group_by(tissue, max_abs_contrast_group) %>% tidyr::nest(items_to_color = c(cluster)) %>%
-  mutate(palette_name = group_palette_map[as.character(max_abs_contrast_group)]) %>% rowwise() %>%
-  mutate(n_clusters = nrow(items_to_color), cluster_shades = list(if (n_clusters > 9) { colorRampPalette(rev(RColorBrewer::brewer.pal(9, palette_name)))(n_clusters) } else { rev(RColorBrewer::brewer.pal(max(3, n_clusters), palette_name))[1:n_clusters] })) %>%
-  ungroup() %>% mutate(items_with_color = map2(items_to_color, cluster_shades, ~ .x %>% arrange(cluster) %>% bind_cols(cluster_color = .y))) %>%
-  select(tissue, max_abs_contrast_group, items_with_color) %>% tidyr::unnest(cols = items_with_color) %>% select(tissue, cluster, max_abs_contrast_group, cluster_color)
-center_df <- center_df %>% select(-any_of("cluster_color")) %>% left_join(color_lookup_df, by = c("tissue", "cluster", "max_abs_contrast_group"))
 
-# --- 6. PLOTTING LOGIC (Revised for Perfect Alignment) ---
+color_lookup_df <- center_df %>%
+  distinct(tissue, cluster, max_abs_contrast_group) %>%
+  group_by(tissue, max_abs_contrast_group) %>%
+  tidyr::nest(items_to_color = c(cluster)) %>%
+  mutate(palette_name = group_palette_map[as.character(max_abs_contrast_group)]) %>%
+  rowwise() %>%
+  mutate(
+    n_clusters = nrow(items_to_color),
+    cluster_shades = list(
+      if (n_clusters > 9) {
+        colorRampPalette(rev(RColorBrewer::brewer.pal(9, palette_name)))(n_clusters)
+      } else {
+        rev(RColorBrewer::brewer.pal(max(3, n_clusters), palette_name))[1:n_clusters]
+      }
+    )
+  ) %>%
+  ungroup() %>%
+  mutate(
+    items_with_color = map2(
+      items_to_color, 
+      cluster_shades, 
+      ~ .x %>% arrange(cluster) %>% bind_cols(cluster_color = .y)
+    )
+  ) %>%
+  select(tissue, max_abs_contrast_group, items_with_color) %>%
+  tidyr::unnest(cols = items_with_color) %>%
+  select(tissue, cluster, max_abs_contrast_group, cluster_color)
 
-# 6a. Define plot order and create the list of sparkline plots
-tissue_order <- c("adipose", "blood", "muscle")
+center_df <- center_df %>%
+  select(-any_of("cluster_color")) %>%
+  left_join(color_lookup_df, by = c("tissue", "cluster", "max_abs_contrast_group"))
+
+
+# ==============================================================================
+# 4. PLOTTING - SPARKLINE PANELS
+# ==============================================================================
+
+# Calculate global Y-limits across entire dataset to enforce identical y-scales
+global_y_min <- min(center_df$center, na.rm = TRUE)
+global_y_max <- max(center_df$center + 0.3, na.rm = TRUE) # Includes label height offset
+global_y_limits <- c(global_y_min, global_y_max)
+
+tissue_order   <- c("adipose", "blood", "muscle")
 contrast_order <- c("P15-45M", "P3.5/4H", "P24H")
 
 plot_groups <- center_df %>%
   distinct(tissue, max_abs_contrast) %>%
   mutate(
-    tissue = factor(tissue, levels = tissue_order),
+    tissue           = factor(tissue, levels = tissue_order),
     max_abs_contrast = factor(max_abs_contrast, levels = contrast_order)
   ) %>%
   filter(!is.na(tissue), !is.na(max_abs_contrast)) %>% 
   arrange(tissue, max_abs_contrast) %>%
   mutate(plot_index = 1:n())
 
+# Generate list of individual sparkline plots
 plot_list <- pmap(
   .l = list(t = plot_groups$tissue, c = plot_groups$max_abs_contrast, i = plot_groups$plot_index),
   .f = function(t, c, i) {
+    
     plot_data <- center_df %>% filter(tissue == t, max_abs_contrast == c)
+    all_clusters_in_panel <- unique(as.character(plot_data$cluster))
+    
+    # 4a. Smart Label Spacing Algorithm (Greedy + Fallback)
+    ranking_data <- plot_data %>%
+      group_by(cluster, contrast) %>%
+      summarise(peak_score = max(abs(center), na.rm = TRUE), .groups = "drop") %>%
+      mutate(cluster = as.character(cluster), contrast = as.character(contrast)) %>%
+      arrange(desc(peak_score))
+    
+    final_assignments <- tibble(cluster = character(), contrast = character())
+    remaining_ranking  <- ranking_data
+    
+    # Assign available unique timepoints
+    while (nrow(remaining_ranking) > 0) {
+      winner <- remaining_ranking %>% slice(1)
+      
+      final_assignments <- bind_rows(
+        final_assignments, 
+        tibble(cluster = winner$cluster, contrast = winner$contrast)
+      )
+      
+      remaining_ranking <- remaining_ranking %>%
+        filter(cluster != winner$cluster, contrast != winner$contrast)
+    }
+    
+    # Fallback for overflow clusters: assign to peak timepoint
+    unassigned <- setdiff(all_clusters_in_panel, final_assignments$cluster)
+    if (length(unassigned) > 0) {
+      fallback <- ranking_data %>%
+        filter(cluster %in% unassigned) %>%
+        group_by(cluster) %>%
+        slice_max(peak_score, n = 1, with_ties = FALSE) %>%
+        ungroup() %>%
+        select(cluster, contrast)
+      
+      final_assignments <- bind_rows(final_assignments, fallback)
+    }
+    
+    # --- HARDCODED LABEL OVERRIDES ---
+    # Move Blood Cluster 7 label to match Cluster 1 (or midpoint "P15-45M")
+    # This helps the labels not overlap. the hard coding affects labels, not data
+    if (t == "blood" && "7" %in% final_assignments$cluster) {
+      c1_contrast <- final_assignments %>% filter(cluster == "1") %>% pull(contrast)
+      target_contrast <- if (length(c1_contrast) > 0) c1_contrast[1] else "P15-45M"
+      
+      final_assignments <- final_assignments %>%
+        mutate(contrast = if_else(cluster == "7", target_contrast, contrast))
+    }
+    
+    # Move Adipose Cluster 13 label to the last timepoint ("P24H")
+    if (t == "adipose" && "13" %in% final_assignments$cluster) {
+      final_assignments <- final_assignments %>%
+        mutate(contrast = if_else(cluster == "13", "P24H", contrast))
+    }
+    
+    label_data <- plot_data %>%
+      mutate(cluster = as.character(cluster), contrast = as.character(contrast)) %>%
+      inner_join(final_assignments, by = c("cluster", "contrast"))
+
     cluster_color_map <- plot_data %>% distinct(cluster, cluster_color) %>% tibble::deframe()
+    
+    # 4b. Single Sparkline Construction
     p_single <- ggplot(plot_data, aes(x = contrast, y = center, group = cluster)) +
       geom_hline(yintercept = 0, linetype = "dashed", color = "grey50", linewidth = 0.25) +
+      
+      # Trajectory lines
       geom_line(color = "black", linewidth = 0.85, alpha = 0.7) +
       geom_line(aes(color = cluster), linewidth = 0.75, alpha = 0.9) +
+      
+      # Circle labels & text
+      geom_point(
+        data = label_data, 
+        aes(fill = cluster, y = center + 0.3), 
+        shape = 21, color = "black", size = 1.2, stroke = 0.2
+      ) +
+      geom_text(
+        data = label_data, 
+        aes(label = cluster, y = center + 0.3), 
+        color = "black", size = 0.8, fontface = "bold"
+      ) +
+      
+      # Color & Uniform Global Y-Scale
       scale_color_manual(values = cluster_color_map, guide = "none") +
-      labs(x = NULL, y = NULL) + theme_bw(base_size = 8)
+      scale_fill_manual(values = cluster_color_map, guide = "none") +
+      scale_y_continuous(
+        limits = global_y_limits,
+        expand = expansion(mult = c(0.06, 0.14))
+      ) +
+      
+      coord_cartesian(clip = "off") +
+      labs(x = NULL, y = NULL) + 
+      theme_bw(base_size = 8) +
+      theme(
+        panel.border  = element_rect(color = "black", fill = NA, linewidth = 0.5),
+        axis.ticks    = element_blank(), 
+        axis.text     = element_blank(), 
+        axis.title    = element_blank(),
+        panel.grid    = element_blank(), 
+        legend.position = "none",
+        panel.spacing = unit(0, "lines"),
+        plot.margin   = margin(1, 1, 1, 1, "pt") 
+      )
     
-    # Base theme for all sparklines
-    p_single <- p_single + theme(
-      panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5),
-      axis.ticks = element_blank(), axis.text = element_blank(), axis.title = element_blank(),
-      panel.grid = element_blank(), legend.position = "none",
-      panel.spacing = unit(0, "lines"),
-      # *** KEY CHANGE: Remove plot margins to ensure plots are flush ***
-      plot.margin = margin(0, 0, 0, 0) 
-    )
-    
+    # Add modality facet strip to first plot only
     if (i == 1) {
-      # Add modality strip only to the very first plot
-      p_single <- p_single + facet_grid(modality ~ ., switch = "y") +
-        theme(strip.text.y = element_text(size = 5, angle = 0), strip.background = element_blank())
+      p_single <- p_single + 
+        facet_grid(modality ~ ., switch = "y") +
+        theme(
+          strip.text.y = element_text(size = 5, angle = 0), 
+          strip.background = element_blank()
+        )
     } else {
-      # All other plots have no strip
-      p_single <- p_single + facet_grid(modality ~ .) +
+      p_single <- p_single + 
+        facet_grid(modality ~ .) +
         theme(strip.text.y = element_blank())
     }
+    
     return(p_single)
   }
 )
 
-# 6b. Create the plot for the `max_abs_contrast` labels (middle row)
-contrast_color_lookup <- tibble(max_abs_contrast = names(contrast_recode_map), long_contrast_name = unname(contrast_recode_map))
-plot_groups_for_labels <- left_join(plot_groups, contrast_color_lookup, by = "max_abs_contrast")
 
-p_contrast_labels <- ggplot(plot_groups_for_labels, aes(label = max_abs_contrast, fill = long_contrast_name)) +
-  # *** KEY CHANGE: Set color = NA to remove borders between rectangles ***
-  geom_rect(aes(xmin = plot_index - 0.5, xmax = plot_index + 0.5, ymin = 0, ymax = 1), color = NA) +
-  #geom_text(aes(x = plot_index, y = 0.5), color = "black", fontface = "bold", size = 1.5) +
+# ==============================================================================
+# 5. HEADER STRIPS (TISSUE & CONTRAST LABELS)
+# ==============================================================================
+
+# Contrast headers (Middle Row) with "P10-45M" label for blood
+contrast_color_lookup <- tibble(
+  max_abs_contrast   = names(contrast_recode_map), 
+  long_contrast_name = unname(contrast_recode_map)
+)
+
+plot_groups_for_labels <- left_join(plot_groups, contrast_color_lookup, by = "max_abs_contrast") %>%
+  mutate(
+    display_contrast = ifelse(
+      tissue == "blood" & max_abs_contrast == "P15-45M", 
+      "P10-45M", 
+      as.character(max_abs_contrast)
+    )
+  )
+
+p_contrast_labels <- ggplot(plot_groups_for_labels) +
+  geom_rect(
+    aes(xmin = plot_index - 0.5, xmax = plot_index + 0.5, ymin = 0, ymax = 1, fill = long_contrast_name), 
+    color = NA
+  ) +
+  geom_text(
+    aes(x = plot_index, y = 0.5, label = display_contrast), 
+    color = "black", fontface = "bold", size = 1.3
+  ) +
   scale_fill_manual(values = HUMAN_ACUTE_TIMEPOINT_COLORS, guide = "none") +
   scale_x_continuous(limits = c(0.5, nrow(plot_groups) + 0.5), expand = c(0, 0)) +
   scale_y_continuous(expand = c(0, 0)) +
   theme_void()
 
-# 6c. Create the plot for the Tissue labels (top row)
+# Tissue headers (Top Row)
 tissue_label_data <- plot_groups %>%
   group_by(tissue) %>%
-  summarise(x_center = mean(plot_index), xmin = min(plot_index) - 0.5, xmax = max(plot_index) + 0.5, .groups = 'drop')
+  summarise(
+    x_center = mean(plot_index), 
+    xmin     = min(plot_index) - 0.5, 
+    xmax     = max(plot_index) + 0.5, 
+    .groups  = 'drop'
+  )
 
 p_tissue_labels <- ggplot(tissue_label_data, aes(label = tissue, fill = tissue)) +
-  # *** KEY CHANGE: Set color = NA to remove borders between rectangles ***
   geom_rect(aes(xmin = xmin, xmax = xmax, ymin = 0, ymax = 1), color = NA) +
   geom_text(aes(x = x_center, y = 0.5), color = "black", fontface = "bold", size = 1.5) +
   scale_fill_manual(values = HUMAN_TISSUE_COLORS, guide = "none") +
@@ -368,29 +577,34 @@ p_tissue_labels <- ggplot(tissue_label_data, aes(label = tissue, fill = tissue))
   scale_y_continuous(expand = c(0, 0)) +
   theme_void()
 
-# --- 7. Combine and Export Plots ---
+
+# ==============================================================================
+# 6. COMBINE & EXPORT
+# ==============================================================================
+
 sparklines_plot <- patchwork::wrap_plots(plot_list, nrow = 1)
 
 final_combined_plot <- p_tissue_labels / p_contrast_labels / sparklines_plot +
-  plot_layout(heights = c(0.1, 0.08, 1)) # Adjusted heights for better proportions
+  plot_layout(heights = c(0.1, 0.08, 1))
 
-plot_width_in <- 0.5
+plot_width_in  <- 0.5
 plot_height_in <- 0.9
-num_plots <- length(plot_list) 
+num_plots      <- length(plot_list) 
 total_width_in <- num_plots * plot_width_in
 
-pdf("cluster_centroid_sparklines_with_labels.pdf", width = total_width_in, height = plot_height_in)
+pdf("cluster_centroid_sparklines_with_labels_new_axes.pdf", width = total_width_in, height = plot_height_in)
 print(final_combined_plot)
 dev.off()
 ```
+
 ```{r figure 3F}
 # --- 1. Manual Selection Setup ---
 # Define exactly which clusters you want for each tissue here.
 # The names of the list must match the 'tissue' values in your dataframe.
 tissue_selections <- list(
-  "adipose"  = c(10),       # Example: Clusters 1, 3, 5 for Blood
-  "blood" = c(4,5),    # Example: Clusters 2, 4, 6, 8 for Spleen
-  "muscle"  = c(4,10,6,12)           # Add as many tissues as needed
+  "adipose"  = c(8),       
+  "blood" = c(7,9),    
+  "muscle"  = c(6,10,12,7)           # Add as many tissues as needed
 )
 
 # --- 2. Generate Plot List ---
@@ -516,7 +730,6 @@ print(sparklines_plot)
 dev.off()
 ```
 
-
 # Top ORA Enrichments of C-means Clusters
 This section identifies the top Over-Representation Analysis (ORA) gene sets from the C-means clusters (hard-clustered with probability > 0.3) and finds which sets are common across all three tissues.
 
@@ -617,7 +830,7 @@ all_tissues_df <- bind_rows(lapply(tissue_names, function(tissue) {
 ### Combined Bar Graph and Dot Plot
 This visualization combines a bar chart showing the omics composition of each cluster with a dot plot showing the top ORA pathway enrichments for those clusters.
 
-```{r combined_bar_dot_plot figure 3D}
+```{r combined_bar_dot_plot figure 4D}
 # --- Load Libraries ---
 library(dplyr)
 library(forcats)
@@ -665,8 +878,8 @@ plot_data_bar <- all_tissues_df %>%
   summarise(Count = n(), .groups = 'drop') %>%
   mutate(high_cluster = as.numeric(as.character(high_cluster))) %>% 
   left_join(MotrpacBicQC::assay_codes, by = c("Ome" = "assay_code"), relationship = "many-to-many") %>% 
-  select(tissue, high_cluster, Ome, ome_text, Count) %>% 
-  mutate(ome_text = if_else(Ome == "metab", "Metabolomics", ome_text)) %>% 
+  select(tissue, high_cluster, Ome, omics_text, Count) %>% 
+  mutate(omics_text = if_else(Ome == "metab", "Metabolomics", omics_text)) %>% 
   distinct() %>% 
   filter(!is.na(high_cluster)) %>% 
   left_join(max_cluster_timepoint, by = c("tissue", "high_cluster" = "cluster")) %>%
@@ -700,7 +913,7 @@ set_pvalue_lookup <- FCM_ORA_top_hits %>%
 # --- Hybrid Set Selection: Manual + Greedy Algorithm ---
 # Manually define a list of key pathways to include in the plot.
 
-manually_curated_pathways = readxl::read_excel(path = file.path(here(), "figures", "landscape", "curated_pathways.xlsx"),
+manually_curated_pathways = readxl::read_excel(path = file.path("~/GitHub/MoTrPAC/motrpac-human-presuspension-acute/", "figures", "landscape", "curated_pathways.xlsx"),
                                           sheet = "3")
 
 manual_sets_to_plot <- manually_curated_pathways %>%  pull(set)
@@ -842,9 +1055,9 @@ plot_data_ora_raw_for_plot <- FCM_ORA_top_hits %>%
   mutate(included_ratio = set_size_in_cluster/cluster_size) %>% 
   mutate(cluster_label = paste(cluster, tissue, sep = " - ")) %>%
   left_join(MotrpacBicQC::assay_codes, by = c("assay" = "assay_code"), relationship = "many-to-many") %>%
-  mutate(ome_text = if_else(assay == "metab", "Metabolomics", ome_text)) %>%
-  filter(!is.na(ome_text)) %>%
-  select(cluster_label, set, included_ratio, ome_text) %>%
+  mutate(omics_text = if_else(assay == "metab", "Metabolomics", omics_text)) %>%
+  filter(!is.na(omics_text)) %>%
+  select(cluster_label, set, included_ratio, omics_text) %>%
   distinct()
 
 # Create the complete data frame for plotting, ensuring alignment
@@ -932,7 +1145,7 @@ p1_vert <- ggplot(plot_data_bar, aes(x = cluster_label)) +
   scale_fill_manual(values = HUMAN_TISSUE_COLORS) +
   guides(fill = "none") + 
   new_scale_fill() +
-  geom_col(aes(y = -Count, fill = ome_text), position = "stack") +
+  geom_col(aes(y = -Count, fill = omics_text), position = "stack") +
   scale_y_continuous(labels = abs, position = "left") +
   scale_fill_manual(values = c(HUMAN_OME_COLORS, "metab" = "#6D4B08")) + 
   labs(
@@ -974,7 +1187,7 @@ p2_vert <- ggplot(plot_data_ora_complete, aes(x = cluster_label, y = set)) +
   geom_hline(aes(yintercept = set, color = set), linetype = "solid", alpha = 0.6) +
   # Points representing enrichment
   geom_point(
-    aes(size = included_ratio, fill = ome_text),
+    aes(size = included_ratio, fill = omics_text),
     shape = 21,
     color = "black"
   ) +
@@ -1369,6 +1582,56 @@ feature_heatmap_with_RA <- function(feature_ids = NULL,
 
 ## Generating Curated Heatmaps
 This section uses the custom heatmap function to generate plots for specific pathways, with row annotations indicating cluster membership.
+```{r}
+#' @title Find pathway features from a numeric SET_ID value
+#'
+#' @description Basically just pulls info from SET_TO_ID for a given pathway
+#'
+#' @param pathway The pathway's SET_ID value from the
+#'  \code{\link{MotrpacHumanPreSuspensionAnalysis::SET_TO_ID}}
+#'
+#' @return A character vector of values from
+#'  \code{\link{MotrpacHumanPreSuspensionAnalysis::MOLECULAR_SIGNATURES}}
+#' @export
+#'
+#' @examples {.choose_pathway_features_numeric(1)}
+.choose_pathway_features_numeric = function(pathway){
+  selected_pathway = SET_TO_ID %>% dplyr::filter(set_id == sprintf("%05d", pathway)) #we change pathway to a character using sprintf
+  if(length(pathway) == 0)
+    stop("no pathways fit this name, check again")
+  actual_features = MotrpacHumanPreSuspensionAnalysis::MOLECULAR_SIGNATURES[[unique(selected_pathway$database)]][[unique(selected_pathway$set)]]
+  return(actual_features)
+}
+
+# Note: I made this function before I realized `SET_TO_ID` was a thing...should probably re-write it at some point
+# -Chris Sep 23, 2024
+
+#' @title Find pathway features from a character set name
+#' @description Basically just pulls info from SET_TO_ID for a given pathway. If
+#' there are multiple pathways that have similar names (which actually happens
+#' a lot), it just stops and tells you to be more specific.
+#'
+#' @param pathway  The pathway's SET_ID value from the
+#'  \code{\link{MotrpacHumanPreSuspensionAnalysis::SET_TO_ID}}
+#'
+#' @return A character vector of values from
+#'  \code{\link{MotrpacHumanPreSuspensionAnalysis::MOLECULAR_SIGNATURES}}
+#' @export
+#'
+#' @examples .choose_pathway_features_text("BIOCARTA_41BB_PATHWAY")
+.choose_pathway_features_text = function(pathway){
+  all_pathways = base::unlist(MotrpacHumanPreSuspensionAnalysis::MOLECULAR_SIGNATURES, recursive = F) #unlist only to 1 layer essentially, not recursively
+  desired_pathway = all_pathways[grep(pathway, names(all_pathways))]
+  if(length(desired_pathway) > 1)
+    stop("multiple pathways fit this name, check again")
+  if(length(desired_pathway) == 0)
+    stop("no pathways fit this name, check again")
+  return(unlist(desired_pathway, use.names = F))
+}
+```
+
+
+
 
 ```{r prepare_heatmap_parameters}
 # --- 1. Define Shared Parameters ---
@@ -1508,7 +1771,7 @@ generate_cluster_heatmap <- function(
 }
 ```
 
-```{r generate_curated_heatmaps}
+```{r generate_curated_heatmaps Figures 3F, ED5D, and ED5E}
 # # Plot 1: VEGF, Adipose Cluster 10
 # adipose10_VEGF <- generate_cluster_heatmap(
 #   filter_tissue = "adipose",
@@ -1534,11 +1797,11 @@ generate_cluster_heatmap <- function(
 # Corresponds to figure 3H
 muscle_adipose_early_VEGF <- generate_cluster_heatmap(
   filter_tissue = "muscle",
-  filter_cluster = c("10","4"),
-  (high_cluster_adipose %in% c("10")) ,
+  filter_cluster = c("10","6"),
+  (high_cluster_adipose %in% c("8")) ,
   pathway_name = CURRENT_PATHWAY,
   ome_name = CURRENT_OME,
-  output_filename = "multitissue_heatmap_muscle-adipose-early_overlap_VEGF.pdf",
+  output_filename = "multitissue_heatmap_muscle-adipose-early_overlap_VEGF.png",
   color_list = custom_row_colors
 )
 
@@ -1554,10 +1817,10 @@ dev.off()
 muscle_blood_middle_VEGF <- generate_cluster_heatmap(
   filter_tissue = "muscle",
   filter_cluster = c("12"),
-  (high_cluster_blood %in% c("4","5")) ,
+  (high_cluster_blood %in% c("7","9")) ,
   pathway_name = CURRENT_PATHWAY,
   ome_name = CURRENT_OME,
-  output_filename = "multitissue_heatmap_muscle-blood-middle_overlap_VEGF.pdf",
+  output_filename = "multitissue_heatmap_muscle-blood-middle_overlap_VEGF.png",
   color_list = custom_row_colors
 )
 
@@ -1571,68 +1834,68 @@ dev.off()
 # Corresponds to 3J
 muscle_6_VEGF <- generate_cluster_heatmap(
   filter_tissue = "muscle",
-  filter_cluster = c("6"),
+  filter_cluster = c("7"),
   #!is.na(high_cluster_adipose),
   pathway_name = CURRENT_PATHWAY,
   ome_name = CURRENT_OME,
-  output_filename = "multitissue_heatmap_muscle-6_VEGF.png",
+  output_filename = "multitissue_heatmap_muscle-7_VEGF.png",
   color_list = custom_row_colors
 )
 
-pdf("multitissue_heatmap_muscle-6_VEGF.pdf", width = 10, height = 10)
+pdf("multitissue_heatmap_muscle-7_VEGF.pdf", width = 10, height = 11)
 draw(muscle_6_VEGF, padding = unit(c(5, 1, 1, 1), "cm"))
 dev.off()
 
 
 
-# Plot 4: Autophagy, Muscle Clusters 12  
-# Corresponds to S3D
-muscle_12_autophagy <- generate_cluster_heatmap(
-  filter_tissue = "muscle",
-  filter_cluster = c("12"),
-  #!is.na(high_cluster_adipose),
-  pathway_name = "GOBP_PROCESS_UTILIZING_AUTOPHAGIC_MECHANISM",
-  ome_name = CURRENT_OME,
-  output_filename = "multitissue_heatmap_muscle-12_autophagy.png",
-  color_list = custom_row_colors
-)
-
-pdf("multitissue_heatmap_muscle-12_autophagy.pdf", width = 10, height = 20)
-draw(muscle_12_autophagy, padding = unit(c(5, 1, 1, 1), "cm"))
-dev.off()
-
-
-# Plot 5: Autophagy, blood Clusters 4 
-# Corresponds to S3B
-blood_4_autophagy <- generate_cluster_heatmap(
-  filter_tissue = "blood",
-  filter_cluster = c("4"),
-  (high_cluster_muscle != "12"),
-  pathway_name = "GOBP_PROCESS_UTILIZING_AUTOPHAGIC_MECHANISM",
-  ome_name = CURRENT_OME,
-  output_filename = "multitissue_heatmap_blood4_autophagy.png",
-  color_list = custom_row_colors
-)
-
-pdf("multitissue_heatmap_blood4_autophagy.pdf", width = 10, height = 15)
-draw(blood_4_autophagy, padding = unit(c(5, 1, 1, 1), "cm"))
-dev.off()
-
-# Plot 6: Autophagy, blood Clusters 5
-# Corresponds to S3C
-blood_5_autophagy <- generate_cluster_heatmap(
-  filter_tissue = "blood",
-  filter_cluster = c("5"),
-   (high_cluster_muscle != "12"),
-  pathway_name = "GOBP_PROCESS_UTILIZING_AUTOPHAGIC_MECHANISM",
-  ome_name = CURRENT_OME,
-  output_filename = "multitissue_heatmap_blood5_autophagy.png",
-  color_list = custom_row_colors
-)
-
-pdf("multitissue_heatmap_blood5_autophagy.pdf", width = 10, height = 15)
-draw(blood_5_autophagy, padding = unit(c(5, 1, 1, 1), "cm"))
-dev.off()
+# # Plot 4: Autophagy, Muscle Clusters 12  
+# # Corresponds to S3D
+# muscle_12_autophagy <- generate_cluster_heatmap(
+#   filter_tissue = "muscle",
+#   filter_cluster = c("12"),
+#   #!is.na(high_cluster_adipose),
+#   pathway_name = "GOBP_PROCESS_UTILIZING_AUTOPHAGIC_MECHANISM",
+#   ome_name = CURRENT_OME,
+#   output_filename = "multitissue_heatmap_muscle-12_autophagy.png",
+#   color_list = custom_row_colors
+# )
+# 
+# pdf("multitissue_heatmap_muscle-12_autophagy.pdf", width = 10, height = 20)
+# draw(muscle_12_autophagy, padding = unit(c(5, 1, 1, 1), "cm"))
+# dev.off()
+# 
+# 
+# # Plot 5: Autophagy, blood Clusters 4 
+# # Corresponds to S3B
+# blood_4_autophagy <- generate_cluster_heatmap(
+#   filter_tissue = "blood",
+#   filter_cluster = c("4"),
+#   (high_cluster_muscle != "12"),
+#   pathway_name = "GOBP_PROCESS_UTILIZING_AUTOPHAGIC_MECHANISM",
+#   ome_name = CURRENT_OME,
+#   output_filename = "multitissue_heatmap_blood4_autophagy.png",
+#   color_list = custom_row_colors
+# )
+# 
+# pdf("multitissue_heatmap_blood4_autophagy.pdf", width = 10, height = 15)
+# draw(blood_4_autophagy, padding = unit(c(5, 1, 1, 1), "cm"))
+# dev.off()
+# 
+# # Plot 6: Autophagy, blood Clusters 5
+# # Corresponds to S3C
+# blood_5_autophagy <- generate_cluster_heatmap(
+#   filter_tissue = "blood",
+#   filter_cluster = c("5"),
+#    (high_cluster_muscle != "12"),
+#   pathway_name = "GOBP_PROCESS_UTILIZING_AUTOPHAGIC_MECHANISM",
+#   ome_name = CURRENT_OME,
+#   output_filename = "multitissue_heatmap_blood5_autophagy.png",
+#   color_list = custom_row_colors
+# )
+# 
+# pdf("multitissue_heatmap_blood5_autophagy.pdf", width = 10, height = 15)
+# draw(blood_5_autophagy, padding = unit(c(5, 1, 1, 1), "cm"))
+# dev.off()
 
 ```
 
@@ -1854,11 +2117,11 @@ generate_pathway_upset <- function(
 }
 ```
 
-```{r figure3G}
+```{r figure ED5C}
 # 1. Define Merges
 my_merges <- list(
-  "blood-4/5 (Combined)" = c("blood-4", "blood-5"),
-  "muscle-4/10 (Combined)" = c("muscle-10", "muscle-4")
+  "blood-7/9 (Combined)" = c("blood-7","blood-9"),
+  "muscle-6/10 (Combined)" = c("muscle-10", "muscle-6")
 )
 
 # 2. Run

@@ -15,7 +15,10 @@ Code for the adipose tissue manuscript. Each R script covers a specific analysis
 | `precawg_adi_gdcat.R` | GD-CAT analysis |
 | `precawg_adi_ssec.R` | Sex-stratified exercise comparisons |
 | `baseline_sex_analyses_figures.R` | Baseline sex difference figures; reads from `Files/sex_da/` and the all-omes enrichment file |
-| `figure_2_cmeans.Rmd` | C-means clustering figure |
+
+The `cmeans/` subfolder holds the c-means clustering figure:
+- `adipose_cmeans.Rmd` — clusters the adipose DA results by modality, runs pathway and cell type ORA over the clusters, and writes the trajectory + enrichment panels
+- `cmeans_helpers.R` — the trajectory panel, the enrichment bubble heatmap, and the combined layout
 
 The `sex_difference_analysis/` subfolder contains sensitivity analyses for baseline sex differences:
 - `baseline_sex_differences.Rmd`

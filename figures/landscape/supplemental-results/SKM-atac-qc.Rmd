@@ -1,0 +1,514 @@
+---
+title: "SKM-atac-qc"
+output: html_document
+author: "Anne Marie Weitzel"
+---
+
+This analysis file uses a couple of functions that I created for other purposes in packages available on GitHub. Packages can be installed using the following commands: `pak::pak("weitzela/PeakGeneNet")`, `pak::pak("weitzela/bltools")`
+```{r setup, include=FALSE}
+pacman::p_load(tidyverse, ComplexHeatmap)
+```
+
+```{r}
+source("fxns.R")
+
+group_colors = c(MotrpacHumanPreSuspensionAnalysis::HUMAN_EXERCISE_GROUP_COLORS,
+                 set_names(MotrpacHumanPreSuspensionAnalysis::HUMAN_EXERCISE_GROUP_COLORS, c("RE", "EE", "CON")))
+
+saveFigures = function(file_prefix, plot_fxn, width, height) {
+  bltools::pdfEmbed(file.path("tmp", "figures", paste0(file_prefix, ".pdf")), plot_fxn, width, height)
+  grDevices::png(file.path("tmp", "figures", paste0(file_prefix, ".png")), width = width, height = height, units = "in", res = 300, family = "ArialMT"); print(plot_fxn); dev.off()
+}
+
+gg_add = list(
+  scale_color_manual(values = group_colors, labels = prettyLabels, name = "Modality"),
+  theme(
+    legend.key.size = unit(2, "mm")
+  )
+)
+```
+
+```{r}
+# prepare metadata
+metadata = MotrpacHumanPreSuspensionData::load_pheno(load_acute_only = TRUE) |> 
+  MotrpacHumanPreSuspensionData::attach_dictionary() |> 
+  filter(visitcode == "ADULT Baseline Biospecimen Assessment Sequence (BAS)")
+
+metadata_gcp = c("samples", "removed-samples") |> 
+  purrr::set_names() |> 
+  map(~ MotrpacBicQC::dl_read_gcp(paste0("gs://motrpac-data-hub/analysis/human-precovid-sed-adu/c2.0/epigenomics/metadata/human-precovid-sed-adu_t06-muscle_epigen-atac-seq_metadata_", .x, "_v2.0.txt"), tmpdir = "tmp") |> mutate(vialLabel = as.character(vialLabel)))
+
+metadata = metadata |> 
+  inner_join(metadata_gcp$samples, by = "vialLabel") |> 
+  filter(!(vialLabel %in% metadata_gcp$`removed-samples`$vialLabel)) |> # drop samples swaps
+  filter(n() > 1, .by = c("pid", "randomGroupCode")) |>  #  drop libraries where only one timepoint exists for the PID. they won't be used in any analysis so are removed))
+  arrange(randomGroupCode, Sample_batch) |> 
+  mutate(across(c(codedsiteid, Seq_flowcell_lane, Seq_flowcell_run, randomGroupCode), factor),
+         Seq_batch_short = paste0(Seq_flowcell_lane, "__", Seq_flowcell_run) |> factor(),
+         FRiP = peak_enrich.frac_reads_in_peaks.macs2.frip,
+         across(c(Nuclei_extr_date, Tagmentation_date, PCR_date), ~ mdy(.x)),
+         nucleiIsolation2Tagmentation = Tagmentation_date - Nuclei_extr_date, 
+         Tagmentation2PCR = PCR_date - Tagmentation_date,
+         nuclei2atac_lag = nucleiIsolation2Tagmentation > 0,
+         library = vialLabel) |> 
+  relocate(vialLabel, pid, randomGroupCode, Sex, Sample_batch, Seq_batch_short, nucleiIsolation2Tagmentation, Tagmentation2PCR, nuclei2atac_lag) |> 
+  group_by(randomGroupCode, pid) |> 
+  arrange(randomGroupCode, min(Sample_batch)) |> 
+  ungroup() |> 
+  dplyr::rename("nuclei_isolation_batch" = "Sample_batch") |> 
+  droplevels()
+
+tmp_binarized = metadata |> 
+  (\(df) {
+    binarized_df = df |> 
+      (\(tmp_df) {
+          map(c("randomGroupCode", "Timepoint", "codedsiteid", "Seq_batch_short"), function(tmp_var) binarizeVar(tmp_df[[tmp_var]], tmp_var)) |> 
+            bind_cols() 
+        })() 
+    numeric_df = df |> 
+      select(Sex, nuclei2atac_lag) |> 
+      mutate(across(c(Sex, nuclei2atac_lag), as.numeric)) 
+    bind_cols(numeric_df, binarized_df) |> 
+      rename_with(function(.c) paste0("binarized___", .c))
+  })()
+metadata = bind_cols(metadata, tmp_binarized)
+
+# prepare count matrix, voom normalized
+features_to_keep = MotrpacBicQC::dl_read_gcp("gs://motrpac-data-hub/analysis/human-precovid-sed-adu/c2.0/epigenomics/qc-norm/human-precovid-sed-adu_t06-muscle_epigen-atac-seq_qc-norm_log-cpm_v2.0.txt", tmpdir = "tmp") |> 
+  mutate(feature_id = str_replace_all(feature_id, "-", ":")) |> pull(feature_id)
+
+voom = MotrpacBicQC::dl_read_gcp("gs://motrpac-data-hub/quant-id/human-precovid/c1.0/epigenomics/t06-muscle/epigen-atac-seq/motrpac_human-precovid_t06-muscle_epigen-atac-seq_counts_v1.0.txt.gz", tmpdir = "tmp") |> 
+  unite(feature_id, chrom:end, sep = ":") |> 
+  filter(feature_id %in% features_to_keep) |> 
+  select(feature_id, all_of(metadata$vialLabel)) |> 
+  column_to_rownames(var = "feature_id") |> 
+  as.matrix() |> 
+  (\(.mat) limma::voom(.mat[,metadata$vialLabel])$E)()
+
+identical(colnames(voom), as.character(metadata$vialLabel))
+
+rm(metadata_gcp, tmp_binarized, features_to_keep); invisible(gc())
+```
+
+```{r fig.width=20}
+# did this to see what qc metric columns to select. i hand picked terms to represent a highly correlated cluster 
+
+# metadata |> select(starts_with(c("align", "peak", "replication")) & where(is.numeric)) |>
+#   select(-c(contains("syn_x_intercept"))) |>
+#   select(!where(~ n_distinct(.x) == 1)) |>
+#   as.matrix() |>
+#   Hmisc::rcorr() |>
+#   (\(mat) bltools::chHeatmap(mat[[1]], column_km = 7, row_km = 7))() #cluster_columns = F, cluster_rows = F
+```
+
+```{r}
+selected_metadata_columns = list(
+  "Biological" = data.frame(col_name = c("randomGroupCode", "Timepoint", "Sex", "calculatedAge", "BMI")),
+  # "GroupTimepoint" = data.frame(col_name = "group_timepoint"),
+  "Experimental" = data.frame(col_name = c("codedsiteid", "Seq_batch_short", "nuclei_isolation_batch", "nuclei2atac_lag")),
+  "QC Metrics" = data.frame(col_name = intersect(colnames(metadata), c("FRiP", "align.samstat.total_reads", "align.dup.pct_duplicate_reads", "align.nodup_samstat.total_reads", "align_enrich.tss_enrich.tss_enrich", "align.frag_len_stat.frac_reads_in_nfr", "peak_stat.peak_region_size.idr_opt.mean", "align.samstat.pct_properly_paired_reads", "peak_enrich.frac_reads_in_annot.fri_blacklist", "replication.num_peaks.num_peaks", "align.dup.paired_optical_duplicate_reads", "align.frac_mito.frac_mito_reads", "peak_stat.peak_region_size.mean", "peak_stat.peak_region_size.overlap_opt.mean", "peak_stat.peak_region_size.max_size")))
+) |> 
+  bind_rows(.id = "category")
+selected_metadata_columns = data.frame(full_col_name = grep("binarized___", colnames(metadata), value = TRUE)) |> 
+  separate_wider_delim(full_col_name, "___", names = c("col_type", "col_name", "short_name"), too_few = "align_start", cols_remove = FALSE) |> 
+  mutate(short_name = ifelse(col_name %in% c("codedsiteid", "Seq_batch_short"), paste0(col_name, "_", short_name), short_name)) |> 
+  (\(df) left_join(selected_metadata_columns, df, by = "col_name"))() |> 
+  mutate(col_type = ifelse(is.na(col_type), "numeric", col_type),
+         short_name = ifelse(is.na(short_name), col_name, short_name),
+         full_col_name = ifelse(is.na(full_col_name), col_name, full_col_name))
+```
+
+# General Figures
+## Experimental Setup
+```{r}
+heatmap_legend_params = list(title_gp = gpar(fontsize = 7, fontface = "bold"), labels_gp = gpar(fontsize = 6), grid_width = unit(0.3, "cm"), grid_height = unit(0.3, "cm"))
+
+hm_ls = list()
+hm_ls$prep_by_pid = metadata |> 
+  (\(tmp_df) {
+    tmp_df = tmp_df |> 
+      select(pid, randomGroupCode, Sex, Timepoint, codedsiteid, nuclei_isolation_batch) |> 
+      pivot_wider(id_cols = pid:Sex, names_from = "Timepoint", values_from = "nuclei_isolation_batch", names_sort = TRUE)
+    mat = tmp_df |> 
+      column_to_rownames(var = "pid") |> 
+      select(pre_exercise:last_col()) |> 
+      as.matrix()
+    hm = mat |> 
+      Heatmap(
+        na_col = "white", row_split = tmp_df$randomGroupCode, cluster_rows = FALSE, cluster_columns = FALSE,
+        col = rev(rainbow(10)), column_labels = prettyLabels(colnames(mat)),
+        column_title = "Nuclei\nIsolation\nBatch", column_title_gp = gpar(fontsize = 7),
+        row_names_gp = grid::gpar(fontsize = 6),
+        column_names_gp = grid::gpar(fontsize = 6), 
+        row_title_gp = grid::gpar(fontsize = 7), 
+        heatmap_legend_param = c(list(title = "Nuclei Isolation\nBatch (ordered)", 
+                                      at = c(17, 27, 36, 53),
+                                      # at = c(1, 2.5, 4.5, 6)*10, 
+                                      direction = "horizontal", legend_width = unit(1.75, "cm"), grid_height = unit(0.25, "cm")), heatmap_legend_params |> discard_at(c("grid_width", "grid_height"))),
+        height = nrow(tmp_df) * grid::unit(2.5, "mm"),
+        width = 4 * grid::unit(2.5, "mm"), 
+        left_annotation = rowAnnotation(df = tmp_df |> select(Group = randomGroupCode, Sex), col = list(Sex = MotrpacHumanPreSuspensionAnalysis::HUMAN_SEX_COLORS, Group = MotrpacHumanPreSuspensionAnalysis::HUMAN_EXERCISE_GROUP_COLORS), simple_anno_size = unit(3, "mm"), annotation_name_gp = gpar(fontsize = 6), annotation_legend_param = c(list(), heatmap_legend_params))
+      )
+    return(hm)
+  })()
+
+hm_ls$time_by_pid = metadata |> 
+  select(pid, randomGroupCode, Sex, Timepoint, codedsiteid, nucleiIsolation2Tagmentation) |>
+  mutate(nucleiIsolation2Tagmentation = as.numeric(nucleiIsolation2Tagmentation)) |>
+  pivot_wider(id_cols = pid:Sex, names_from = "Timepoint", values_from = "nucleiIsolation2Tagmentation", names_sort = TRUE) |> 
+  (\(tmp_df) {
+    mat = tmp_df |>
+      column_to_rownames(var = "pid") |>
+      select(pre_exercise:last_col()) |>
+      as.matrix()
+    hm = mat |> 
+      Heatmap(
+        na_col = "white", row_split = tmp_df$randomGroupCode, cluster_rows = FALSE, cluster_columns = FALSE,
+        col = circlize::colorRamp2(c(0, 1), c("#CBFBF1", "#36BBA7")), column_labels = prettyLabels(colnames(mat)),
+        column_title = "ATAC From\nFrozen Nuclei", column_title_gp = gpar(fontsize = 7),
+        row_names_gp = grid::gpar(fontsize = 6),
+        column_names_gp = grid::gpar(fontsize = 6),
+        row_title_gp = grid::gpar(fontsize = 7),
+        heatmap_legend_param = c(list(title = "Days Between\nNuclei Isolation\n& Tagmentation", at = c(1, 0), labels = c("≥1", "0"), color_bar = "discrete"), heatmap_legend_params),
+        height = nrow(tmp_df) * grid::unit(2.5, "mm"),
+        width = 4 * grid::unit(3.5, "mm"), 
+        layer_fun = function(j, i, x, y, width, height, fill) {
+          v_P = ComplexHeatmap::pindex(mat, i, j)
+          c_1 = (!is.na(v_P)) & (v_P > 0)
+          grid.text(sprintf("%d", v_P[c_1]), x[c_1], y[c_1], gp = gpar(fontsize = 5))
+        }
+      )
+    return(hm)
+  })()
+
+hm_ls$flowcells_by_pid = metadata |> 
+  (\(tmp_df) {
+    tmp_df = tmp_df |> 
+      select(pid, randomGroupCode, Sex, Timepoint, codedsiteid, Seq_batch_short) |> 
+      pivot_wider(id_cols = pid:Sex, names_from = "Timepoint", values_from = "Seq_batch_short", names_sort = TRUE)
+    mat = tmp_df |> 
+      column_to_rownames(var = "pid") |> 
+      select(pre_exercise:last_col()) |> 
+      as.matrix()
+    hm = mat |> 
+      Heatmap(
+        na_col = "white", row_split = tmp_df$randomGroupCode, column_labels = prettyLabels(colnames(mat)),
+        col = tmp_df |> select(pre_exercise:last_col()) |> unlist() |> na.omit() |> unique() |> (\(x) set_names(aesthetically_pleasing_colors$colorBlindFriendly2[1:length(x)], x))(),
+        column_title = "Sequence\nBatch", column_title_gp = gpar(fontsize = 7),
+        row_names_gp = grid::gpar(fontsize = 6),
+        column_names_gp = grid::gpar(fontsize = 6), 
+        row_title_gp = grid::gpar(fontsize = 7), 
+        heatmap_legend_param = c(list(title = "Sequence\nBatch"), heatmap_legend_params),
+        height = nrow(tmp_df) * grid::unit(2.5, "mm"),
+        width = 4 * grid::unit(2.5, "mm")
+      )
+    return(hm)
+  })()
+
+hm_full = draw(reduce(hm_ls, `+`), heatmap_legend_side = "bottom", annotation_legend_side = "bottom", legend_grid_width = unit(1, "cm"), legend_grouping = "original")
+saveFigures("metadata-by-pid_hm", plot(hm_full), 2.8, 6)
+```
+
+## FRiP
+```{r}
+p_frip = ggplot(metadata, aes(x = Timepoint, y = FRiP, color = randomGroupCode)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  facet_wrap(~ randomGroupCode) + 
+  xlab(NULL) + 
+  scale_x_discrete(labels = ~ prettyLabels(.x, T)) +
+  geom_boxplot(outliers = FALSE, show.legend = FALSE) +
+  geom_jitter(aes(color = randomGroupCode, shape = Timepoint), size = 1.5) + 
+  gg_add + 
+  scale_shape_manual(values = c(15, 17, 18, 16)) + 
+  theme(legend.position = "none")
+p_frip
+saveFigures("boxplot_frip-by-group", plot(p_frip), 3, 2)
+```
+
+# PCA  
+Data adjustment uses `PeakGeneNet::adjustCovariateMatrix` that can be installed using, `pak::pak("weitzela/PeakGeneNet")`.
+```{r}
+original_vars = c("BMI", "Sex", "calculatedAge", "codedsiteid", "Timepoint", "randomGroupCode")
+
+protect_vars = list("exercise" = c("randomGroupCode", "Timepoint"), "sex" = "Sex")
+
+model_inclusion = list(
+  "no_adj" = "",
+  "~M0" = c("FRiP", original_vars)
+)
+
+filter_fxns = c(
+  all = function(df) df,
+  map(levels(metadata$randomGroupCode) |> set_names(prettyLabels), 
+      function(.x) function(df) df |> filter(randomGroupCode == .x))
+)
+```
+
+```{r}
+pca_ls = imap(filter_fxns, function(.filter_fxn, .filter_label) {
+  map(protect_vars, function(.protect_vars) {
+    map(model_inclusion, function(.additional_vars) {
+      try(pcaWrapper(voom, metadata, .filter_fxn, .additional_vars, .protect_vars), silent = TRUE)
+    })
+  })
+})
+
+pca_ls = pca_ls |> 
+  map_depth(2, function(.ls) discard(.ls, ~ class(.x) == "try-error"))
+```
+
+## Figures
+```{r, fig.width=8, fig.height=8, dpi=300}
+# heatmap
+hm_ls_split = imap(pca_ls[1], function(.sample_ls, .sample_inclusion) {
+  imap(.sample_ls, function(.protect_ls, .protect_var) {
+    imap(c(list("all" = c("ADUControl", "ADUEndur", "ADUResist")), list("ADUControl", "ADUEndur", "ADUResist") |> purrr::set_names()) |> keep_at(ifelse(.sample_inclusion == "all", TRUE, set_names(levels(metadata$randomGroupCode), prettyLabels)[.sample_inclusion])), function(.grp, .grp_filter) {
+      pca_res_wide = .protect_ls |> 
+        imap(function(.pca, .model) {
+          .pca$x |> 
+            filter(randomGroupCode %in% .grp) |> 
+            select(library, set_names(names(.pca$variance), .pca$variance)[1:5]) |> 
+            rename_with(function(.c) paste0(.c, "___PC ", .model), -library)
+        }) |> 
+        reduce(full_join, by = "library")
+      
+
+      binarized_tmp = metadata |> 
+        select(library, all_of(selected_metadata_columns$full_col_name)) |> 
+        inner_join(pca_res_wide, by = "library") |> 
+        select(-library)
+      
+      split_tmp = selected_metadata_columns |> 
+        right_join(data.frame(full_col_name = colnames(binarized_tmp)), by = "full_col_name") |>
+        arrange(match(full_col_name, colnames(binarized_tmp))) |> 
+        mutate(short_name = ifelse(is.na(category), str_remove_all(full_col_name, "___.*$"), short_name),
+               category = ifelse(is.na(category), str_remove_all(full_col_name, "^.*___") |> str_replace(" ", "\n"), category) |> str_replace_all(c("\\+" = "\n\\+", "PC\n" = "", "no_adj" = "Voom\nCounts"))) |> 
+        mutate(category = fct_inorder(category))
+      
+      row_vars = intersect(colnames(binarized_tmp), selected_metadata_columns$full_col_name)
+      col_vars = setdiff(colnames(binarized_tmp), selected_metadata_columns$full_col_name)
+      
+      tmp_df = split_tmp |> 
+        filter(full_col_name %in% col_vars) |> 
+        mutate(correlation_inclusion = ifelse(.grp_filter == "all", "All Samples", "Within Group"),
+               samples = ifelse(.grp_filter == "all", "All", .grp),
+               adjustment = category |> str_replace_all("\n\\+", "\\+") |> str_replace_all("\n", " ") |> str_remove_all("PC\n")) |> 
+        select(`Correlation Inclusion` = correlation_inclusion, samples, adjustment, full_col_name) |> 
+        column_to_rownames(var = "full_col_name")
+      if (.sample_inclusion != "all") tmp_df = tmp_df |> select(-`Correlation Inclusion`)
+      
+      hm = binarized_tmp |> 
+        as.matrix() |> 
+        Hmisc::rcorr() |> 
+        discard_at("type") |> 
+        map(~ .x[row_vars, col_vars]) |>
+        (\(mat) bltools::chHeatmap(mat[[1]], name = "r", na_col = "gray90",
+                                   col_and_row_name_size = 6, cell_mm = 2.5, heatmap_legend_param = list(title_gp = gpar(fontsize = 7, fontface = "bold"), labels_gp = gpar(fontsize = 6), grid_width = unit(0.3, "cm")),
+                                   column_title_gp = gpar(fontsize = 8), row_title_gp = gpar(fontsize = 8),
+                                   column_title_side = "bottom",
+                                   column_split = pull(split_tmp, category, full_col_name)[colnames(mat[[1]])],
+                                   row_split = pull(split_tmp, category, full_col_name)[rownames(mat[[1]])],
+                                   column_labels = pull(split_tmp, short_name, full_col_name)[colnames(mat[[1]])],
+                                   row_labels = pull(split_tmp, short_name, full_col_name)[rownames(mat[[1]])],
+                                   cluster_row_slices = FALSE, cluster_column_slices = FALSE,
+                                   cluster_rows = FALSE, cluster_columns = FALSE,
+                                   cell_fun = bltools::hmSigDots(mat$P, threshold = 0.05, fun = "cell", dot_pt_size = 2, label_mat = round(mat$r, 1), fontsize = 3),
+                                   row_names_max_width = unit(2, "cm"),
+                                   top_annotation = columnAnnotation(
+                                     df = tmp_df,
+                                     col = list(adjustment = c("#E78AC3", "#A6D854", "#FFD92F", "#6699CC")[1:n_distinct(tmp_df$adjustment)] |> set_names(fct_inorder(unique(tmp_df$adjustment))), `Correlation Inclusion` = c("#999933", "#882255") |> set_names(c("All Samples", "Within Group")), samples = c("All" = "#E5C494", MotrpacHumanPreSuspensionAnalysis::HUMAN_EXERCISE_GROUP_COLORS)),
+                                     annotation_name_gp = gpar(fontsize = 6),
+                                     annotation_legend_param = list(title_gp = gpar(fontsize = 7, fontface = "bold"), labels_gp = gpar(fontsize = 6), grid_width = unit(0.3, "cm"), grid_height = unit(0.3, "cm"), nrow = 2),
+                                     simple_anno_size = unit(3, "mm"),
+                                     show_annotation_name = .grp_filter == "ADUResist"
+                                   )
+                                   ) |> `attr<-`("cor_res", mat))()
+      return(hm)
+    })
+  })
+})
+
+hm_split_all_only = map(hm_ls_split$all, ~ reduce(.x[1], `+`) |> draw(heatmap_legend_side = "right", annotation_legend_side = "top", align_heatmap_legend = "heatmap_top"))
+saveFigures("hm_filtered_all-sample-pca_protect-exercise", draw(hm_split_all_only$exercise), 3.5, 6.5)
+```
+
+```{r, fig.width=3.2, fig.height=2, dpi=300}
+pc1_nuclei_isolation_batch = pca_ls$all$exercise$`~M0`$x |> 
+  mutate(Timepoint = fct_relabel(Timepoint, function(.label) prettyLabels(.label, TRUE))) |> 
+  ggplot(aes(x = factor(nuclei_isolation_batch), y = PC1)) + ylab(paste0("~M0 ", pca_ls$all$exercise$`~M0`$variance[1])) + xlab("Nuclei Isolation Batch") +
+  geom_point(aes(color = randomGroupCode, shape = Timepoint), size = 2, alpha = 0.5, stroke = 0) +
+  guides(color = guide_legend(order = 1, override.aes = list(alpha = 1)),
+         shape = guide_legend(override.aes = list(alpha = 1))) + 
+  gg_add + 
+  scale_shape_manual(values = c(15, 17, 18, 16)) +
+  theme(legend.position = "none") +
+  geom_smooth(method = "lm", se = FALSE, aes(x = as.numeric(factor(nuclei_isolation_batch))), color = "#E5C494",  data = ~ .x |> filter(nuclei_isolation_batch < 50)) +
+  geom_smooth(method = "lm", se = FALSE, aes(x = as.numeric(factor(nuclei_isolation_batch)), color = randomGroupCode), data = ~ .x |> filter(nuclei_isolation_batch < 50)) + 
+  ggpubr::stat_cor(method = "spearman", aes(x = as.numeric(factor(nuclei_isolation_batch))), cor.coef.name = "rho", color = "#E5C494", label.y.npc = 0.27, label.x.npc = 0.72, p.digits = 2, p.accuracy = 1e-10) +
+  ggpubr::stat_cor(method = "spearman", aes(x = as.numeric(factor(nuclei_isolation_batch)), color = randomGroupCode), cor.coef.name = "rho", label.y.npc = 0.2, label.x.npc = 0.72, p.accuracy = 0.001); pc1_nuclei_isolation_batch
+saveFigures("pc1-vs-nuclei-isolation-batch", plot(pc1_nuclei_isolation_batch), 3, 2)
+```
+
+```{r}
+pc2_frozen_nuclei = pca_ls$all$exercise$`~M0`$x |> 
+  ggplot(aes(x = randomGroupCode, y = PC2, color = nuclei2atac_lag, shape = Timepoint)) |> 
+  (\(.p) list(
+    .p + geom_boxplot(outliers = FALSE, show.legend = FALSE, aes(shape = NULL), linewidth = 0.25),
+    .p + geom_boxplot(outliers = FALSE, show.legend = FALSE, linewidth = 0.25)
+  ))() |> 
+  map(function(.p) {
+    .p + 
+      geom_point(position = position_jitterdodge(), size = 1.25, stroke = 0) + 
+      guides(color = guide_legend(title = "Use of Frozen Nuclei", override.aes = list(size = 2)),
+             shape = "none") +
+      theme(legend.position = "bottom", legend.margin = margin(), 
+            legend.key.width = unit(2, "mm"), legend.key.height = unit(1, "mm")) +
+      labs(x = NULL, y = paste0("~M0 ", pca_ls$all$exercise$`~M0`$variance[2])) + 
+      scale_shape_manual(values = c(15, 17, 18, 16)) + 
+      scale_x_discrete(labels = prettyLabels)
+  }) |> 
+  ggpubr::ggarrange(plotlist = _, nrow = 1, common.legend = TRUE, widths = c(0.7, 1), legend = "bottom")
+saveFigures("pc2-vs-frozen-nuclei", plot(pc2_frozen_nuclei), 2.8, 2)
+```
+
+```{r, fig.height=2, fig.asp=1}
+p_pca_grid1 = imap(pca_ls$all$exercise[2], function(.x, .additional) {
+  model_anno = paste0("In Model: ", paste0(attr(.x, "in_model"), collapse = ", ") |> str_wrap(45), "\n",
+                      "Protected: ", paste0(attr(.x, "protect"), collapse = ", "))
+  .x$x = .x$x |> 
+    mutate(Timepoint = fct_relabel(Timepoint, function(.label) prettyLabels(.label, TRUE)))
+  p = ggplot(.x$x, aes(x = PC1, y = PC2, color = randomGroupCode,shape = Timepoint, linetype = Timepoint, linewidth = Timepoint))
+  p = p +
+    geom_point(size = 1.5, stroke = 0, alpha = 0.8) + 
+    stat_ellipse(alpha = 0.8) +
+    theme(aspect.ratio = 1) +
+    theme(legend.direction = "horizontal", legend.position = "bottom") +
+    guides(color = guide_legend(override.aes = list(linetype = 0), order = 1), 
+           shape = guide_legend(override.aes = list(size = 1))) +
+    labs(x = paste0("~M0 ", .x$variance[["PC1"]]), y = paste0("~M0 ", .x$variance[["PC2"]]), caption = model_anno) +
+    scale_linewidth_manual(values = c(0.5, 0.5, 0.15, 0.15)) +
+    scale_linetype_manual(values = c("solid", "dotted", "dotted", "solid")) +
+    gg_add + 
+    theme(legend.key.width = unit(3, "mm")) +
+    scale_shape_manual(values = c(15, 17, 18, 16))
+  
+  p = p |> 
+    `attr<-`("legend", ggpubr::get_legend(p))
+  p = p +
+    theme(legend.position = "none")
+  return(p)
+}) 
+
+m0_pca = p_pca_grid1$`~M0` + labs(caption = NULL)
+saveFigures("m0-pca-plot", plot(m0_pca), 2, 2)
+```
+```{r}
+p_legend = (p_pca_grid1$`~M0` + 
+  theme(legend.position = "right") +
+  guides(linetype = guide_legend(order = 1, override.aes = list(alpha = 1)),
+         linewidth = guide_legend(order = 1),
+         shape = guide_legend(order = 2, override.aes = list(size = 2)),
+         color = guide_legend(order = 3, override.aes = list(linetype = 0, size = 2, alpha = 1)))) |> 
+  ggpubr::get_legend() 
+saveFigures("legend", plot(p_legend), 2.5, 0.5)
+
+grDevices::png(file.path("tmp", "figures", paste0("legend", ".png")), width = 2.5, height = 0.5, units = "in", res = 300, family = "ArialMT"); print(plot(p_legend)); dev.off()
+```
+
+# Numbers
+```{r}
+metadata |> 
+  group_by(randomGroupCode, nuclei2atac_lag) |> tally() |> pivot_wider(names_from = nuclei2atac_lag, values_from = n) |> mutate(sum = `FALSE` + `TRUE`)
+
+metadata |> 
+  group_by(pid) |> 
+  mutate(any_frozen = any(nuclei2atac_lag)) |> 
+  distinct(pid, any_frozen, randomGroupCode) |> 
+  group_by(randomGroupCode, any_frozen) |> 
+  tally() |> 
+  pivot_wider(names_from = any_frozen, values_from = n) |> mutate(pct = scales::label_percent()(`TRUE` / (`FALSE` + `TRUE`)))
+
+metadata |> 
+  group_by(pid) |> 
+  mutate(multi_seq = n_distinct(Seq_batch_short) > 1, .before = 1) |> 
+  distinct(pid, multi_seq, randomGroupCode) |> 
+  group_by(randomGroupCode, multi_seq) |> 
+  tally() |> 
+  pivot_wider(names_from = multi_seq, values_from = n) |> mutate(pct = scales::label_percent()(`TRUE` / (`FALSE` + `TRUE`)))
+```
+
+## Peak Counts
+```{r}
+og_res = MotrpacBicQC::dl_read_gcp("gs://motrpac-data-hub/analysis/human-precovid-sed-adu/c2.0/epigenomics/da/human-precovid-sed-adu_t06-muscle_epigen-atac-seq_da_dream-acute_v2.1.txt", tmpdir = "tmp")
+# og_res = MotrpacHumanPreSuspensionAnalysis::load_differential_analysis("epigen-atac-seq", "muscle", epigen = TRUE, repo_local_dir = "tmp")
+
+results_category = og_res |> 
+  # filter(contrast_type != "Endur_vs_Resist") |> 
+  filter(adj_p_value < 0.05) |> 
+  distinct(contrast) |> 
+  mutate(contrast_tmp = str_remove_all(contrast, "group_timepoint")) |> 
+  separate_wider_delim(contrast_tmp, delim = regex(" -|\\+ "), names = c("ex_post", "ex_pre", "con_post", "con_pre"), too_few = "align_start", cols_remove = FALSE) |> 
+  mutate(randomGroupCode = str_remove_all(ex_post, "\\..*$"),
+         Timepoint = str_remove_all(ex_post, "^.*\\.(?=post)"),
+         model_type = paste0(randomGroupCode, "-", ifelse(is.na(con_post), randomGroupCode, str_remove_all(con_post, "\\..*$"))) |> str_remove_all(" ") |> prettyLabels(), .before = 1) |> 
+  filter(model_type != "EE-RE") |> 
+  mutate(contrast_type = ifelse(str_detect(model_type, "-CON"), "exercise_with_controls", "exercise_no_controls"), .before = 1) |> 
+  mutate(contrast_type = fct_rev(contrast_type),
+         randomGroupCode = factor(randomGroupCode),
+         Timepoint = fct_relevel(Timepoint, "post_24_hr", after = 3)) |> 
+  select(-c(ex_post, ex_pre, con_post, con_pre))
+
+peak_compare = results_category |> 
+  inner_join(og_res |> filter(adj_p_value < 0.05), by = "contrast") |> 
+  # droplevels() |> 
+  group_by(contrast_type, Timepoint, randomGroupCode) |> 
+  summarise(peaks = list(feature_id)) |> 
+  pivot_wider(names_from = "contrast_type", values_from = "peaks", values_fill = list()) |> 
+  mutate(dd_only = map2_dbl(exercise_with_controls, exercise_no_controls, ~ length(setdiff(.x, .y))), 
+         common = map2_dbl(exercise_with_controls, exercise_no_controls, ~ length(intersect(.x, .y))), 
+         within_group_only = map2_dbl(exercise_with_controls, exercise_no_controls, ~ length(setdiff(.y, .x))), .after = 2) |> 
+  bind_rows(data.frame(Timepoint = factor("post_24_hr"), randomGroupCode = "ADUEndur", dd_only = 0, common = 0, within_group_only = 0)) |> 
+  arrange(randomGroupCode, Timepoint) 
+
+p_count_compare2 = peak_compare |> 
+  select(-where(is.list)) |> 
+  pivot_longer(-c(Timepoint, randomGroupCode), names_to = "category", values_to = "n") |> 
+  mutate(x_val = c("dd_only" = 0.125, "common" = 0.5, "within_group_only" = 0.875)[category]) |> 
+  mutate(fill_val = ifelse(x_val == 0.5, 0.5, 0.25)) |> 
+  mutate(category = fct_inorder(category)) |> 
+  ggplot(aes(x = x_val, y = fct_rev(Timepoint), label = n, fill = category)) + 
+  geom_tile(color = "white", linewidth = 1) +
+  # geom_col(aes(x = fill_val), position = position_stack(reverse = TRUE)) +
+  geom_text(fontface = "bold") + 
+  facet_wrap(~ randomGroupCode) + 
+  labs(y = NULL, x = NULL) + 
+  scale_y_discrete(labels = ~ prettyLabels(.x, TRUE), expand = expansion(0)) + 
+  scale_x_continuous(breaks = c(0.125, 0.5, 0.875), labels = c("difference-in-\nchanges only", "common", "within-group\nonly"), expand = expansion(0)) +
+  scale_fill_manual(values = aesthetically_pleasing_colors$colorBlindFriendly2[-c(1:3)]) +
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5)) + 
+  ggtitle("Distinct & Overlapping Significant Peaks")
+
+p_count_compare1 = results_category |> 
+  inner_join(og_res |> filter(adj_p_value < 0.05), by = "contrast") |> 
+  group_by(contrast_type, Timepoint, randomGroupCode) |> tally() |> 
+  ungroup() |> 
+  bind_rows(data.frame(contrast_type = c(rep("exercise_with_controls", 2), "exercise_no_controls"), Timepoint = factor("post_24_hr"), randomGroupCode = c("ADUResist", rep("ADUEndur", 2)), n = 0)) |> 
+  mutate(contrast_type = fct_inorder(contrast_type)) |> 
+  ggplot(aes(y = fct_rev(Timepoint), x = contrast_type, fill = n, label = n)) +
+  geom_tile(color = "white", linewidth = 1) + 
+  geom_text(fontface = "bold") + 
+  facet_wrap(~ randomGroupCode) + 
+  # coord_fixed() + 
+  scale_fill_continuous(palette = c("#EFEDF5", "#BCBDDC", "#756BB1")) +
+  scale_x_discrete(labels = c("difference-in-\nchanges", "within-\ngroup"), expand = expansion(0)) + 
+  scale_y_discrete(labels = ~ prettyLabels(.x, TRUE), expand = expansion(0)) + 
+  labs(y = NULL, x = NULL) + 
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5)) + 
+  ggtitle("Count of Significant Peaks")
+
+p_count_compare_grid = ggpubr::ggarrange(p_count_compare1, p_count_compare2, nrow = 1, align = "h", widths = c(0.6, 1))
+saveFigures("peak-count-plots", plot(p_count_compare_grid), 6, 1.3)
+
+# percent corroboration
+sum(peak_compare$common) / (sum(peak_compare$common) + sum(peak_compare$dd_only))
+```

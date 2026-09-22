@@ -1,0 +1,80 @@
+# Packages the panel scripts, the compute stages, and their shared helpers
+# actually import.
+#
+# GENERATED — do not edit. `make panel-packages` rewrites this file, header and
+# all, from the scripts themselves. Change what a script loads, run it again.
+#
+# Under CLOSURE_CHECK_MODE=STRICT every package listed here must match the
+# version recorded in precovid-repro's docs/environment/package_versions.tsv.
+# Drift in the rest of that ~436-package closure is reported as WARN: it cannot
+# reach a panel, so it cannot change one.
+#
+# Derived from every .R under scripts/10_build_panels/, every helper in
+# scripts/lib/, and the R drivers of Stages 05 to 08. The generator matches
+# text, so a package named only inside a comment or a message string is included
+# too — harmless, since such a package is in the reference and matches.
+#
+# The compute stages are gated for a stronger reason than the panels. A panel
+# script draws what it is handed; Stage 05 FITS the table ED3A is then drawn
+# from, Stage 06 the one ED3E is drawn from, Stage 07 the one ED4G and FIG3EFG
+# are drawn from, and Stage 08 the PLIER fits, so which variancePartition,
+# edgeR, limma or PLIER they ran under decides the numbers in those figures and
+# not merely their appearance. limma in particular: eBayes()'s `legacy` argument,
+# and the estimator it selects, moves every moderated t and p in the fit.
+#
+# Deliberately excluded, and why — all of it in scripts/lib/derive_panel_packages.sh:
+#
+#   base, grDevices, grid, stats, utils, methods, ...
+#       base-priority, versioned with R itself. REQUIRED_R_VERSION covers them.
+#
+#   MotrpacHumanPreSuspensionData, MotrpacHumanPreSuspensionAnalysis
+#       the reference manifest records the versions from BEFORE `make all` runs
+#       on precovid-repro, so checking them here would fail a correctly updated
+#       library. The version each panel was actually drawn from is recorded
+#       per-PDF in outputs/panels/export_manifest.tsv.
+#
+#   MotrpacHumanPreSuspension
+#       a third package the legacy figure scripts called plot_single_feature()
+#       from. No script here names it.
+#
+# Some entries reach a panel at RUN TIME and are named in no script; the
+# generator's RUNTIME_EXTRA list carries them and says why for each. No entry is
+# absent from the reference manifest.
+
+annotatr
+BiocParallel
+circlize
+ComplexHeatmap
+ComplexUpset
+data.table
+dplyr
+edgeR
+forcats
+geomtextpath
+ggh4x
+ggnewscale
+ggplot2
+ggpubr
+ggrastr
+ggrepel
+gplots
+gridExtra
+jsonlite
+latex2exp
+limma
+lme4
+MotrpacBicQC
+openxlsx
+patchwork
+pheatmap
+PLIER
+ragg
+RColorBrewer
+readxl
+scales
+stringr
+tibble
+tidyr
+TMSig
+variancePartition
+WGCNA

@@ -5,10 +5,14 @@
 *.DS_Store
 CLAUDE*
 
+# Scratch work and R graphics-device by-products
+/sandbox/
+Rplots.pdf
+
 # figures/landscape/ — built outputs
 figures/landscape/outputs/
 
-# figures/landscape/ — downloaded consortium data cache (7.7 GB epigenomics DA/QC)
+# figures/landscape/ — downloaded consortium data cache (epigenomics QC, SF1 raw counts)
 figures/landscape/staging/
 
 # Individual-level inputs that may not be published.

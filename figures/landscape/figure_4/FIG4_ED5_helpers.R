@@ -1,9 +1,8 @@
-# FIG4_ED5.R — the CAMERA-PR bubble heatmap and the fuzzy c-means objects, as
-# Figure 4 and Extended Data 5 read them.
+# FIG4_ED5.R — the fuzzy c-means objects, as Figure 4 and Extended Data 5 read
+# them: the cmeans_* functions behind FIG4C-FIG4F and ED5B-ED5E.
 #
-# One file because both figures read both halves:
-#   camera_enrich_heatmap()   FIG4A, FIG4B, ED5A
-#   the cmeans_* functions    FIG4C-FIG4F, ED5B-ED5E
+# The CAMERA-PR bubble heatmaps (FIG4A, FIG4B, ED5A) call
+# MotrpacHumanPreSuspensionAnalysis::plot_enrich_heatmap(return_drawing = TRUE).
 #
 # Sourced after lib/panel_export.R, which defines landscape_root().
 #
@@ -15,289 +14,6 @@ suppressPackageStartupMessages({
   library(ComplexHeatmap)
   library(dplyr)
 })
-
-# ============================================================================
-# CAMERA-PR
-# ============================================================================
-#
-# FIG4A, FIG4B and ED5A are all one call to
-# MotrpacHumanPreSuspensionAnalysis::plot_enrich_heatmap() in the legacy, over
-# CAMERA_RESULTS, differing only in ome and selection:
-#
-#   FIG4A  transcript-rna-seq, twelve curated sets
-#   FIG4B  prot-pr, eight curated sets
-#   ED5A   metab, the six most significant sets per tissue and contrast
-#
-# That function cannot be called here. It opens its own cairo_pdf() on the
-# filename it is given and closes it with on.exit(), so it writes a PDF instead
-# of returning a drawing, and export_panel() has nothing to export. Its page size
-# is computed from the data and is not a value the manifest could carry either.
-#
-# camera_enrich_heatmap() below is that function with the device removed. The
-# body is otherwise the upstream one: the same filters, the same annotation
-# frame, the same column split, the same size arithmetic, and the same
-# TMSig::enrichmap() call. Three changes, all forced:
-#
-#   - grDevices::cairo_pdf() and its on.exit(dev.off()) are gone. The caller
-#     hands the returned $draw to export_panel(), which opens the device the
-#     manifest declares.
-#   - draw_args gains newpage = FALSE. enrichmap() ends in ComplexHeatmap::draw(),
-#     whose default starts a fresh page on the device export_panel() already
-#     opened, leaving page 1 blank and the heatmap on page 2. ED2E and FIG3B
-#     carry the same argument for the same reason.
-#   - the computed width and height are returned rather than consumed, so the
-#     caller passes them to export_panel(). A panel whose row count decides its
-#     page size cannot take the size from the manifest.
-#
-# The three unexported helpers it reaches for (.add_contrast_labels(),
-# .contrast_colors(), .enrich_heatmap_color_function) are called through ::: on
-# the installed package rather than copied, so the labels, the contrast colours
-# and the z-score colour ramp stay whatever the pinned version says they are.
-#
-# Provenance: MotrpacHumanPreSuspensionAnalysis R/plot_enrich_heatmap.R, at the
-# version config/required_packages.tsv pins. The legacy
-# callers are figures/landscape/CAMERA-PR/curated_CAMERA-PR_heatmaps.R.
-
-#' The CAMERA-PR bubble heatmap, as a drawing and the page it needs.
-#'
-#' @param set_ids Character set ids to draw, or NULL to take the n_top most
-#'   significant per tissue and contrast.
-#' @param selected_ome One of the omes CAMERA_RESULTS carries.
-#' @param selected_tissues Tissues to include. With more than one, only sets
-#'   tested in at least two of them are kept.
-#' @param contrast_type Which contrast family to draw.
-#' @param padj_cutoff The adjusted-p cut an asterisk marks.
-#' @param n_top Sets per tissue and contrast when set_ids is NULL.
-#' @param zscore_colors Length-2 ramp for the smallest and largest z-scores.
-#'
-#' @return list(draw, width, height). draw is zero-argument, for export_panel().
-camera_enrich_heatmap <- function(set_ids = NULL,
-                                  selected_ome,
-                                  selected_tissues = c("adipose", "blood", "muscle"),
-                                  contrast_type = "exercise_with_controls",
-                                  padj_cutoff = 0.05,
-                                  n_top = 6L,
-                                  zscore_colors = c("#3366ff", "darkred")) {
-  pkg <- asNamespace("MotrpacHumanPreSuspensionAnalysis")
-
-  x <- MotrpacHumanPreSuspensionAnalysis::CAMERA_RESULTS
-
-  required_cols <- c("tissue", "assay", "contrast", "contrast_type",
-                     "set_id", "set", "set_short", "p_value", "adj_p_value",
-                     "z.std")
-  missing_cols <- setdiff(required_cols, colnames(x))
-  if (length(missing_cols) > 0) {
-    stop("CAMERA_RESULTS is missing column(s): ",
-         paste(missing_cols, collapse = ", "), call. = FALSE)
-  }
-
-  x <- x %>%
-    dplyr::filter(.data$contrast_type == !!contrast_type,
-                  .data$assay == selected_ome,
-                  .data$tissue %in% selected_tissues) %>%
-    droplevels.data.frame()
-
-  selected_tissues <- intersect(selected_tissues, unique(as.character(x$tissue)))
-
-  # With more than one tissue, a set has to have been tested in at least two of
-  # them to be comparable across the columns.
-  if (length(selected_tissues) > 1L) {
-    x <- dplyr::filter(x, .by = "set", length(unique(.data$tissue)) > 1L)
-  }
-  x <- dplyr::filter(x, .by = "set", any(.data$adj_p_value < padj_cutoff))
-
-  if (nrow(x) == 0) {
-    stop("no sets are significant at padj_cutoff = ", padj_cutoff,
-         " for ome ", selected_ome, call. = FALSE)
-  }
-
-  if (is.null(set_ids)) {
-    # p_value rather than adj_p_value for the ordering, to avoid ties.
-    set_ids <- x %>%
-      dplyr::filter(.data$adj_p_value < padj_cutoff) %>%
-      dplyr::slice_min(.data$p_value, by = c("tissue", "contrast"), n = n_top) %>%
-      dplyr::pull("set_id") %>%
-      unique() %>%
-      as.character()
-  } else {
-    set_ids <- sprintf("%05d", as.numeric(gsub("[^[:digit:]]", "", set_ids)))
-    set_ids <- unique(set_ids)
-    found <- intersect(set_ids, as.character(x$set_id))
-    if (length(found) == 0) {
-      stop("none of the curated set ids survives this run's CAMERA-PR for ome ",
-           selected_ome, call. = FALSE)
-    }
-    if (length(found) < length(set_ids)) {
-      message(sprintf(
-        "        %d of %d curated set(s) not returned by this run and not drawn: %s",
-        length(set_ids) - length(found), length(set_ids),
-        paste(sort(setdiff(set_ids, found)), collapse = ", ")))
-    }
-  }
-
-  x <- dplyr::filter(x, .data$set_id %in% set_ids)
-
-  contrast_df <- pkg$.add_contrast_labels() %>%
-    dplyr::filter(.data$contrast %in% levels(x$contrast)) %>%
-    droplevels.data.frame()
-
-  column_df <- dplyr::distinct(x, .data$tissue, .data$contrast) %>%
-    dplyr::mutate(tissue = factor(.data$tissue, levels = selected_tissues)) %>%
-    dplyr::arrange(.data$contrast, .data$tissue) %>%
-    dplyr::left_join(contrast_df, by = "contrast") %>%
-    dplyr::rename(modality = "anno_group") %>%
-    dplyr::mutate(modality = factor(.data$modality, levels = c("EE", "RE")))
-
-  anno_df <- dplyr::select(column_df,
-                           Tissue = "tissue",
-                           Modality = "modality",
-                           Timepoint = "contrast_labels")
-
-  anno_col <- list(
-    Tissue = MotrpacHumanPreSuspensionAnalysis::HUMAN_TISSUE_COLORS[selected_tissues],
-    Modality = stats::setNames(c("#d95f02", "#1b9e77"), c("EE", "RE")),
-    Timepoint = pkg$.contrast_colors()[levels(anno_df$Timepoint)]
-  )
-
-  # A contrast in one tissue is a different column from the same contrast in
-  # another.
-  column_df <- column_df %>%
-    dplyr::mutate(contrast2 = paste(.data$tissue, .data$contrast),
-                  contrast2 = factor(.data$contrast2, levels = unique(.data$contrast2)))
-
-  if (length(selected_tissues) == 1L) {
-    anno_df$Tissue <- NULL
-    anno_col["Tissue"] <- NULL
-  }
-
-  show_column_names <- FALSE
-  if (identical(contrast_type, "baseline")) {
-    anno_df$Timepoint <- NULL
-    anno_col["Timepoint"] <- NULL
-    show_column_names <- TRUE
-  }
-  if (!contrast_type %in% c("exercise_with_controls", "exercise_no_controls")) {
-    anno_df$Modality <- NULL
-    anno_col["Modality"] <- NULL
-  }
-
-  top_annotation <- NULL
-  column_split <- NULL
-
-  if (length(anno_col) > 0) {
-    if (!is.null(anno_df[["Tissue"]]) && !is.null(anno_df[["Modality"]])) {
-      column_split <- anno_df %>%
-        dplyr::mutate(column_split = paste(.data$Tissue, .data$Modality),
-                      row_order = seq_len(dplyr::n())) %>%
-        dplyr::arrange(.data$Tissue, .data$Modality) %>%
-        dplyr::mutate(column_split = factor(.data$column_split,
-                                            levels = unique(.data$column_split))) %>%
-        dplyr::arrange(.data$row_order) %>%
-        dplyr::pull("column_split")
-    } else if (!is.null(anno_df[["Tissue"]])) {
-      column_split <- anno_df[["Tissue"]]
-    } else if (!is.null(anno_df[["Modality"]])) {
-      column_split <- anno_df[["Modality"]]
-    }
-
-    top_annotation <- ComplexHeatmap::HeatmapAnnotation(
-      df = anno_df,
-      col = anno_col,
-      which = "column",
-      border = TRUE,
-      gap = grid::unit(2, "pt"),
-      annotation_name_gp = grid::gpar(fontsize = 0.9 * 14),
-      annotation_legend_param = list(
-        border = TRUE,
-        title_gp = grid::gpar(fontsize = 0.9 * grid::unit(14, "pt"),
-                              fontface = "bold"),
-        labels_gp = grid::gpar(fontsize = 0.9 * grid::unit(14, "pt"))
-      )
-    )
-  }
-
-  # One 14 pt cell per set, plus room for the annotation and the legends.
-  n_sets <- length(unique(x[["set"]]))
-  height <- grid::convertUnit(n_sets * grid::unit(14, "pt"), "in")
-  height <- max(as.numeric(height), 4 + 2 * (1L - show_column_names)) +
-    3 + show_column_names
-
-  row_label_width <- ComplexHeatmap::max_text_width(
-    text = x[["set_short"]],
-    gp = grid::gpar(fontsize = 0.9 * 14)
-  )
-  row_label_width <- grid::convertUnit(row_label_width, "in")
-  width <- grid::convertUnit(nrow(anno_df) * grid::unit(14, "pt"), "in")
-  width <- as.numeric(width + row_label_width) + 3
-
-  extended_range <- TMSig::extendRangeNum(x[["z.std"]], nearest = 0.1)
-  breaks <- if (all(extended_range <= 0)) {
-    c(extended_range[1], 0)
-  } else if (all(extended_range >= 0)) {
-    c(0, extended_range[2])
-  } else {
-    c(extended_range[1], 0, extended_range[2])
-  }
-
-  # Row clustering fails when a set is measured in too few contrasts to cluster
-  # on, so it is turned off for the same case upstream turns it off for.
-  cluster_rows <- x %>%
-    dplyr::count(.data$set_short) %>%
-    dplyr::pull("n") %>%
-    {all(. >= 0.5 * max(.))}
-
-  x <- x %>%
-    dplyr::mutate(contrast2 = paste(.data$tissue, .data$contrast),
-                  contrast2 = factor(.data$contrast2,
-                                     levels = levels(column_df$contrast2)),
-                  set_short = factor(.data$set_short,
-                                     levels = sort(unique(.data$set_short))))
-
-  # Few rows leave the legends taller than the heatmap; the padding keeps the
-  # page from growing to fit them.
-  draw_args <- list(newpage = FALSE)
-  if (length(unique(x$set)) <= 10L) {
-    draw_args$padding <- grid::unit(c(185, 0, 0, 0), "pt")
-  } else if (length(unique(x$set)) <= 20L) {
-    draw_args$padding <- grid::unit(c(70, 0, 0, 0), "pt")
-  }
-
-  draw <- function() {
-    TMSig::enrichmap(
-      x = as.data.frame(x),
-      n_top = Inf,
-      set_column = "set_short",
-      statistic_column = "z.std",
-      contrast_column = "contrast2",
-      padj_column = "adj_p_value",
-      padj_cutoff = padj_cutoff,
-      plot_sig_only = TRUE,
-      heatmap_color_fun = pkg$.enrich_heatmap_color_function,
-      colors = zscore_colors,
-      padj_legend_title = "BH Adjusted\nP-Value",
-      draw_args = draw_args,
-      heatmap_args = list(
-        na_col = "grey95",
-        rect_gp = grid::gpar(fill = "white", col = "grey85"),
-        cluster_rows = cluster_rows,
-        column_split = column_split,
-        row_labels = latex2exp::TeX(levels(x$set_short)),
-        column_labels = column_df$contrast_labels,
-        show_column_names = show_column_names,
-        column_names_side = "top",
-        column_title_gp = grid::gpar(fontsize = 0),
-        top_annotation = top_annotation,
-        heatmap_legend_param = list(
-          title = "Z-Score",
-          at = breaks,
-          labels = breaks
-        )
-      )
-    )
-  }
-
-  list(draw = draw, width = width, height = height, n_sets = n_sets)
-}
 
 # ============================================================================
 # Fuzzy c-means
@@ -321,11 +37,11 @@ camera_enrich_heatmap <- function(set_ids = NULL,
 #
 # Values already exported in the environment WIN, which is what makes a one-off
 # override possible:
-#   CMEANS_VEGF_BLOOD=4,5 Rscript figures/landscape/ED5.R ED5C
+#   CMEANS_VEGF_BLOOD=4,5 Rscript figures/landscape/figure_4/ED5.R ED5C
 .cmeans_load_env <- function() {
   path <- file.path(landscape_root(), "figure_4", "cmeans.env")
   if (!file.exists(path)) {
-    stop("cmeans.env is missing from config/", call. = FALSE)
+    stop("cmeans.env is missing from figure_4/", call. = FALSE)
   }
   for (line in readLines(path, warn = FALSE)) {
     line <- trimws(line)
@@ -763,8 +479,8 @@ cmeans_enriched_clusters <- function(pathway, ome) {
          "\n  config/highlights.json (cmeans) and CMEANS_OME in figure_4/cmeans.env name them.",
          call. = FALSE)
   }
-  # as.numeric first: FCM_ORA stores the cluster as "01" in places and "1" in
-  # others, and the group id has to match the centroid frame's rownames.
+  # FCM_ORA$cluster is a factor with levels "1".."13"; the group id has to
+  # match the centroid frame's rownames.
   found$cluster <- as.character(as.numeric(found$cluster))
   found <- unique(found)
   found$group_id <- paste0(found$tissue, "-", found$cluster)

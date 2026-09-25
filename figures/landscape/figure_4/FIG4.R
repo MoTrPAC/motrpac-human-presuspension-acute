@@ -48,7 +48,7 @@ source(file.path(here, "FIG4_ED5_helpers.R"))
 # order, and FIG4C, FIG4D and FIG4E all read left to right in it.
 TISSUE_ORDER <- c("adipose", "blood", "muscle")
 
-# FIG4A and FIG4B do NOT share a CAMERA load: they call camera_enrich_heatmap()
+# FIG4A and FIG4B do NOT share a CAMERA load: they call plot_enrich_heatmap()
 # with different omes and different curated selections, so there is one result
 # per panel and nothing to memoise.
 #
@@ -81,7 +81,7 @@ rna_plier <- local({
 # itself is not recomputed here: CAMERA_RESULTS in the Analysis package is the
 # published run over all three tissues, and this panel selects rows from it.
 #
-# Adipose, blood and muscle at once. camera_enrich_heatmap() keeps only sets
+# Adipose, blood and muscle at once. plot_enrich_heatmap() keeps only sets
 # tested in at least two tissues, so a pathway measured in one is dropped rather
 # than drawn as a row of blanks.
 
@@ -97,11 +97,13 @@ fig4a <- function() {
 
   # ---- plot ----
 
-  heatmap <- camera_enrich_heatmap(
+  heatmap <- MotrpacHumanPreSuspensionAnalysis::plot_enrich_heatmap(
+    x = MotrpacHumanPreSuspensionAnalysis::CAMERA_RESULTS,
     set_ids = curated$set_id,
     selected_ome = "transcript-rna-seq",
     selected_tissues = c("adipose", "blood", "muscle"),
-    contrast_type = "exercise_with_controls"
+    contrast_type = "exercise_with_controls",
+    return_drawing = TRUE
   )
 
   message(sprintf("        FIG4A: drawing %d pathway(s) on a %.1f x %.1f in page",
@@ -135,11 +137,13 @@ fig4b <- function() {
 
   # ---- plot ----
 
-  heatmap <- camera_enrich_heatmap(
+  heatmap <- MotrpacHumanPreSuspensionAnalysis::plot_enrich_heatmap(
+    x = MotrpacHumanPreSuspensionAnalysis::CAMERA_RESULTS,
     set_ids = curated$set_id,
     selected_ome = "prot-pr",
     selected_tissues = c("adipose", "blood", "muscle"),
-    contrast_type = "exercise_with_controls"
+    contrast_type = "exercise_with_controls",
+    return_drawing = TRUE
   )
 
   message(sprintf("        FIG4B: drawing %d pathway(s) on a %.1f x %.1f in page",

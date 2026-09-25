@@ -55,23 +55,25 @@ TISSUE_ORDER <- c("adipose", "blood", "muscle")
 # THE SELECTION IS COMPUTED, NOT CURATED. Where FIG4A and FIG4B draw a hand
 # list from config/highlights.json, this panel takes the six most significant
 # classes from each tissue and contrast and draws their union — n_top = 6 in
-# camera_enrich_heatmap(), which is the upstream default and what the legacy
+# plot_enrich_heatmap(), which is the upstream default and what the legacy
 # call used. Nothing about it is hand-set, so it has no highlights.json entry.
 #
 # Ordering is on the raw p-value rather than the adjusted one, to avoid ties
-# among classes that share an adjusted p.
+# among classes that share an adjusted p; remaining ties go to the larger |z|.
 
 ed5a <- function() {
   panel_init("ED5A")
 
   # ---- plot ----
 
-  heatmap <- camera_enrich_heatmap(
+  heatmap <- MotrpacHumanPreSuspensionAnalysis::plot_enrich_heatmap(
+    x = MotrpacHumanPreSuspensionAnalysis::CAMERA_RESULTS,
     set_ids = NULL,
     n_top = 6L,
     selected_ome = "metab",
     selected_tissues = c("adipose", "blood", "muscle"),
-    contrast_type = "exercise_with_controls"
+    contrast_type = "exercise_with_controls",
+    return_drawing = TRUE
   )
 
   message(sprintf("        ED5A: drawing %d RefMet class(es) on a %.1f x %.1f in page",

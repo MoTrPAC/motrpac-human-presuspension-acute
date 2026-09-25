@@ -1,13 +1,10 @@
 # motrpac-human-presuspension-acute
 
-This repository tracks the exact code, parameters, and documentation/links to external data used to generate each of the manuscripts for the Molecular Transducers of Physical Activity Consortium Pre-Suspension Human Phase.
+This repository tracks the exact code, parameters, and documentation and links to external data used to generate each manuscript from the Molecular Transducers of Physical Activity Consortium (MoTrPAC) Pre-Suspension human phase.
 
-For each manuscript, the code used to generate the figures is located in the subfolder `figures/`, labeled under the relevant manuscript name. The `landscape` folder indicates the integrative analysis that incorporates data from all tissues. Each topic sub-analysis group is responsible for the relevant code for their figures. If you have any questions or issues that show up, please [submit a new issue](https://github.com/MoTrPAC/MotrpacPreSuspensionAcute/issues)
-and be very clear about which specific code or figure panel you are describing. Please include as many details as possible. 
+For each manuscript, the code used to generate the figures is located in the subfolder `figures/`, labeled under the relevant manuscript name. The `landscape` folder contains the integrative analysis that incorporates data from all tissues. Each topic sub-analysis group is responsible for the relevant code for their figures. If you have questions or find a problem, please [submit a new issue](https://github.com/MoTrPAC/motrpac-human-presuspension-acute/issues) and state which script or figure panel you are describing, with as much detail as possible.
 
-This repository also contains some of the quality control steps that visualize decisions such as how outliers were flagged, or how the decisions were made that reflect the data generation process that is implemented in `MotrpacHumanPreSuspensionAnalysis`.
-Please review the`QC` folder to take a look at these visualizations and data processing steps, which will explain in a bit more detail. 
-
+This repository also contains quality control reports that document decisions such as how outliers were flagged and how the data processing implemented in `MotrpacHumanPreSuspensionAnalysis` was chosen. See the `QC` folder for these reports.
 
 ## How this repo fits with the others
 
@@ -42,29 +39,37 @@ subject-level data — access-gated         aggregate results — public
 | [`motrpac-human-presuspension-repro`](https://github.com/MoTrPAC/motrpac-human-presuspension-repro) | the end-to-end rebuild pipeline and its pinned software environment | code; a full run needs consortium bucket access |
 | [`MotrpacHumanPreSuspensionData`](https://github.com/MoTrPAC/MotrpacHumanPreSuspensionData) | subject-level molecular and phenotypic data objects | formal data-access request to the consortium |
 | [`MotrpacHumanPreSuspensionAnalysis`](https://github.com/MoTrPAC/MotrpacHumanPreSuspensionAnalysis) | differential analysis, group summary statistics, enrichment, clustering, feature-to-gene map, plotting functions | public |
-| [`motrpac-human-presuspension-acute`](https://github.com/MoTrPAC/motrpac-human-presuspension-acute) | per-manuscript figure code and QC vignettes | code public; some panels need Data access |
+| [`motrpac-human-presuspension-acute`](https://github.com/MoTrPAC/motrpac-human-presuspension-acute) | per-manuscript figure code and QC vignettes | code public; some panels need `MotrpacHumanPreSuspensionData` access |
 
 ## Repository Structure
 
 ```
-MotrpacPreSuspensionAcute/
-
+motrpac-human-presuspension-acute/
 ├── figures/                           # All manuscript figure code and outputs
 │   ├── landscape/                     # Cross-tissue integrative analysis paper
 │   ├── blood/                         # Blood tissue paper
 │   ├── adipose/                       # Adipose tissue paper
 │   ├── muscle/                        # Muscle tissue paper
 │   └── splicing/                      # Alternative splicing paper
-└── QC/                                # Quality control vignettes (HTML reports)
+└── QC/                                # Quality control reports (HTML)
 ```
 
-## Notes for the public:
+## Notes for the public
 
-If you are viewing the original bioRxiv submission, please realize that the the code used to generate the figures may change over time as the consortium analysis groups address revisions or concerns or do extra analysis. Please refer to the `RELEASES` list on the side of the github repository for more information on if you would like stored versions of the repository corresponding to specific versions of the bioRxiv submission. As of Feb 25th, 2026, the code used for each of the `landscape`, `splicing`, and `adipose` figures is available, but analysts are still updating the code used for the blood and muscle manuscripts. The first formal github release will be locked in once all the code for the panels for those manuscripts is available. 
+The code used to generate the figures may change over time as the consortium analysis groups address revisions, respond to reviewer concerns, or add analyses. The version of this repository that matches the original bioRxiv submission is tagged as the [`v1.0-alpha` release](https://github.com/MoTrPAC/motrpac-human-presuspension-acute/releases/tag/v1.0-alpha); see the Releases list in the GitHub sidebar for stored versions. Code for all five manuscripts (`landscape`, `blood`, `adipose`, `muscle` and `splicing`) is in `figures/`. The tissue papers (`adipose`, `blood` and `muscle`) are still a work in progress, and their code may change.
 
-To protect participant privacy and comply with data-use governance policies, individual-level (subject-level) molecular or phenotypic data, found in `MotrpacHumanPreSuspensionData`, are available only through formal data access requests to the MoTrPAC consortium. This means that some of the figures generated will not be directly replicate-able until that access is granted.
+Since that release, the `landscape` code on `main` has been reorganized around the manuscript's own figure numbering: one script per figure, run together by `figures/landscape/run_all.R`, and aligned with `MotrpacHumanPreSuspensionAnalysis` 2.0.8 and `MotrpacHumanPreSuspensionData` 2.0.3. [`figures/landscape/README.md`](figures/landscape/README.md) gives the script for every figure panel and supplementary table.
 
-The figures folders rely HEAVILY on the the packages for `MotrpacHumanPreSuspensionAnalysis` and `MotrpacHumanPreSuspensionData` for access. Some references to data from external datasets are located within the relevant figure folder, but most of the data loaded will be done through the `MotrpacHumanPreSuspensionData` package (which is available via request to the Consortium). 
+To protect participant privacy and comply with data-use governance policies, individual-level (subject-level) molecular and phenotypic data, found in `MotrpacHumanPreSuspensionData`, are available only through formal data access requests to the MoTrPAC consortium. Some figures therefore cannot be reproduced until that access is granted.
 
+The figure folders rely heavily on the `MotrpacHumanPreSuspensionAnalysis` and `MotrpacHumanPreSuspensionData` packages. Some data from external datasets are stored in the relevant figure folder, but most data are loaded through `MotrpacHumanPreSuspensionData`.
 
+## Running the figure scripts
 
+Instructions for running each manuscript's figure code:
+
+- `landscape`: [`figures/landscape/README.md`](figures/landscape/README.md)
+- `adipose`: [`figures/adipose/README.md`](figures/adipose/README.md) (work in progress)
+- `muscle`: [`figures/muscle/README.md`](figures/muscle/README.md) (work in progress)
+- `blood`: [`figures/blood/README.md`](figures/blood/README.md) (work in progress)
+- `splicing`: [`figures/splicing/`](figures/splicing/)

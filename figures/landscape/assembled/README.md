@@ -10,7 +10,7 @@ panel to `outputs/panels/<figure_dir>/`. The assembled file is those panels plac
 a page.
 
 **The assembled panels are not always byte-identical to what the scripts emit.** Placing the
-panels is done in Illustrator, and small text was adjusted there: font sizes, label positions,
+panels was done in Illustrator, and small text was adjusted there: font sizes, label positions,
 a truncated axis label given room, panel letters added. **No values, no statistics and no
 graphical elements were changed**: a dot in an assembled figure sits where the script put it.
 So a panel rebuilt from the script may differ cosmetically from its counterpart here, and that

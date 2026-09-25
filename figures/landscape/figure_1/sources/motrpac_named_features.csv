@@ -1,0 +1,152 @@
+feature_id,tissue,assay,Notes,source
+PPARGC1A,muscle,transcript-rna-seq,,ED2b; ED3b; ED Table 1
+PER2,muscle,transcript-rna-seq,,Results multi-omic; ED2b
+P34932_S76s,muscle,prot-ph,HSPA4 S76,ED2b
+Alloisoleucine,adipose,metab,,ED2b
+MYC,blood,transcript-rna-seq,,"Results multi-omic; Fig 2c,d; Results TF; ED7"
+MYC,muscle,transcript-rna-seq,,"Results multi-omic; Fig 2c,d; Results TF; ED7"
+MYC,adipose,transcript-rna-seq,,"Results multi-omic; Fig 2c,d; Results TF; ED7"
+AREG,blood,transcript-rna-seq,,"Results multi-omic; Fig 2c,d"
+AREG,muscle,transcript-rna-seq,,"Results multi-omic; Fig 2c,d"
+AREG,adipose,transcript-rna-seq,,"Results multi-omic; Fig 2c,d"
+Carnitine,blood,metab,,Results multi-omic; Fig 2c
+Carnitine,muscle,metab,,Results multi-omic; Fig 2c
+Carnitine,adipose,metab,,Results multi-omic; Fig 2c
+Glutamic acid,blood,metab,,Results multi-omic; Fig 2c
+Glutamic acid,muscle,metab,,Results multi-omic; Fig 2c
+Glutamic acid,adipose,metab,,Results multi-omic; Fig 2c
+PC 33:2,blood,metab,,Results multi-omic; Fig 2c
+PC 33:2,muscle,metab,,Results multi-omic; Fig 2c
+PC 33:2,adipose,metab,,Results multi-omic; Fig 2c
+Q9P266_S1194s,adipose,prot-ph,JCAD S1194,Results multi-omic; Fig 2e
+Q9P266_S1194s,muscle,prot-ph,JCAD S1194,Results multi-omic; Fig 2e
+Q53EU6_S68s,adipose,prot-ph,GPAT3 S68,Results multi-omic; Fig 2e
+Q53EU6_S68s,muscle,prot-ph,GPAT3 S68,Results multi-omic; Fig 2e
+GZMB,blood,transcript-rna-seq,,Results sex sensitivity; ED3a
+CD177,blood,transcript-rna-seq,,Results sex sensitivity; ED3a
+MMP8,blood,transcript-rna-seq,,Results sex sensitivity; ED3a
+HSPH1,muscle,transcript-rna-seq,,Results modality; ED4d; Discussion
+CAR 6:0,blood,metab,,Results modality; Fig 3d
+CAR 10:1,blood,metab,,Results modality; Fig 3c
+CAR 10:1,muscle,metab,,Results modality; Fig 3c
+CAR 11:0,blood,metab,,Results modality; Fig 3c
+CAR 11:0,muscle,metab,,Results modality; Fig 3c
+CBFA2T3,muscle,transcript-rna-seq,,Results modality; Fig 3d
+LDHA,muscle,transcript-rna-seq,,Results modality; Fig 3d
+PDK4,muscle,transcript-rna-seq,,Results modality; Fig 3d; ED Table 1
+PFKP,muscle,transcript-rna-seq,,Results modality; Fig 3d
+BCKDHB,muscle,transcript-rna-seq,,Results modality; Fig 3d
+LRRC14B,muscle,transcript-rna-seq,,Results modality; Fig 3d; Discussion
+O60936_T114t,muscle,prot-ph,NOL3 T114,ED4e
+Q9UBF9_T145t,muscle,prot-ph,MYOT T145,ED4e
+LRRC25,muscle,transcript-rna-seq,,ED Table 1
+PRRT4,muscle,transcript-rna-seq,,ED Table 1
+CCN2,adipose,transcript-rna-seq,,ED Table 1
+EDEM1,blood,transcript-rna-seq,,ED Table 1
+KCNJ2,blood,transcript-rna-seq,,ED Table 1
+NSUN7,blood,transcript-rna-seq,,ED Table 1
+ANGPTL4,muscle,transcript-rna-seq,,ED Table 1
+CPT1A,blood,transcript-rna-seq,,ED Table 1
+DBP,muscle,transcript-rna-seq,,ED Table 1
+PFKFB4,muscle,transcript-rna-seq,,ED Table 1
+PREB,muscle,transcript-rna-seq,,ED Table 1
+TXNIP,muscle,transcript-rna-seq,,ED Table 1
+ACSL3,muscle,transcript-rna-seq,,ED Table 1
+CKB,muscle,transcript-rna-seq,,ED Table 1
+FUT1,muscle,transcript-rna-seq,,ED Table 1
+HSPB1,muscle,transcript-rna-seq,,ED Table 1
+NCL,muscle,transcript-rna-seq,,ED Table 1
+PDLIM3,muscle,transcript-rna-seq,,ED Table 1
+PITPNM1,muscle,transcript-rna-seq,,ED Table 1
+RAD9A,muscle,transcript-rna-seq,,ED Table 1
+SLC19A2,adipose,transcript-rna-seq,,ED Table 1
+SLC25A5,muscle,transcript-rna-seq,,ED Table 1
+SRSF11,muscle,transcript-rna-seq,,ED Table 1
+Q4VC12,muscle,prot-pr,MSS51,ED Table 1
+SDCBP,blood,transcript-rna-seq,,"Results temporal; Fig 4f; ED5d,e"
+SDCBP,muscle,transcript-rna-seq,,"Results temporal; Fig 4f; ED5d,e"
+HLX,blood,transcript-rna-seq,,"Results temporal; Fig 4f; ED5d,e"
+HLX,muscle,transcript-rna-seq,,"Results temporal; Fig 4f; ED5d,e"
+INPP4B,muscle,transcript-rna-seq,,"Results temporal; Fig 4f; ED5d,e"
+AMOT,muscle,transcript-rna-seq,,"Results temporal; Fig 4f; ED5d,e"
+NAPA,muscle,transcript-rna-seq,,Results temporal (tissue not stated; muscle cluster context)
+AP2S1,muscle,transcript-rna-seq,,Results temporal (tissue not stated; muscle cluster context)
+NR4A1,blood,transcript-rna-seq,,Results temporal LV33; Results TF; ED6d; ED7
+NR4A1,muscle,transcript-rna-seq,,Results temporal LV33; Results TF; ED6d; ED7
+NR4A1,adipose,transcript-rna-seq,,Results temporal LV33; Results TF; ED6d; ED7
+NR4A2,blood,transcript-rna-seq,,Results temporal LV33; ED6d
+NR4A2,muscle,transcript-rna-seq,,Results temporal LV33; ED6d
+NR4A2,adipose,transcript-rna-seq,,Results temporal LV33; ED6d
+ADAMTS1,blood,transcript-rna-seq,,Results temporal LV33; ED5d; ED6d
+ADAMTS1,muscle,transcript-rna-seq,,Results temporal LV33; ED5d; ED6d
+ADAMTS1,adipose,transcript-rna-seq,,Results temporal LV33; ED5d; ED6d
+TAMALIN,blood,transcript-rna-seq,,Results temporal LV33; Fig 4i
+TAMALIN,muscle,transcript-rna-seq,,Results temporal LV33; Fig 4i
+TAMALIN,adipose,transcript-rna-seq,,Results temporal LV33; Fig 4i
+HADHA,muscle,transcript-rna-seq,,Results temporal (EE fatty acid oxidation genes)
+MLYCD,muscle,transcript-rna-seq,,Results temporal (EE fatty acid oxidation genes)
+ACAA2,muscle,transcript-rna-seq,,Results temporal (EE fatty acid oxidation genes)
+JUN,blood,transcript-rna-seq,,Results TF; ED7
+JUN,muscle,transcript-rna-seq,,Results TF; ED7
+JUN,adipose,transcript-rna-seq,,Results TF; ED7
+MAFF,blood,transcript-rna-seq,,Results TF; ED7
+MAFF,muscle,transcript-rna-seq,,Results TF; ED7
+MAFF,adipose,transcript-rna-seq,,Results TF; ED7
+FOSL2,blood,transcript-rna-seq,,Results TF; ED7
+FOSL2,muscle,transcript-rna-seq,,Results TF; ED7
+FOSL2,adipose,transcript-rna-seq,,Results TF; ED7
+SRF,blood,transcript-rna-seq,,Results TF; ED7
+SRF,muscle,transcript-rna-seq,,Results TF; ED7
+SRF,adipose,transcript-rna-seq,,Results TF; ED7
+EGR1,blood,transcript-rna-seq,,Results TF; ED7
+EGR1,muscle,transcript-rna-seq,,Results TF; ED7
+EGR1,adipose,transcript-rna-seq,,Results TF; ED7
+P18846_S198s,muscle,prot-ph,ATF1 S198,Results TF; Fig 5h
+P17544_S44s,muscle,prot-ph,ATF7 S44,Results TF; Fig 5h
+Q15853_S222s,muscle,prot-ph,USF2 S222,Results TF; Fig 5h
+O75030_S504s,muscle,prot-ph,MITF S504,Results TF; Fig 5h
+O00327_S42s,muscle,prot-ph,BMAL1 S42 (ARNTL),Results TF; Fig 5h
+Q13469_S217s,muscle,prot-ph,NFATC2 S217,Results TF; Fig 5h
+Q13469_S236s,muscle,prot-ph,NFATC2 S236,Results TF; Fig 5h
+P23511_S326s,muscle,prot-ph,NFYA S326 (NFY),Results TF; Fig 5h; Results SC-ION
+P11831_S103s,muscle,prot-ph,SRF S103 (CARG),Results TF; Fig 5h
+P11831_S224s,muscle,prot-ph,SRF S224 (CARG),Results TF; Fig 5h
+P11831_S370s,muscle,prot-ph,SRF S370 (CARG),Results TF; Fig 5h
+NFYA,muscle,transcript-rna-seq,,Results SC-ION
+PITX3,muscle,transcript-rna-seq,,Results SC-ION
+STAT5B,muscle,transcript-rna-seq,,Results SC-ION
+RXRA,muscle,transcript-rna-seq,,"Results SC-ION; Fig 6b,e"
+CEBPB,muscle,transcript-rna-seq,,Results SC-ION
+TFEB,blood,transcript-rna-seq,,ED8b
+TFEB,muscle,transcript-rna-seq,,Results SC-ION; Fig 6b; ED8b; Discussion
+TFEB,adipose,transcript-rna-seq,,ED8b
+P19484_S109s,muscle,prot-ph,TFEB S109s,Results SC-ION; Fig 6c; Discussion
+P19484_S114s,muscle,prot-ph,TFEB S114s,Results SC-ION; Fig 6c; Discussion
+P19484_S122s,muscle,prot-ph,TFEB S122s,Results SC-ION; Fig 6c; Discussion
+P19484_S109sS114s,muscle,prot-ph,TFEB S109sS114s,Results SC-ION; Fig 6c; Discussion
+P19484_S109sS114sS122s,muscle,prot-ph,TFEB S109sS114sS122s,Results SC-ION; Fig 6c; Discussion
+P19484_S114sS122s,muscle,prot-ph,TFEB S114sS122s,Results SC-ION; Fig 6c; Discussion
+P19484_S334s,muscle,prot-ph,TFEB S334s,Fig 6c
+P19484_S423s,muscle,prot-ph,TFEB S423s,Fig 6c
+HSP90AA1,blood,transcript-rna-seq,,Results SC-ION; ED8d
+HSP90AA1,muscle,transcript-rna-seq,,Results SC-ION; ED8d
+HSP90AA1,adipose,transcript-rna-seq,,ED8d
+Leucine,blood,metab,,Results SC-ION; ED8f; Discussion
+Isoleucine,blood,metab,,Results SC-ION; Discussion
+Leu-Ile,blood,metab,,ED8f
+Lactic acid,blood,metab,,Results SC-ION; Fig 6f; Discussion
+Lactic acid,muscle,metab,,Fig 6f
+Lactic acid,adipose,metab,,Fig 6f
+OID20822,blood,prot-ol,PXN,Results exerkine; Fig 7a; ED9b
+OID20834,blood,prot-ol,NOS3,Results exerkine; Fig 7a; ED9b
+OID21463,blood,prot-ol,ANGPT2,Results exerkine; Fig 7a; ED9b
+CX3CL1,muscle,transcript-rna-seq,,"Results exerkine; Fig 7a,b"
+CX3CL1,adipose,transcript-rna-seq,,"Results exerkine; Fig 7a,b"
+OID20976,blood,prot-ol,CX3CL1,Results exerkine; Fig 7b
+CCN1,muscle,transcript-rna-seq,,"Results exerkine; Fig 7c,d,e; ED3c; ED9d; Discussion"
+CCN1,adipose,transcript-rna-seq,,"Results exerkine; Fig 7c,d,e; ED3c; ED9d; Discussion"
+OID21368,blood,prot-ol,CCN1,Results exerkine; Fig 7c
+O00622,muscle,prot-pr,CCN1,Results exerkine; Fig 7c; ED Table 1
+SDC4,muscle,transcript-rna-seq,,Results exerkine; Fig 7e
+P21333-2_S1533s,muscle,prot-ph,FLNA S1533,ED9c
+P21333_S1533s,adipose,prot-ph,FLNA S1533,ED9c

@@ -4,3 +4,27 @@
 .Ruserdata
 *.DS_Store
 CLAUDE*
+
+# Scratch work and R graphics-device by-products
+/sandbox/
+Rplots.pdf
+
+# figures/landscape/ — built outputs
+figures/landscape/outputs/
+
+# figures/landscape/ — downloaded consortium data cache (epigenomics QC, SF1 raw counts)
+figures/landscape/staging/
+
+# Individual-level inputs that may not be published.
+#
+# These files are NOT in this repository. ED1A, ED3D and ED3E tell a reader with
+# an approved MoTrPAC consortium data-access request to put a local copy where
+# the panel looks for it; these rules keep that copy from being committed.
+#
+# Matched on FILENAME, not on an exact path. The exact-path form silently
+# stopped matching when the figure folders were reorganised, which is the
+# failure this is written to avoid: a bare name matches at any depth, so it
+# holds wherever a reader puts the file and whatever the folders are called.
+1kg.motrpac.merged.maf_0_05.ld_pruned.pca.RDS
+CIBERSORTx_PrecovidBlood_RNADecon_Results_081226.csv
+motrpac_human-precovid_1kg_pca.csv

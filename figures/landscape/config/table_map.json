@@ -1,0 +1,1603 @@
+{
+  "$comment": [
+    "Supplementary-table manifest for figures/landscape/.",
+    "",
+    "Every entry is one SUB-TABLE: one sheet of one numbered supplementary table,",
+    "built by one R script in this repository, written to exactly one TSV. A table",
+    "script reads its own output path and column schema from here, so renumbering a",
+    "sub-table is an edit to this file and nowhere else.",
+    "",
+    "Every path in this file is relative to figures/landscape/, which the",
+    "environment variable LANDSCAPE_ROOT names (config/landscape.env).",
+    "",
+    "The file carries EVERY sub-table in the manuscript's numbering, including the",
+    "ones this repo does not build (built_here=false). A reader who finds ST2d on",
+    "disk and no ST2e needs to see that ST2e exists and is someone else's, rather",
+    "than conclude the build dropped it.",
+    "",
+    "It also carries the manuscript's Extended Data Tables, which are in the",
+    "manuscript rather than the supplement. Each is a group of its own holding one",
+    "entry whose id is the table number (EDT1); supp_id and supp_dir name that group",
+    "as they name a supplementary table.",
+    "",
+    "columns is the declared schema, in order. export_table() refuses a data frame",
+    "that does not match it, so a column renamed upstream fails the build rather",
+    "than shipping under the old header.",
+    "",
+    "Two sheets carry a banded two-row header in the workbook (a merged tissue",
+    "label over per-timepoint columns, with a blank spacer column between blocks).",
+    "A TSV has one header row, so those are flattened to <Tissue>_<timepoint> and",
+    "the spacer columns - spreadsheet cosmetics, not data - are dropped.",
+    "",
+    "Consumed by lib/table_export.R, which every script that writes a sub-table",
+    "sources.",
+    "",
+    "A sub-table whose numbers are a panel's numbers is written BY THAT PANEL'S",
+    "FIGURE SCRIPT, in the same run, from the same in-memory object. ST3a, ST3b and",
+    "ST3c all fall out of one ORA pass in FIG3B; ST3d is ED4B's plotting frame;",
+    "ST2c is FIG2A's all_da kept by timepoint instead of collapsed. Splitting those",
+    "into their own scripts would recompute the fit once per output and give a",
+    "figure and its table two chances to disagree.",
+    "",
+    "So `script` is whatever file writes the table, and `stage` says which of the",
+    "two shapes that file is: figure_script for a table a per-figure script writes",
+    "alongside its panels (<FIG_ID>.R at the top level), table_script for a",
+    "standalone one (tables/<ST_NUMBER>.R). co_generated_with names everything else",
+    "that comes out of that same file. The relation is recorded from the other side",
+    "too, in config/panel_map.json (co_generated_tables), so neither file is the",
+    "whole story on its own.",
+    "",
+    "pointer_script is the table script that carries a signpost for a sub-table it",
+    "does not build: ST2c belongs under tables/ST2.R by its number, so a reader who",
+    "looks for it there finds an answer rather than nothing.",
+    "",
+    "plotted_in is the weaker relation: the panel that DISPLAYS these numbers,",
+    "whether or not the two are computed together. FIG2F plots ST2e, which FIG2B writes.",
+    "It too is recorded from the other side, as displays_tables in config/panel_map.json."
+  ],
+  "schema_version": "1.0.0",
+  "manuscript": {
+    "study": "MoTrPAC Human Pre-Suspension acute exercise landscape"
+  },
+  "output": {
+    "root": "outputs/tables",
+    "layout": "<root>/<table>_<slug>.tsv",
+    "format": "tsv",
+    "sidecar_manifest": "outputs/tables/export_manifest.tsv",
+    "notes": "One tab-delimited file per sub-table. Paths relative to figures/landscape/. See lib/table_export.R."
+  },
+  "defaults": {
+    "sep": "\t",
+    "na": "",
+    "quote": false,
+    "row_names": false
+  },
+  "supp_tables": [
+    {
+      "supp_id": "EDT1",
+      "supp_dir": "extended_data_table_1",
+      "title": "Selected molecular features associated with baseline clinical traits and acute exercise",
+      "tables": [
+        "EDT1"
+      ]
+    },
+    {
+      "supp_id": "ST1",
+      "supp_dir": "supp_table_1",
+      "title": "Participant numbers",
+      "tables": [
+        "ST1a",
+        "ST1b",
+        "ST1c",
+        "ST1d",
+        "ST1e"
+      ]
+    },
+    {
+      "supp_id": "ST2",
+      "supp_dir": "supp_table_2",
+      "title": "Feature-level results",
+      "tables": [
+        "ST2a",
+        "ST2b",
+        "ST2c",
+        "ST2d",
+        "ST2e",
+        "ST2f",
+        "ST2g",
+        "ST2h"
+      ]
+    },
+    {
+      "supp_id": "ST3",
+      "supp_dir": "supp_table_3",
+      "title": "Direct comparison of EE vs RE, clinical x omics associations",
+      "tables": [
+        "ST3a",
+        "ST3b",
+        "ST3c",
+        "ST3d",
+        "ST3e",
+        "ST3f",
+        "ST3g",
+        "ST3h"
+      ]
+    },
+    {
+      "supp_id": "ST4",
+      "supp_dir": "supp_table_4",
+      "title": "Temporal molecular response analysis",
+      "tables": [
+        "ST4a",
+        "ST4b",
+        "ST4c",
+        "ST4d",
+        "ST4e"
+      ]
+    },
+    {
+      "supp_id": "ST5",
+      "supp_dir": "supp_table_5",
+      "title": "HOMER transcription factor results",
+      "tables": [
+        "ST5a"
+      ]
+    },
+    {
+      "supp_id": "ST6",
+      "supp_dir": "supp_table_6",
+      "title": "SC-ION results",
+      "tables": [
+        "ST6a",
+        "ST6b",
+        "ST6c",
+        "ST6d",
+        "ST6e",
+        "ST6f",
+        "ST6g"
+      ]
+    },
+    {
+      "supp_id": "ST7",
+      "supp_dir": "supp_table_7",
+      "title": "Putative exerkine candidate lists",
+      "tables": [
+        "ST7a"
+      ]
+    }
+  ],
+  "tables": [
+    {
+      "table": "EDT1",
+      "supp_id": "EDT1",
+      "slug": "clinical_x_omics_selected",
+      "title": "Selected molecular features associated with baseline clinical traits and acute exercise",
+      "built_here": true,
+      "script": "figure_3/EDT1.R",
+      "output": "outputs/tables/EDT1_clinical_x_omics_selected.tsv",
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis",
+        "MotrpacHumanPreSuspensionData"
+      ],
+      "columns": [
+        "clinical_trait",
+        "tissue",
+        "omics_platform",
+        "feature_id",
+        "gene_symbol",
+        "t_stat",
+        "adj_p",
+        "beta",
+        "ee_log2fc",
+        "ee_adj_p",
+        "re_log2fc",
+        "re_adj_p",
+        "timepoint",
+        "ee_vs_re_diff",
+        "molecule_info"
+      ],
+      "external_inputs": [
+        {
+          "what": "Baseline clinical x omics association table (clinical_omics_associations.tsv)",
+          "produced_by": "figure_3/clinical_omics_fit.R",
+          "produced_by_script": "figure_3/clinical_omics_fit.R",
+          "env_var": "CLINICAL_OMICS_TABLE",
+          "must_exist": true,
+          "status": "derived",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "notes": "The features the manuscript selected, from config/highlights.json (clinical_omics_features, EDT1): baseline association with the trait from the figure_3/clinical_omics_fit.R fit, and the EE and RE log2FC at the reported timepoint from the differential analysis. ee_vs_re_diff is YES when the EE-RE contrast at that timepoint is FDR < 0.05, NO otherwise, empty where the EE-RE contrast was not fitted. timepoint uses the manuscript shorthand (P15-45M, P3.5/4H, P24H, D20M, D40M).",
+      "stage": "table_script"
+    },
+    {
+      "table": "ST1a",
+      "supp_id": "ST1",
+      "slug": "participants_per_group",
+      "title": "Participants per randomization group",
+      "built_here": true,
+      "script": "figure_1/ST1.R",
+      "output": "outputs/tables/ST1a_participants_per_group.tsv",
+      "stage": "table_script",
+      "data_packages": [
+        "MotrpacHumanPreSuspensionData"
+      ],
+      "columns": [
+        "Characteristic",
+        "Overall",
+        "CON",
+        "EE",
+        "RE"
+      ],
+      "external_inputs": [],
+      "co_generated_with": {
+        "panels": [],
+        "tables": [
+          "ST1b"
+        ],
+        "script": "figure_1/ST1.R"
+      },
+      "notes": "Cohort composition rather than measurement: participants classified by the tempSampProfile column pheno carries, cross-tabulated by randomization group (and sex for ST1b). Written together with ST1b from one participant-level frame - the two are the same counts with and without the sex split."
+    },
+    {
+      "table": "ST1b",
+      "supp_id": "ST1",
+      "slug": "participants_per_group_and_sex",
+      "title": "Participants per group and sex",
+      "built_here": true,
+      "script": "figure_1/ST1.R",
+      "output": "outputs/tables/ST1b_participants_per_group_and_sex.tsv",
+      "stage": "table_script",
+      "data_packages": [
+        "MotrpacHumanPreSuspensionData"
+      ],
+      "columns": [
+        "Characteristic",
+        "Overall_Female",
+        "Overall_Male",
+        "CON_Female",
+        "CON_Male",
+        "EE_Female",
+        "EE_Male",
+        "RE_Female",
+        "RE_Male"
+      ],
+      "external_inputs": [],
+      "co_generated_with": {
+        "panels": [],
+        "tables": [
+          "ST1a"
+        ],
+        "script": "figure_1/ST1.R"
+      },
+      "notes": "Cohort composition rather than measurement: participants classified by the tempSampProfile column pheno carries, cross-tabulated by randomization group (and sex for ST1b). Written together with ST1a from one participant-level frame - the two are the same counts with and without the sex split."
+    },
+    {
+      "table": "ST1c",
+      "supp_id": "ST1",
+      "slug": "participants_per_tissue_and_ome",
+      "title": "Participants per tissue and omics assay",
+      "built_here": true,
+      "script": "figure_1/FIG1.R",
+      "output": "outputs/tables/ST1c_participants_per_tissue_and_ome.tsv",
+      "data_packages": [
+        "MotrpacHumanPreSuspensionData",
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "columns": [
+        "assay",
+        "randomGroupCode",
+        "Adipose_pre_exercise",
+        "Adipose_post_15_30_45_min",
+        "Adipose_post_3.5_4_hr",
+        "Adipose_post_24_hr",
+        "Blood_pre_exercise",
+        "Blood_during_20_min",
+        "Blood_during_40_min",
+        "Blood_post_10_min",
+        "Blood_post_15_30_45_min",
+        "Blood_post_3.5_4_hr",
+        "Blood_post_24_hr",
+        "Muscle_pre_exercise",
+        "Muscle_post_15_30_45_min",
+        "Muscle_post_3.5_4_hr",
+        "Muscle_post_24_hr"
+      ],
+      "external_inputs": [],
+      "co_generated_with": {
+        "panels": [
+          "FIG1C"
+        ],
+        "tables": [
+          "ST2b"
+        ],
+        "script": "figure_1/FIG1.R"
+      },
+      "stage": "figure_script",
+      "notes": "Written by FIG1C's script because both need load_qc(epigen = TRUE), which reads about 6 GB of QC matrices and metadata - the expensive step, and the only one either shares. They are different aggregations of that one load: FIG1C counts distinct participants per tissue x OME (six, with the two proteomics platforms folded together), this table counts them per tissue x ASSAY. So FIG1C does not plot these numbers cell for cell; it plots their ome-level sums.",
+      "pointer_script": "figure_1/ST1.R"
+    },
+    {
+      "table": "ST1d",
+      "supp_id": "ST1",
+      "slug": "outliers",
+      "title": "Outliers",
+      "built_here": true,
+      "script": "figure_1/ST1.R",
+      "output": "outputs/tables/ST1d_outliers.tsv",
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "columns": [
+        "assay",
+        "adipose",
+        "blood",
+        "muscle"
+      ],
+      "external_inputs": [],
+      "co_generated_with": {
+        "panels": [],
+        "tables": [],
+        "script": "figure_1/ST1.R"
+      },
+      "stage": "table_script",
+      "notes": "Standalone: counted straight off the OUTLIERS object, 160 rows, with no QC load at all. Nothing else in the repo shares that read."
+    },
+    {
+      "table": "ST1e",
+      "supp_id": "ST1",
+      "slug": "named_features",
+      "title": "Named features",
+      "built_here": true,
+      "script": "figure_1/ED1.R",
+      "output": "outputs/tables/ST1e_named_features.tsv",
+      "data_packages": [
+        "MotrpacHumanPreSuspensionData",
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "columns": [
+        "feature_id",
+        "tissue",
+        "assay",
+        "Gene",
+        "Control_pre_exercise",
+        "Control_during_20_min",
+        "Control_during_40_min",
+        "Control_post_10_min",
+        "Control_post_15_30_45_min",
+        "Control_post_3.5_4_hr",
+        "Control_post_24_hr",
+        "Endur_pre_exercise",
+        "Endur_during_20_min",
+        "Endur_during_40_min",
+        "Endur_post_10_min",
+        "Endur_post_15_30_45_min",
+        "Endur_post_3.5_4_hr",
+        "Endur_post_24_hr",
+        "Resist_pre_exercise",
+        "Resist_post_10_min",
+        "Resist_post_15_30_45_min",
+        "Resist_post_3.5_4_hr",
+        "Resist_post_24_hr"
+      ],
+      "external_inputs": [],
+      "co_generated_with": {
+        "panels": [
+          "ED1C"
+        ],
+        "tables": [],
+        "script": "figure_1/ED1.R"
+      },
+      "plotted_in": [
+        "ED1C"
+      ],
+      "stage": "figure_script",
+      "pointer_script": "figure_1/ST1.R"
+    },
+    {
+      "table": "ST2a",
+      "supp_id": "ST2",
+      "slug": "covariates",
+      "title": "Covariates included",
+      "built_here": true,
+      "script": "figure_2/ST2.R",
+      "output": "outputs/tables/ST2a_covariates.tsv",
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "columns": [
+        "ome",
+        "tech_or_design",
+        "data_type",
+        "covariate",
+        "tissue"
+      ],
+      "external_inputs": [],
+      "co_generated_with": {
+        "panels": [],
+        "tables": [],
+        "script": "figure_2/ST2.R"
+      },
+      "stage": "table_script"
+    },
+    {
+      "table": "ST2b",
+      "supp_id": "ST2",
+      "slug": "total_n_features",
+      "title": "Total number of features detected",
+      "built_here": true,
+      "script": "figure_1/FIG1.R",
+      "output": "outputs/tables/ST2b_total_n_features.tsv",
+      "data_packages": [
+        "MotrpacHumanPreSuspensionData",
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "columns": [
+        "assay",
+        "Adipose",
+        "Blood",
+        "Muscle"
+      ],
+      "external_inputs": [],
+      "co_generated_with": {
+        "panels": [
+          "FIG1C"
+        ],
+        "tables": [
+          "ST1c"
+        ],
+        "script": "figure_1/FIG1.R"
+      },
+      "stage": "figure_script",
+      "pointer_script": "figure_2/ST2.R",
+      "notes": "Written by FIG1C's script: the feature counts are the row counts of the same qc_norm matrices ST1c counts the columns of, so both come out of one load_qc(epigen = TRUE) call. The 30% missingness filter the legend describes is already applied in the stored object, so the row count IS the filtered count and nothing is filtered again here."
+    },
+    {
+      "table": "ST2c",
+      "supp_id": "ST2",
+      "slug": "num_da_features",
+      "title": "Number of DA features",
+      "built_here": true,
+      "script": "figure_2/FIG2.R",
+      "output": "outputs/tables/ST2c_num_da_features.tsv",
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "columns": [
+        "assay",
+        "randomGroupCode",
+        "Adipose_post_15_30_45_min",
+        "Adipose_post_3.5_4_hr",
+        "Adipose_post_24_hr",
+        "Blood_during_20_min",
+        "Blood_during_40_min",
+        "Blood_post_10_min",
+        "Blood_post_15_30_45_min",
+        "Blood_post_3.5_4_hr",
+        "Blood_post_24_hr",
+        "Muscle_post_15_30_45_min",
+        "Muscle_post_3.5_4_hr",
+        "Muscle_post_24_hr"
+      ],
+      "external_inputs": [],
+      "co_generated_with": {
+        "panels": [
+          "FIG2A"
+        ],
+        "tables": [],
+        "script": "figure_2/FIG2.R"
+      },
+      "stage": "figure_script",
+      "pointer_script": "figure_2/ST2.R"
+    },
+    {
+      "table": "ST2d",
+      "supp_id": "ST2",
+      "slug": "da_percent_overlap",
+      "title": "DA percent overlap",
+      "built_here": true,
+      "script": "figure_2/ST2.R",
+      "output": "outputs/tables/ST2d_da_percent_overlap.tsv",
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "columns": [
+        "assay",
+        "tissue_query",
+        "tissue_compare",
+        "percent_overlap",
+        "n_query",
+        "n_overlap"
+      ],
+      "external_inputs": [
+        {
+          "what": "Epigenomics differential-analysis tables, 5 files totalling 7.7 GB (ATAC muscle and PBMC at v2.1, methylCap muscle, EDTA and adipose at v1.2).",
+          "produced_by": "Downloaded over HTTPS by load_differential_analysis(epigen = TRUE) from the public c2.0 CloudFront release https://d1yw74buhe0ts0.cloudfront.net/data/analysis/human_presuspension_sed_adu/c2.0/epigenomics/da/. No gsutil and no credentials. Not cached: every call downloads again. A failed download is an error. Same pull as FIG2A.",
+          "env_var": null,
+          "status": "external",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "co_generated_with": {
+        "panels": [],
+        "tables": [],
+        "script": "figure_2/ST2.R"
+      },
+      "stage": "table_script",
+      "notes": "Schema, grain and row order copied from the DA_PercentOverlap sheet of sources/supp_table_2/Landscape_Supplementary_Table_2.xlsx, which is vendored as the format reference and is not read by the build. One row per assay x ORDERED tissue pair, 36 rows: n_query is the DA features in tissue_query, n_overlap those also DA in tissue_compare, percent_overlap the ratio, blank where n_query is 0. DA is FDR < 0.05 in any exercise-with-controls contrast, either arm, any timepoint. One deliberate departure from the workbook: prot-pr and prot-ol are keyed on UniProt rather than on feature_id, so a protein measured by mass spec in adipose or muscle and on Olink in blood is one feature. Olink ids are OID accessions against UniProt accessions for global proteomics, so on raw ids the proteomics overlap is zero by construction rather than by measurement; the bridge finds 4 proteins shared adipose/blood and 1 blood/muscle. The grid is complete rather than rostered: an assay not run in a tissue is n_query = 0 with a blank percent, as in the workbook. Standalone: the cross-tissue comparison these numbers belong to is not a panel in this repo's scope, and ST2e is the ORA over the same comparison."
+    },
+    {
+      "table": "ST2e",
+      "supp_id": "ST2",
+      "slug": "cross_tissue_ora",
+      "title": "Cross-tissue ORA",
+      "built_here": true,
+      "script": "figure_2/FIG2.R",
+      "output": "outputs/tables/ST2e_cross_tissue_ora.tsv",
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "columns": [
+        "contrast",
+        "collection",
+        "database",
+        "set_id",
+        "set",
+        "set_short",
+        "set_size",
+        "set_size_DB",
+        "size_ratio",
+        "set_size_in_input",
+        "input_size",
+        "background_size",
+        "p_value",
+        "adj_p_value",
+        "statistic_column"
+      ],
+      "external_inputs": [],
+      "notes": "Over-representation analysis of the six tissue-membership sets FIG2B's UpSet defines. Recomputed here rather than read from the hand-passed CSV the legacy figures consumed, which no committed script produced.",
+      "co_generated_with": {
+        "panels": [
+          "FIG2B"
+        ],
+        "tables": [],
+        "script": "figure_2/FIG2.R"
+      },
+      "plotted_in": [
+        "FIG2Bii",
+        "FIG2F"
+      ],
+      "stage": "figure_script",
+      "pointer_script": "figure_2/ST2.R"
+    },
+    {
+      "table": "ST2f",
+      "supp_id": "ST2",
+      "slug": "phospho_ora_ptmsigdb",
+      "title": "Phospho ORA (PTMsigDB)",
+      "built_here": true,
+      "script": "figure_2/ED2.R",
+      "output": "outputs/tables/ST2f_phospho_ora_ptmsigdb.tsv",
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis",
+        "MotrpacHumanPreSuspensionData"
+      ],
+      "columns": [
+        "contrast",
+        "collection",
+        "database",
+        "set_id",
+        "set",
+        "set_short",
+        "set_size",
+        "set_size_DB",
+        "size_ratio",
+        "set_size_in_input",
+        "input_size",
+        "background_size",
+        "p_value",
+        "adj_p_value",
+        "statistic_column"
+      ],
+      "external_inputs": [
+        {
+          "what": "PTMsigDB over-representation result (837 rows over three phosphosite sets)",
+          "produced_by": "Published PTMsigDB ORA result. This is what ED2E draws and what ST2f carries. The panel also recomputes the pass on every build using per-tissue site confidence and reports the difference to the build log, but nothing from that recomputation reaches the figure or the table.",
+          "status": "vendored",
+          "path": "sources/extended_data_2/landscape_figureED2_PTMSigDB_ORA_results_v2_Aug2026.csv",
+          "override_env_var": "ED2E_PTMSIGDB_ORA_CSV",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "notes": "PTMsigDB over-representation of the muscle-only, adipose-only and shared phosphosite sets, re-emitted here under this repo's column schema with statistic_column = -log10(p_value). ED2E recomputes the pass as a check and logs the difference, but this table is the published result, not the recomputation.",
+      "co_generated_with": {
+        "panels": [
+          "ED2E"
+        ],
+        "tables": [],
+        "script": "figure_2/ED2.R"
+      },
+      "plotted_in": [
+        "ED2E"
+      ],
+      "stage": "figure_script",
+      "pointer_script": "figure_2/ST2.R"
+    },
+    {
+      "table": "ST2g",
+      "supp_id": "ST2",
+      "slug": "sex_specific_da",
+      "title": "Sex-specific DA estimate correlation",
+      "built_here": true,
+      "script": "extended_data_3/ED3.R",
+      "output": "outputs/tables/ST2g_sex_specific_da.tsv",
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "columns": [
+        "Ome",
+        "tissue",
+        "Group",
+        "Timepoint",
+        "n_sig",
+        "Pearsons_R",
+        "slope",
+        "intercept"
+      ],
+      "external_inputs": [],
+      "co_generated_with": {
+        "panels": [
+          "ED3A"
+        ],
+        "tables": [
+          "ST2h"
+        ],
+        "script": "extended_data_3/ED3.R"
+      },
+      "plotted_in": [
+        "ED3A"
+      ],
+      "stage": "figure_script",
+      "pointer_script": "figure_2/ST2.R"
+    },
+    {
+      "table": "ST2h",
+      "supp_id": "ST2",
+      "slug": "sex_specific_enrichment",
+      "title": "Sex-specific differences enrichment",
+      "built_here": true,
+      "script": "extended_data_3/ED3.R",
+      "output": "outputs/tables/ST2h_sex_specific_enrichment.tsv",
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "columns": [
+        "collection",
+        "database",
+        "set_id",
+        "set",
+        "set_short",
+        "set_size",
+        "set_size_DB",
+        "size_ratio",
+        "set_size_in_input",
+        "input_size",
+        "background_size",
+        "p_value",
+        "adj_p_value"
+      ],
+      "external_inputs": [],
+      "co_generated_with": {
+        "panels": [
+          "ED3A"
+        ],
+        "tables": [
+          "ST2g"
+        ],
+        "script": "extended_data_3/ED3.R"
+      },
+      "stage": "figure_script",
+      "pointer_script": "figure_2/ST2.R",
+      "notes": "ORA over the blood transcriptomics features that are significant in the primary analysis (FDR < 0.05) AND differ between the sexes in the resistance arm at 3.5-4 h (FDR < 0.10). The two cuts differ on purpose: the sex-stratified contrast is a sensitivity analysis fitted on half the samples per cell, and at FDR 0.05 only 21 of 20,526 features clear it, leaving 18 input genes. The 0.10 cut gives 95. This departs from the table legend, which states FDR < 0.05 for the inputs."
+    },
+    {
+      "table": "ST3a",
+      "supp_id": "ST3",
+      "slug": "ee_only_muscle_ora",
+      "title": "EE muscle-only ORA features",
+      "built_here": true,
+      "script": "figure_3/FIG3.R",
+      "output": "outputs/tables/ST3a_ee_only_muscle_ora.tsv",
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "columns": [
+        "feature_id",
+        "Timepoint",
+        "logFC_ADUEndur",
+        "logFC_ADUResist",
+        "adj_p_value_ADUEndur",
+        "adj_p_value_ADUResist",
+        "entrez_gene",
+        "gene_symbol"
+      ],
+      "external_inputs": [],
+      "co_generated_with": {
+        "panels": [
+          "FIG3B"
+        ],
+        "tables": [
+          "ST3b",
+          "ST3c"
+        ],
+        "script": "figure_3/FIG3.R"
+      },
+      "stage": "figure_script",
+      "pointer_script": "figure_3/ST3.R"
+    },
+    {
+      "table": "ST3b",
+      "supp_id": "ST3",
+      "slug": "re_only_muscle_ora",
+      "title": "RE muscle-only ORA features",
+      "built_here": true,
+      "script": "figure_3/FIG3.R",
+      "output": "outputs/tables/ST3b_re_only_muscle_ora.tsv",
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "columns": [
+        "feature_id",
+        "Timepoint",
+        "logFC_ADUEndur",
+        "logFC_ADUResist",
+        "adj_p_value_ADUEndur",
+        "adj_p_value_ADUResist",
+        "entrez_gene",
+        "gene_symbol"
+      ],
+      "external_inputs": [],
+      "co_generated_with": {
+        "panels": [
+          "FIG3B"
+        ],
+        "tables": [
+          "ST3a",
+          "ST3c"
+        ],
+        "script": "figure_3/FIG3.R"
+      },
+      "stage": "figure_script",
+      "pointer_script": "figure_3/ST3.R"
+    },
+    {
+      "table": "ST3c",
+      "supp_id": "ST3",
+      "slug": "all_muscle_re_ee_ora",
+      "title": "All-muscle RE/EE-only ORA",
+      "built_here": true,
+      "script": "figure_3/FIG3.R",
+      "output": "outputs/tables/ST3c_all_muscle_re_ee_ora.tsv",
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "columns": [
+        "collection",
+        "database",
+        "set_short",
+        "set_size",
+        "set_size_DB",
+        "size_ratio",
+        "set_size_in_input",
+        "input_size",
+        "background_size",
+        "p_value",
+        "adj_p_value",
+        "contrast",
+        "z.std"
+      ],
+      "external_inputs": [],
+      "co_generated_with": {
+        "panels": [
+          "FIG3B"
+        ],
+        "tables": [
+          "ST3a",
+          "ST3b"
+        ],
+        "script": "figure_3/FIG3.R"
+      },
+      "plotted_in": [
+        "FIG3B",
+        "ED4B"
+      ],
+      "stage": "figure_script",
+      "pointer_script": "figure_3/ST3.R"
+    },
+    {
+      "table": "ST3d",
+      "supp_id": "ST3",
+      "slug": "triangle_selected_pathways",
+      "title": "Triangle selected pathways",
+      "built_here": true,
+      "script": "figure_3/ED4.R",
+      "output": "outputs/tables/ST3d_triangle_selected_pathways.tsv",
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "columns": [
+        "tissue",
+        "set_short",
+        "Timepoint",
+        "adj_p_value_overall",
+        "condition",
+        "adj_p_value",
+        "shape",
+        "size"
+      ],
+      "external_inputs": [],
+      "co_generated_with": {
+        "panels": [
+          "ED4B"
+        ],
+        "tables": [],
+        "script": "figure_3/ED4.R"
+      },
+      "plotted_in": [
+        "ED4B"
+      ],
+      "stage": "figure_script",
+      "pointer_script": "figure_3/ST3.R"
+    },
+    {
+      "table": "ST3e",
+      "supp_id": "ST3",
+      "slug": "da_features_ee_re_opposite",
+      "title": "DA features with opposite EE/RE direction",
+      "built_here": false,
+      "script": null,
+      "output": null,
+      "reason_not_built": "built outside this repository"
+    },
+    {
+      "table": "ST3f",
+      "supp_id": "ST3",
+      "slug": "clinical_x_omics_all_sig",
+      "title": "Clinical x omics all significant associations",
+      "built_here": true,
+      "script": "figure_3/ED4.R",
+      "output": "outputs/tables/ST3f_clinical_x_omics_all_sig.tsv",
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis",
+        "MotrpacHumanPreSuspensionData"
+      ],
+      "columns": [
+        "clinical_trait",
+        "tissue",
+        "omics_platform",
+        "feature_id",
+        "gene_symbol",
+        "beta",
+        "se",
+        "t_stat",
+        "p_value",
+        "n_obs",
+        "adj_p"
+      ],
+      "external_inputs": [],
+      "notes": "Every association reaching FDR < 0.05 in the figure_3/clinical_omics_fit.R fit, which is what ED4G counts.",
+      "co_generated_with": {
+        "panels": [
+          "ED4G"
+        ],
+        "tables": [],
+        "script": "figure_3/ED4.R"
+      },
+      "stage": "figure_script",
+      "pointer_script": "figure_3/ST3.R"
+    },
+    {
+      "table": "ST3g",
+      "supp_id": "ST3",
+      "slug": "clinical_omics_ora_skm_vo2peak",
+      "title": "Over-representation analysis of muscle transcripts associated with baseline VO2peak",
+      "built_here": true,
+      "script": "figure_3/ST3.R",
+      "output": "outputs/tables/ST3g_clinical_omics_ora_skm_vo2peak.tsv",
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "columns": [
+        "ONTOLOGY",
+        "ID",
+        "Description",
+        "FoldEnrichment",
+        "pvalue",
+        "p.adjust",
+        "geneID",
+        "Count",
+        "vo2peak_dir"
+      ],
+      "external_inputs": [
+        {
+          "what": "Baseline clinical x omics association table (clinical_omics_associations.tsv)",
+          "produced_by": "figure_3/clinical_omics_fit.R",
+          "produced_by_script": "figure_3/clinical_omics_fit.R",
+          "env_var": "CLINICAL_OMICS_TABLE",
+          "must_exist": true,
+          "status": "derived",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "notes": "Muscle transcriptomics against VO2peak: 517 genes positively and 399 negatively associated, against a background of 14,972. ORA over the features of this slice reaching FDR < 0.05 in the figure_3/clinical_omics_fit.R fit, split on the sign of the association; the background is every gene the slice fitted, so it is what was measured rather than what responded. Columns follow the assembled workbook's clinical_x_omics_SKM_transcript sheet, and the rows are a superset of it: that sheet is Gene Ontology only, this one carries every collection run_ORA tests. GO sets fill ONTOLOGY with BP, CC or MF and ID with the GO accession, recovered by inverting MSigDB's set name against GO.db (10,341 of 10,461 GO sets resolve); the other collections fill ONTOLOGY with their database name and leave ID empty. FoldEnrichment is the observed overlap over the overlap a set of that size would take by chance; geneID is the set's members that are in the input, which run_ORA counts but does not name. Rows are cut at FDR < 0.05, as the workbook sheets are. Ported from precovid-analyses PR #103 commit 28d43ee, which ran clusterProfiler::enrichGO over Ensembl ids against GO alone and saved nothing; run_ORA computes the same hypergeometric test over the package's own signatures. The legacy joined HUMAN_FEATURE_TO_GENE on feature_id alone, which fans a feature out across every assay carrying that id; the join here is on assay and feature_id.",
+      "co_generated_with": {
+        "panels": [],
+        "tables": [],
+        "script": "figure_3/ST3.R"
+      },
+      "stage": "table_script"
+    },
+    {
+      "table": "ST3h",
+      "supp_id": "ST3",
+      "slug": "clinical_omics_ora_at_homa_ir",
+      "title": "Over-representation analysis of adipose transcripts associated with baseline HOMA-IR",
+      "built_here": true,
+      "script": "figure_3/ST3.R",
+      "output": "outputs/tables/ST3h_clinical_omics_ora_at_homa_ir.tsv",
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "columns": [
+        "ONTOLOGY",
+        "ID",
+        "Description",
+        "FoldEnrichment",
+        "pvalue",
+        "p.adjust",
+        "geneID",
+        "Count",
+        "homa_ir_dir"
+      ],
+      "external_inputs": [
+        {
+          "what": "Baseline clinical x omics association table (clinical_omics_associations.tsv)",
+          "produced_by": "figure_3/clinical_omics_fit.R",
+          "produced_by_script": "figure_3/clinical_omics_fit.R",
+          "env_var": "CLINICAL_OMICS_TABLE",
+          "must_exist": true,
+          "status": "derived",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "notes": "Adipose transcriptomics against HOMA-IR: 1,269 genes positively and 951 negatively associated, against a background of 17,287. ORA over the features of this slice reaching FDR < 0.05 in the figure_3/clinical_omics_fit.R fit, split on the sign of the association; the background is every gene the slice fitted, so it is what was measured rather than what responded. Columns follow the assembled workbook's clinical_x_omics_AT_transcripts sheet, and the rows are a superset of it: that sheet is Gene Ontology only, this one carries every collection run_ORA tests. GO sets fill ONTOLOGY with BP, CC or MF and ID with the GO accession, recovered by inverting MSigDB's set name against GO.db (10,341 of 10,461 GO sets resolve); the other collections fill ONTOLOGY with their database name and leave ID empty. FoldEnrichment is the observed overlap over the overlap a set of that size would take by chance; geneID is the set's members that are in the input, which run_ORA counts but does not name. Rows are cut at FDR < 0.05, as the workbook sheets are. Ported from precovid-analyses PR #103 commit 28d43ee, which ran clusterProfiler::enrichGO over Ensembl ids against GO alone and saved nothing; run_ORA computes the same hypergeometric test over the package's own signatures. The legacy joined HUMAN_FEATURE_TO_GENE on feature_id alone, which fans a feature out across every assay carrying that id; the join here is on assay and feature_id.",
+      "co_generated_with": {
+        "panels": [],
+        "tables": [],
+        "script": "figure_3/ST3.R"
+      },
+      "stage": "table_script"
+    },
+    {
+      "table": "ST4a",
+      "supp_id": "ST4",
+      "slug": "fcm_ora_filtered",
+      "title": "ORA of fuzzy c-means clusters, filtered",
+      "built_here": true,
+      "script": "figure_4/ST4.R",
+      "output": "outputs/tables/ST4a_fcm_ora_filtered.tsv",
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "columns": [
+        "tissue",
+        "assay",
+        "cluster",
+        "collection",
+        "database",
+        "set",
+        "set_short",
+        "set_size",
+        "set_size_DB",
+        "size_ratio",
+        "set_size_in_cluster",
+        "cluster_size",
+        "background_size",
+        "p_value",
+        "adj_p_value"
+      ],
+      "external_inputs": [],
+      "co_generated_with": {
+        "panels": [],
+        "tables": [],
+        "script": "figure_4/ST4.R"
+      },
+      "stage": "table_script"
+    },
+    {
+      "table": "ST4b",
+      "supp_id": "ST4",
+      "slug": "cross_tissue_rnaseq_plier",
+      "title": "Cross-tissue RNA-seq PLIER",
+      "built_here": false,
+      "script": null,
+      "output": null,
+      "reason_not_built": "unassigned",
+      "notes": "Unassigned. The numbers are PLIER's Uauc block for the selected RNA latent variables, which figure_4/plier_fit.R's crosstissue_rna_plier.rds now carries: the legacy wrote it and ST4c together as one 'Supplemental Table S4_RNAseq_081026.csv', a Uauc block rbind()ed onto a Z block. Splitting that CSV the way this manifest names it is a table job over a fit that already exists."
+    },
+    {
+      "table": "ST4c",
+      "supp_id": "ST4",
+      "slug": "transcript_affinity",
+      "title": "Transcript affinity",
+      "built_here": false,
+      "script": null,
+      "output": null,
+      "reason_not_built": "unassigned",
+      "notes": "Unassigned. The Z (affinity) block of the same legacy CSV as ST4b, over the union of the selected latent variables' marker transcripts. figure_4/plier_fit.R's crosstissue_rna_plier.rds carries it."
+    },
+    {
+      "table": "ST4d",
+      "supp_id": "ST4",
+      "slug": "cross_tissue_metab_plier",
+      "title": "Cross-tissue metabolomics PLIER",
+      "built_here": false,
+      "script": null,
+      "output": null,
+      "reason_not_built": "unassigned",
+      "notes": "Unassigned. ST4b over the metabolomics fit — the Uauc block of 'Supplemental Table S4_Metab_081426.csv'. figure_4/plier_fit.R's crosstissue_metab_plier.rds carries it."
+    },
+    {
+      "table": "ST4e",
+      "supp_id": "ST4",
+      "slug": "metabolite_affinity",
+      "title": "Metabolite affinity",
+      "built_here": false,
+      "script": null,
+      "output": null,
+      "reason_not_built": "unassigned",
+      "notes": "Unassigned. ST4c over the metabolomics fit — the Z block of the same legacy CSV. figure_4/plier_fit.R's crosstissue_metab_plier.rds carries it."
+    },
+    {
+      "table": "ST5a",
+      "supp_id": "ST5",
+      "slug": "tf_enrichment",
+      "title": "Transcription factor enrichment and expression",
+      "built_here": true,
+      "script": "figure_5/ST5.R",
+      "output": "outputs/tables/ST5a_tf_enrichment.tsv",
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "columns": [
+        "motif",
+        "gene_symbol",
+        "measure",
+        "randomGroupCode",
+        "Adipose_post_15_30_45_min",
+        "Adipose_post_3.5_4_hr",
+        "Adipose_post_24_hr",
+        "Blood_during_20_min",
+        "Blood_during_40_min",
+        "Blood_post_10_min",
+        "Blood_post_15_30_45_min",
+        "Blood_post_3.5_4_hr",
+        "Blood_post_24_hr",
+        "Muscle_post_15_30_45_min",
+        "Muscle_post_3.5_4_hr",
+        "Muscle_post_24_hr"
+      ],
+      "external_inputs": [
+        {
+          "what": "HOMER findMotifs.pl knownResults for 22 tissue x arm x timepoint DEG lists",
+          "produced_by": "findMotifs.pl run outside R; vendored under sources/figure_5/.",
+          "env_var": null,
+          "status": "vendored",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "tfproanno.RDS, the curated HOMER motif -> gene-symbol table carried over from PASS1B",
+          "produced_by": "PASS1B; only its Gene.Name column is read. Vendored under sources/figure_5/.",
+          "env_var": null,
+          "status": "vendored",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "co_generated_with": {
+        "panels": [],
+        "tables": [],
+        "script": "figure_5/ST5.R"
+      },
+      "plotted_in": [
+        "FIG5B",
+        "FIG5C",
+        "FIG5H"
+      ],
+      "stage": "table_script",
+      "notes": "Previously emitted as a 471 x 70 CSV. Reshaped to this repo's tissue x timepoint grid (the shape ST1c and ST2c use): the exercise arm is a key column rather than part of every header, and the four measure blocks the workbook laid side by side are a `measure` key. One row per motif x measure x arm that carries at least one value. enrichment_q is HOMER's q for the motif in that tissue, arm and timepoint, UNFLOORED - the panels replace a reported 0 with 1e-5 so a -log10 stays finite, and a table doing the same would assert a value HOMER never estimated. The three response measures are the smallest adj_p among the factor's features of that ome, over the exercise-with-controls contrast, through tf_min_adj_p_by_motif() - the same function FIG5H calls. Blank is 'not measured'; the legacy initialised the whole matrix to 1 and left it, so an unmeasured factor and an unresponsive one read the same. Two fixes carry into every response cell: the legacy filled EVERY 'RE 3.5/4 hr' column from the corresponding Endur contrast (8 of its 70 columns, all three tissues, all three response omes), and it selected a factor's transcript with an unanchored grep() on its Ensembl id. Standalone: no panel computes this grid - FIG5B and FIG5C read the enrichment block, FIG5H the muscle enrichment and phospho blocks filtered to 15 motifs, and nothing draws the protein block."
+    },
+    {
+      "table": "ST6a",
+      "supp_id": "ST6",
+      "slug": "combined_ee_re_edges",
+      "title": "Combined EE+RE edge table",
+      "built_here": true,
+      "script": "figure_6/ST6.R",
+      "output": "outputs/tables/ST6a_combined_ee_re_edges.tsv",
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "columns": [
+        "name",
+        "regulator_id",
+        "site",
+        "target_id",
+        "modality",
+        "tissue",
+        "cluster",
+        "weight"
+      ],
+      "external_inputs": [
+        {
+          "what": "Every edge of the merged EE+RE SC-ION network after the 0.1 weight trim (116,419 rows)",
+          "produced_by": "precovid-analyses PR #104 (figures/landscape/figure_7/SCION_supplemental_table_edges.csv): the Cytoscape export of the merged network with regulator_id filled from the edge name for metabolite regulators. The SC-ION inference, permutation trim and Cytoscape merge that produced it are not in the PR.",
+          "env_var": null,
+          "status": "vendored",
+          "path": "sources/figure_6/SCION_supplemental_table_edges.csv",
+          "documented_in": "docs/external_dependencies.md",
+          "override_env_var": "FIG6_SCION_EDGES_CSV"
+        }
+      ],
+      "co_generated_with": {
+        "panels": [],
+        "tables": [
+          "ST6b"
+        ],
+        "script": "figure_6/ST6.R"
+      },
+      "stage": "table_script",
+      "notes": "Re-emitted from the vendored merged-network edge table under this schema. The literal string NA the source carries in site for every metabolite edge is written as empty. FIG6E reads the same file for the TFEB and RXRA target sets. Ported from precovid-analyses PR #104; the inference, permutation trim and Cytoscape merge behind it are not reproduced here.",
+      "plotted_in": [
+        "FIG6E"
+      ]
+    },
+    {
+      "table": "ST6b",
+      "supp_id": "ST6",
+      "slug": "combined_ee_re_nodes",
+      "title": "Combined EE+RE node table",
+      "built_here": true,
+      "script": "figure_6/ST6.R",
+      "output": "outputs/tables/ST6b_combined_ee_re_nodes.tsv",
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "columns": [
+        "name",
+        "nms.EE",
+        "nms.RE",
+        "nms.score.avg"
+      ],
+      "external_inputs": [
+        {
+          "what": "Network Motif Score of every node in the merged EE+RE SC-ION network (10,052 rows)",
+          "produced_by": "precovid-analyses PR #104 (figures/landscape/figure_7/Merged_Network_combined_NMS_v2.csv). No script in the PR computes it.",
+          "env_var": null,
+          "status": "vendored",
+          "path": "sources/figure_6/Merged_Network_combined_NMS_v2.csv",
+          "documented_in": "docs/external_dependencies.md",
+          "override_env_var": "FIG6_SCION_NMS_CSV"
+        }
+      ],
+      "co_generated_with": {
+        "panels": [],
+        "tables": [
+          "ST6a"
+        ],
+        "script": "figure_6/ST6.R"
+      },
+      "stage": "table_script",
+      "notes": "Re-emitted from the vendored NMS table under the submitted workbook's header (nms.score.EE -> nms.EE, nms.score.RE -> nms.RE). A blank nms.EE or nms.RE is a node absent from that modality's network; nms.score.avg is blank when either is."
+    },
+    {
+      "table": "ST6c",
+      "supp_id": "ST6",
+      "slug": "tfeb_chip_targets",
+      "title": "TFEB ChIP targets",
+      "built_here": true,
+      "script": "figure_6/FIG6.R",
+      "output": "outputs/tables/ST6c_tfeb_chip_targets.tsv",
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "columns": [
+        "feature_id",
+        "gene_symbol",
+        "SCION.target",
+        "Gambardella_et_al_2020",
+        "MSigDb_TFEB_TARGET_GENES",
+        "Settembre_et_al_2013",
+        "Doronzo_et_al_2018",
+        "any"
+      ],
+      "external_inputs": [
+        {
+          "what": "Gambardella et al. 2020 TFEB ChIP-seq peak table (Sci. Adv. 6, eabb0205, table S2, sheet 2)",
+          "produced_by": "Published supplementary table. A gene counts as bound when a peak is annotated to its promoter within 1 kb.",
+          "env_var": null,
+          "status": "vendored",
+          "path": "sources/figure_6/Gambardella-et-al-2020-table-s2.xlsx",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "MSigDB TFEB_TARGET_GENES gene set (v2024.1.Hs), from GTRD",
+          "produced_by": "MSigDB C3 GTRD set TFEB_TARGET_GENES, exported as TSV; the gene list is the 18th row's comma-separated second field.",
+          "env_var": null,
+          "status": "vendored",
+          "path": "sources/figure_6/TFEB_TARGET_GENES.v2024.1.Hs.tsv",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "Doronzo et al. 2019 TFEB ChIP-seq peaks, GEO GSM2354032 (hg19 BED)",
+          "produced_by": "Published peak calls. Annotated with annotatr against hg19_basicgenes; a gene counts as bound by a promoter or 1-5 kb peak.",
+          "env_var": null,
+          "status": "vendored",
+          "path": "sources/figure_6/GSM2354032_TFEB_e5_peaks.bed",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "The 705 muscle transcripts SC-ION predicts as TFEB targets in the merged EE+RE network",
+          "produced_by": "precovid-analyses PR #104 (figures/landscape/figure_7/TFEB_targets_v2.xlsx). Read off the merged Cytoscape network; no script in the PR writes it, and FIG6E derives the same list from the edge table as a check.",
+          "env_var": null,
+          "status": "vendored",
+          "path": "sources/figure_6/TFEB_targets_v2.xlsx",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "co_generated_with": {
+        "panels": [
+          "FIG6D"
+        ],
+        "tables": [
+          "ST6d",
+          "ST6e",
+          "ST6f",
+          "ST6g"
+        ],
+        "script": "figure_6/FIG6.R"
+      },
+      "stage": "figure_script",
+      "notes": "Every muscle transcript with a gene symbol, flagged Y/N for SC-ION prediction and for each of the four TFEB ChIP sources; any is Y when at least one source is. feature_id is added ahead of the workbook's columns so a symbol carried by more than one transcript is a keyed row rather than a duplicate. The four ORA inputs of FIG6D are the any = Y rows that are DA at 3.5-4 h.",
+      "plotted_in": [
+        "ED8A",
+        "ED8E"
+      ],
+      "pointer_script": "figure_6/ST6.R"
+    },
+    {
+      "table": "ST6d",
+      "supp_id": "ST6",
+      "slug": "ee_3p5_4hr_up",
+      "title": "EE 3.5-4 h up",
+      "built_here": true,
+      "script": "figure_6/FIG6.R",
+      "output": "outputs/tables/ST6d_ee_3p5_4hr_up.tsv",
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "columns": [
+        "collection",
+        "database",
+        "set_id",
+        "set",
+        "set_short",
+        "set_size",
+        "set_size_DB",
+        "size_ratio",
+        "set_size_in_input",
+        "input_size",
+        "background_size",
+        "p_value",
+        "adj_p_value"
+      ],
+      "external_inputs": [
+        {
+          "what": "Gambardella et al. 2020 TFEB ChIP-seq peak table (Sci. Adv. 6, eabb0205, table S2, sheet 2)",
+          "produced_by": "Published supplementary table. A gene counts as bound when a peak is annotated to its promoter within 1 kb.",
+          "env_var": null,
+          "status": "vendored",
+          "path": "sources/figure_6/Gambardella-et-al-2020-table-s2.xlsx",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "MSigDB TFEB_TARGET_GENES gene set (v2024.1.Hs), from GTRD",
+          "produced_by": "MSigDB C3 GTRD set TFEB_TARGET_GENES, exported as TSV; the gene list is the 18th row's comma-separated second field.",
+          "env_var": null,
+          "status": "vendored",
+          "path": "sources/figure_6/TFEB_TARGET_GENES.v2024.1.Hs.tsv",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "Doronzo et al. 2019 TFEB ChIP-seq peaks, GEO GSM2354032 (hg19 BED)",
+          "produced_by": "Published peak calls. Annotated with annotatr against hg19_basicgenes; a gene counts as bound by a promoter or 1-5 kb peak.",
+          "env_var": null,
+          "status": "vendored",
+          "path": "sources/figure_6/GSM2354032_TFEB_e5_peaks.bed",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "co_generated_with": {
+        "panels": [
+          "FIG6D"
+        ],
+        "tables": [
+          "ST6c",
+          "ST6e",
+          "ST6f",
+          "ST6g"
+        ],
+        "script": "figure_6/FIG6.R"
+      },
+      "stage": "figure_script",
+      "notes": "ORA of ChIP-supported TFEB targets up at 3.5-4 h after EE, against every muscle transcript with a gene symbol, over the full MOLECULAR_SIGNATURES collection through run_ORA(). Unfiltered: FIG6D draws the curated selection in config/highlights.json.",
+      "plotted_in": [
+        "FIG6D"
+      ],
+      "pointer_script": "figure_6/ST6.R"
+    },
+    {
+      "table": "ST6e",
+      "supp_id": "ST6",
+      "slug": "ee_3p5_4hr_down",
+      "title": "EE 3.5-4 h down",
+      "built_here": true,
+      "script": "figure_6/FIG6.R",
+      "output": "outputs/tables/ST6e_ee_3p5_4hr_down.tsv",
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "columns": [
+        "collection",
+        "database",
+        "set_id",
+        "set",
+        "set_short",
+        "set_size",
+        "set_size_DB",
+        "size_ratio",
+        "set_size_in_input",
+        "input_size",
+        "background_size",
+        "p_value",
+        "adj_p_value"
+      ],
+      "external_inputs": [
+        {
+          "what": "Gambardella et al. 2020 TFEB ChIP-seq peak table (Sci. Adv. 6, eabb0205, table S2, sheet 2)",
+          "produced_by": "Published supplementary table. A gene counts as bound when a peak is annotated to its promoter within 1 kb.",
+          "env_var": null,
+          "status": "vendored",
+          "path": "sources/figure_6/Gambardella-et-al-2020-table-s2.xlsx",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "MSigDB TFEB_TARGET_GENES gene set (v2024.1.Hs), from GTRD",
+          "produced_by": "MSigDB C3 GTRD set TFEB_TARGET_GENES, exported as TSV; the gene list is the 18th row's comma-separated second field.",
+          "env_var": null,
+          "status": "vendored",
+          "path": "sources/figure_6/TFEB_TARGET_GENES.v2024.1.Hs.tsv",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "Doronzo et al. 2019 TFEB ChIP-seq peaks, GEO GSM2354032 (hg19 BED)",
+          "produced_by": "Published peak calls. Annotated with annotatr against hg19_basicgenes; a gene counts as bound by a promoter or 1-5 kb peak.",
+          "env_var": null,
+          "status": "vendored",
+          "path": "sources/figure_6/GSM2354032_TFEB_e5_peaks.bed",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "co_generated_with": {
+        "panels": [
+          "FIG6D"
+        ],
+        "tables": [
+          "ST6c",
+          "ST6d",
+          "ST6f",
+          "ST6g"
+        ],
+        "script": "figure_6/FIG6.R"
+      },
+      "stage": "figure_script",
+      "notes": "ORA of ChIP-supported TFEB targets down at 3.5-4 h after EE, against every muscle transcript with a gene symbol, over the full MOLECULAR_SIGNATURES collection through run_ORA(). Unfiltered: FIG6D draws the curated selection in config/highlights.json.",
+      "plotted_in": [
+        "FIG6D"
+      ],
+      "pointer_script": "figure_6/ST6.R"
+    },
+    {
+      "table": "ST6f",
+      "supp_id": "ST6",
+      "slug": "re_3p5_4hr_up",
+      "title": "RE 3.5-4 h up",
+      "built_here": true,
+      "script": "figure_6/FIG6.R",
+      "output": "outputs/tables/ST6f_re_3p5_4hr_up.tsv",
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "columns": [
+        "collection",
+        "database",
+        "set_id",
+        "set",
+        "set_short",
+        "set_size",
+        "set_size_DB",
+        "size_ratio",
+        "set_size_in_input",
+        "input_size",
+        "background_size",
+        "p_value",
+        "adj_p_value"
+      ],
+      "external_inputs": [
+        {
+          "what": "Gambardella et al. 2020 TFEB ChIP-seq peak table (Sci. Adv. 6, eabb0205, table S2, sheet 2)",
+          "produced_by": "Published supplementary table. A gene counts as bound when a peak is annotated to its promoter within 1 kb.",
+          "env_var": null,
+          "status": "vendored",
+          "path": "sources/figure_6/Gambardella-et-al-2020-table-s2.xlsx",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "MSigDB TFEB_TARGET_GENES gene set (v2024.1.Hs), from GTRD",
+          "produced_by": "MSigDB C3 GTRD set TFEB_TARGET_GENES, exported as TSV; the gene list is the 18th row's comma-separated second field.",
+          "env_var": null,
+          "status": "vendored",
+          "path": "sources/figure_6/TFEB_TARGET_GENES.v2024.1.Hs.tsv",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "Doronzo et al. 2019 TFEB ChIP-seq peaks, GEO GSM2354032 (hg19 BED)",
+          "produced_by": "Published peak calls. Annotated with annotatr against hg19_basicgenes; a gene counts as bound by a promoter or 1-5 kb peak.",
+          "env_var": null,
+          "status": "vendored",
+          "path": "sources/figure_6/GSM2354032_TFEB_e5_peaks.bed",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "co_generated_with": {
+        "panels": [
+          "FIG6D"
+        ],
+        "tables": [
+          "ST6c",
+          "ST6d",
+          "ST6e",
+          "ST6g"
+        ],
+        "script": "figure_6/FIG6.R"
+      },
+      "stage": "figure_script",
+      "notes": "ORA of ChIP-supported TFEB targets up at 3.5-4 h after RE, against every muscle transcript with a gene symbol, over the full MOLECULAR_SIGNATURES collection through run_ORA(). Unfiltered: FIG6D draws the curated selection in config/highlights.json.",
+      "plotted_in": [
+        "FIG6D"
+      ],
+      "pointer_script": "figure_6/ST6.R"
+    },
+    {
+      "table": "ST6g",
+      "supp_id": "ST6",
+      "slug": "re_3p5_4hr_down",
+      "title": "RE 3.5-4 h down",
+      "built_here": true,
+      "script": "figure_6/FIG6.R",
+      "output": "outputs/tables/ST6g_re_3p5_4hr_down.tsv",
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "columns": [
+        "collection",
+        "database",
+        "set_id",
+        "set",
+        "set_short",
+        "set_size",
+        "set_size_DB",
+        "size_ratio",
+        "set_size_in_input",
+        "input_size",
+        "background_size",
+        "p_value",
+        "adj_p_value"
+      ],
+      "external_inputs": [
+        {
+          "what": "Gambardella et al. 2020 TFEB ChIP-seq peak table (Sci. Adv. 6, eabb0205, table S2, sheet 2)",
+          "produced_by": "Published supplementary table. A gene counts as bound when a peak is annotated to its promoter within 1 kb.",
+          "env_var": null,
+          "status": "vendored",
+          "path": "sources/figure_6/Gambardella-et-al-2020-table-s2.xlsx",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "MSigDB TFEB_TARGET_GENES gene set (v2024.1.Hs), from GTRD",
+          "produced_by": "MSigDB C3 GTRD set TFEB_TARGET_GENES, exported as TSV; the gene list is the 18th row's comma-separated second field.",
+          "env_var": null,
+          "status": "vendored",
+          "path": "sources/figure_6/TFEB_TARGET_GENES.v2024.1.Hs.tsv",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "Doronzo et al. 2019 TFEB ChIP-seq peaks, GEO GSM2354032 (hg19 BED)",
+          "produced_by": "Published peak calls. Annotated with annotatr against hg19_basicgenes; a gene counts as bound by a promoter or 1-5 kb peak.",
+          "env_var": null,
+          "status": "vendored",
+          "path": "sources/figure_6/GSM2354032_TFEB_e5_peaks.bed",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "co_generated_with": {
+        "panels": [
+          "FIG6D"
+        ],
+        "tables": [
+          "ST6c",
+          "ST6d",
+          "ST6e",
+          "ST6f"
+        ],
+        "script": "figure_6/FIG6.R"
+      },
+      "stage": "figure_script",
+      "notes": "ORA of ChIP-supported TFEB targets down at 3.5-4 h after RE, against every muscle transcript with a gene symbol, over the full MOLECULAR_SIGNATURES collection through run_ORA(). Unfiltered: FIG6D draws the curated selection in config/highlights.json.",
+      "plotted_in": [
+        "FIG6D"
+      ],
+      "pointer_script": "figure_6/ST6.R"
+    },
+    {
+      "table": "ST7a",
+      "supp_id": "ST7",
+      "slug": "exerkine_candidates",
+      "title": "Exerkine candidate list",
+      "built_here": true,
+      "script": "figure_7/FIG7.R",
+      "output": "outputs/tables/ST7a_exerkine_candidates.tsv",
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "columns": [
+        "gene_symbol",
+        "assay",
+        "tissue",
+        "contrast",
+        "Modality",
+        "Extracellular_score",
+        "Tissue_direction",
+        "Plasma_direction",
+        "Directionality_concordant",
+        "Temporally_concordant"
+      ],
+      "external_inputs": [
+        {
+          "what": "COMPARTMENTS integrated channel, extracellular locations (compartments_extracellular.tsv)",
+          "status": "vendored",
+          "path": "sources/figure_7/compartments_extracellular.tsv",
+          "override_env_var": "ACUTE_COMPARTMENTS_TSV",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "co_generated_with": {
+        "panels": [
+          "FIG7A"
+        ],
+        "tables": [],
+        "script": "figure_7/FIG7.R"
+      },
+      "stage": "figure_script"
+    }
+  ]
+}

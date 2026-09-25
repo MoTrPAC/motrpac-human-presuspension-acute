@@ -1,0 +1,2653 @@
+{
+  "$comment": [
+    "Panel manifest for figures/landscape/.",
+    "",
+    "Every entry names one panel: the per-figure R script that draws it, the one",
+    "PDF it writes, its page size and its seed. A figure script draws every panel",
+    "of its figure, and each panel reads its own output path, page size and seed",
+    "from here, so renumbering a panel is an edit to this file and nowhere else.",
+    "",
+    "Every path in this file is relative to figures/landscape/, which the",
+    "environment variable LANDSCAPE_ROOT names (config/landscape.env).",
+    "",
+    "Some figure scripts additionally write a supplementary sub-table — the one",
+    "whose numbers are that panel's numbers. That is still one computation and one",
+    "file; see co_generated_tables below and config/table_map.json.",
+    "",
+    "co_generated_tables names the supplementary sub-tables THIS PANEL'S FIGURE",
+    "SCRIPT also writes, in the same run, from the same objects — see",
+    "config/table_map.json, which records the same relation from the other side.",
+    "One file, one computation, so the figure and its table cannot disagree and",
+    "nothing is computed twice.",
+    "",
+    "displays_tables is the weaker relation: this panel PLOTS the numbers that",
+    "sub-table tabulates, whether or not the two were ever computed together.",
+    "",
+    "not_built, on a figure, lists the panels of it this repo does not draw: what",
+    "each one is and what made it. They have no entry under panels and nothing",
+    "builds them; the figure script named there says so and stops.",
+    "",
+    "Consumed by lib/panel_export.R, which every figure script sources."
+  ],
+  "schema_version": "1.0.0",
+  "manuscript": {
+    "study": "MoTrPAC Human Pre-Suspension acute exercise landscape"
+  },
+  "output": {
+    "root": "outputs/panels",
+    "layout": "<root>/<figure_dir>/<panel>_<slug>.pdf",
+    "format": "pdf",
+    "sidecar_manifest": "outputs/panels/export_manifest.tsv",
+    "notes": "One PDF per panel, vector, Illustrator-editable. Paths relative to figures/landscape/. See lib/panel_export.R."
+  },
+  "defaults": {
+    "seed": 0,
+    "device": "pdf",
+    "useDingbats": false,
+    "font_family": "sans",
+    "raster_dpi": 600
+  },
+  "figures": [
+    {
+      "figure_id": "FIG1",
+      "figure_dir": "figure_1",
+      "folder": "figure_1",
+      "title": "Study design and cohort overview",
+      "panels": [
+        "FIG1C"
+      ],
+      "not_built": [
+        {
+          "panel": "FIG1A",
+          "what": "Study design: screening, randomization and the three intervention arms",
+          "made_with": "BioRender",
+          "script": "figure_1/FIG1.R"
+        },
+        {
+          "panel": "FIG1B",
+          "what": "Sampling timeline: the seven collection points across the two days",
+          "made_with": "BioRender",
+          "script": "figure_1/FIG1.R"
+        }
+      ]
+    },
+    {
+      "figure_id": "ED1",
+      "figure_dir": "extended_data_1",
+      "folder": "figure_1",
+      "title": "Extended Data 1 - cohort and data overview",
+      "panels": [
+        "ED1A",
+        "ED1B",
+        "ED1C",
+        "ED1D"
+      ]
+    },
+    {
+      "figure_id": "FIG2",
+      "figure_dir": "figure_2",
+      "folder": "figure_2",
+      "title": "Differential abundance landscape",
+      "panels": [
+        "FIG2A",
+        "FIG2B",
+        "FIG2Bii",
+        "FIG2C",
+        "FIG2D",
+        "FIG2E",
+        "FIG2F"
+      ]
+    },
+    {
+      "figure_id": "ED2",
+      "figure_dir": "extended_data_2",
+      "folder": "figure_2",
+      "title": "Extended Data 2 - differential abundance supplement",
+      "panels": [
+        "ED2A",
+        "ED2B",
+        "ED2C",
+        "ED2D",
+        "ED2E",
+        "ED2F"
+      ]
+    },
+    {
+      "figure_id": "FIG3",
+      "figure_dir": "figure_3",
+      "folder": "figure_3",
+      "title": "Resistance vs endurance exercise",
+      "panels": [
+        "FIG3A",
+        "FIG3B",
+        "FIG3C",
+        "FIG3D",
+        "FIG3EFG"
+      ]
+    },
+    {
+      "figure_id": "ED3",
+      "figure_dir": "extended_data_3",
+      "folder": "extended_data_3",
+      "title": "Extended Data 3 - sex sensitivity and cellular deconvolution",
+      "panels": [
+        "ED3A",
+        "ED3B",
+        "ED3C",
+        "ED3D",
+        "ED3E"
+      ]
+    },
+    {
+      "figure_id": "FIG4",
+      "figure_dir": "figure_4",
+      "folder": "figure_4",
+      "title": "Clustering and PLIER latent variables",
+      "panels": [
+        "FIG4A",
+        "FIG4B",
+        "FIG4C",
+        "FIG4D",
+        "FIG4E",
+        "FIG4F",
+        "FIG4G",
+        "FIG4H",
+        "FIG4I"
+      ]
+    },
+    {
+      "figure_id": "ED4",
+      "figure_dir": "extended_data_4",
+      "folder": "figure_3",
+      "title": "Extended Data 4 - RE vs EE supplement",
+      "panels": [
+        "ED4A",
+        "ED4B",
+        "ED4C",
+        "ED4D",
+        "ED4E",
+        "ED4F",
+        "ED4G"
+      ]
+    },
+    {
+      "figure_id": "ED5",
+      "figure_dir": "extended_data_5",
+      "folder": "figure_4",
+      "title": "Extended Data 5 - fuzzy c-means supplement",
+      "panels": [
+        "ED5A",
+        "ED5B",
+        "ED5C",
+        "ED5D",
+        "ED5E"
+      ]
+    },
+    {
+      "figure_id": "ED6",
+      "figure_dir": "extended_data_6",
+      "folder": "figure_4",
+      "title": "Extended Data 6 - cross-tissue PLIER supplement",
+      "panels": [
+        "ED6A",
+        "ED6Aii",
+        "ED6B",
+        "ED6C",
+        "ED6D",
+        "ED6E",
+        "ED6F",
+        "ED6G",
+        "ED6H",
+        "ED6I"
+      ]
+    },
+    {
+      "figure_id": "FIG5",
+      "figure_dir": "figure_5",
+      "folder": "figure_5",
+      "title": "Transcription-factor motif enrichment and TF exercise responses",
+      "panels": [
+        "FIG5A",
+        "FIG5B",
+        "FIG5C",
+        "FIG5D",
+        "FIG5E",
+        "FIG5F",
+        "FIG5G",
+        "FIG5H"
+      ]
+    },
+    {
+      "figure_id": "ED7",
+      "figure_dir": "extended_data_7",
+      "folder": "figure_5",
+      "title": "Extended Data 7 - transcription-factor supplement",
+      "panels": [
+        "ED7A",
+        "ED7B"
+      ]
+    },
+    {
+      "figure_id": "FIG6",
+      "figure_dir": "figure_6",
+      "folder": "figure_6",
+      "title": "Multi-omic regulatory network analysis (SC-ION)",
+      "panels": [
+        "FIG6C",
+        "FIG6D",
+        "FIG6E",
+        "FIG6F"
+      ],
+      "not_built": [
+        {
+          "panel": "FIG6A",
+          "what": "SC-ION workflow schematic",
+          "made_with": "Illustrator",
+          "script": "figure_6/FIG6.R"
+        },
+        {
+          "panel": "FIG6B",
+          "what": "Merged EE+RE network and the TFEB first-neighbour subnetwork",
+          "made_with": "Cytoscape",
+          "script": "figure_6/FIG6.R"
+        },
+        {
+          "panel": "FIG6G",
+          "what": "TFEB signalling module schematic",
+          "made_with": "BioRender",
+          "script": "figure_6/FIG6.R"
+        }
+      ]
+    },
+    {
+      "figure_id": "ED8",
+      "figure_dir": "extended_data_8",
+      "folder": "figure_6",
+      "title": "Extended Data 8 - TFEB pathway regulation in response to EE and RE",
+      "panels": [
+        "ED8A",
+        "ED8B",
+        "ED8C",
+        "ED8D",
+        "ED8E",
+        "ED8F"
+      ]
+    },
+    {
+      "figure_id": "FIG7",
+      "figure_dir": "figure_7",
+      "folder": "figure_7",
+      "title": "Secretome",
+      "panels": [
+        "FIG7A",
+        "FIG7B",
+        "FIG7C",
+        "FIG7D"
+      ]
+    },
+    {
+      "figure_id": "ED9",
+      "figure_dir": "extended_data_9",
+      "folder": "figure_7",
+      "title": "Extended Data 9 - secretome supplement",
+      "panels": [
+        "ED9A",
+        "ED9B",
+        "ED9C",
+        "ED9D"
+      ]
+    },
+    {
+      "figure_id": "SF1",
+      "figure_dir": "supplementary_figure_1",
+      "folder": "supplementary_figure_1",
+      "title": "Supplementary Figure 1 - skeletal muscle ATAC-seq QC",
+      "panels": [
+        "SF1A",
+        "SF1B",
+        "SF1C",
+        "SF1D",
+        "SF1E",
+        "SF1F",
+        "SF1G"
+      ]
+    }
+  ],
+  "panels": [
+    {
+      "panel": "FIG1C",
+      "figure_id": "FIG1",
+      "slug": "data_availability",
+      "title": "Samples measured per ome, tissue, exercise group and timepoint",
+      "script": "figure_1/FIG1.R",
+      "output": "outputs/panels/figure_1/FIG1C_data_availability.pdf",
+      "width_in": 7.5,
+      "height_in": 4.2,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionData",
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "ATAC-seq and methylCap-seq QC objects, downloaded into EPIGEN_QC_DIR by load_qc(epigen = TRUE)",
+          "produced_by": "Downloaded at run time by load_qc(epigen = TRUE) from the c2.0 data-hub prefix gs://motrpac-data-hub/analysis/human-precovid-sed-adu/c2.0, and cached under the directory EPIGEN_QC_DIR names. Neither data package ships them.",
+          "env_var": null,
+          "status": "derived",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "co_generated_tables": [
+        "ST1c",
+        "ST2b"
+      ]
+    },
+    {
+      "panel": "ED1A",
+      "figure_id": "ED1",
+      "slug": "ancestry_pca_1000g",
+      "title": "Genetic ancestry PCA, MoTrPAC participants projected onto 1000 Genomes",
+      "script": "figure_1/ED1.R",
+      "output": "outputs/panels/extended_data_1/ED1A_ancestry_pca_1000g.pdf",
+      "width_in": 12,
+      "height_in": 12,
+      "seed": 0,
+      "stochastic": [],
+      "reproducibility_note": "Deterministic given its inputs, and it computes no principal component: the variant calling, the merge with 1000 Genomes, the LD pruning and the snpgdsPCA all ran once outside any pipeline and this panel consumes the result. What fixes the figure is therefore which copy of that result is read, not an RNG seed - the LD-pruning seed lives in the workflow that produced it. Under ED1A_PC_SOURCE=data_hub (the default) the participants' coordinates are the released ones from the analysis collection's resources/ prefix, pinned to a collection version in ED1.R; the 1000 Genomes reference cloud still comes from the cached RDS, because the release publishes no coordinate for a reference sample.",
+      "data_packages": [],
+      "external_inputs": [
+        {
+          "what": "Released genetic-ancestry principal components (resources/motrpac_human-precovid_1kg_pca.csv): one row per participant keyed on vialLabel, plus a var_explained_pct row the axis labels are taken from",
+          "produced_by": "Downloaded at run time from the analysis collection's resources/ prefix, pinned by ANCESTRY_PCA_GCS in ED1.R and cached under sources/extended_data_1/downloaded/. The numbers themselves came from the VCF workflow described below; this is that workflow's published output, and reading it is what removes the need to hold or re-run the workflow.",
+          "env_var": null,
+          "status": "derived",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "Cached snpgdsPCA result (1kg.motrpac.merged.maf_0_05.ld_pruned.pca.RDS) - 2,742 samples, 32 components",
+          "status": "vendored",
+          "path": "sources/extended_data_1/1kg.motrpac.merged.maf_0_05.ld_pruned.pca.RDS",
+          "override_env_var": "ED1A_PCA_RDS",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "1000 Genomes sample-to-population table (1kg_samples.tsv)",
+          "status": "vendored",
+          "path": "sources/extended_data_1/1kg_samples.tsv",
+          "override_env_var": "ED1A_1KG_SAMPLES",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "1000 Genomes population colour table (1kg_population_colors.csv)",
+          "status": "vendored",
+          "path": "sources/extended_data_1/1kg_population_colors.csv",
+          "override_env_var": "ED1A_1KG_POP_COLORS",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "needs_external_inputs": true
+    },
+    {
+      "panel": "ED1B",
+      "figure_id": "ED1",
+      "slug": "omic_sample_overlap",
+      "title": "Sample overlap across assays within muscle, blood and adipose",
+      "script": "figure_1/ED1.R",
+      "output": "outputs/panels/extended_data_1/ED1B_omic_sample_overlap.pdf",
+      "width_in": 12,
+      "height_in": 14,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionData",
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "The five epigen QC objects (ATAC log-CPM and methylCap beta values for the tissues that have them, plus their sample metadata), about 6 GB, cached locally",
+          "produced_by": "Downloaded at run time by load_qc(epigen = TRUE) from the c2.0 data-hub prefix gs://motrpac-data-hub/analysis/human-precovid-sed-adu/c2.0, and cached under the directory EPIGEN_QC_DIR names. Neither data package ships them.",
+          "env_var": "EPIGEN_QC_DIR",
+          "status": "external",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ]
+    },
+    {
+      "panel": "ED1C",
+      "figure_id": "ED1",
+      "slug": "prot_sample_count_histogram",
+      "title": "Sample counts for significant vs non-significant (phospho)proteomic features",
+      "script": "figure_1/ED1.R",
+      "output": "outputs/panels/extended_data_1/ED1C_prot_sample_count_histogram.pdf",
+      "width_in": 10,
+      "height_in": 8,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionData",
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [],
+      "co_generated_tables": [
+        "ST1e"
+      ],
+      "displays_tables": [
+        "ST1e"
+      ]
+    },
+    {
+      "panel": "ED1D",
+      "figure_id": "ED1",
+      "slug": "pca_covariate_cca_heatmap",
+      "title": "Covariate association with principal components, all tissue x assay",
+      "script": "figure_1/ED1.R",
+      "output": "outputs/panels/extended_data_1/ED1D_pca_covariate_cca_heatmap.pdf",
+      "width_in": 15,
+      "height_in": 15,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionData",
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "The two epigen-atac-seq QC objects (muscle and PBMC log-CPM, plus their sample metadata), ~1 GB, cached locally. methylCap is excluded from this panel, so its 4 GB is not fetched for it.",
+          "produced_by": "Downloaded at run time by load_qc(epigen = TRUE) from the c2.0 data-hub prefix gs://motrpac-data-hub/analysis/human-precovid-sed-adu/c2.0, and cached under the directory EPIGEN_QC_DIR names. Neither data package ships them. EPIGEN_QC_DIR is the same cache ED1B fills.",
+          "env_var": "EPIGEN_QC_DIR",
+          "status": "external",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ]
+    },
+    {
+      "panel": "FIG2A",
+      "figure_id": "FIG2",
+      "slug": "da_feature_matrix",
+      "title": "Percent of features differentially abundant, ome x tissue x exercise group",
+      "script": "figure_2/FIG2.R",
+      "output": "outputs/panels/figure_2/FIG2A_da_feature_matrix.pdf",
+      "width_in": 7,
+      "height_in": 5,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "Epigenomics differential-analysis tables, 5 files totalling 7.7 GB (ATAC muscle and PBMC at v2.1, methylCap muscle, EDTA and adipose at v1.2).",
+          "produced_by": "Downloaded over HTTPS by load_differential_analysis(epigen = TRUE) from the public c2.0 CloudFront release https://d1yw74buhe0ts0.cloudfront.net/data/analysis/human_presuspension_sed_adu/c2.0/epigenomics/da/. No gsutil and no credentials. Not cached: every call downloads again. A failed download is an error.",
+          "env_var": null,
+          "status": "external",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "needs_external_inputs": true,
+      "co_generated_tables": [
+        "ST2c"
+      ]
+    },
+    {
+      "panel": "FIG2B",
+      "figure_id": "FIG2",
+      "slug": "cross_tissue_da_upset",
+      "title": "Differentially abundant features shared across tissues",
+      "script": "figure_2/FIG2.R",
+      "output": "outputs/panels/figure_2/FIG2B_cross_tissue_da_upset.pdf",
+      "width_in": 7.5,
+      "height_in": 5.1,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "Epigenomics differential-analysis tables, 5 files totalling 7.70 GB (ATAC muscle and PBMC, methylCap muscle, EDTA and adipose)",
+          "produced_by": "Downloaded by load_differential_analysis(epigen = TRUE) from the public CloudFront release. Same pull FIG2A makes.",
+          "env_var": null,
+          "status": "external",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "needs_external_inputs": true,
+      "co_generated_tables": [
+        "ST2e"
+      ]
+    },
+    {
+      "panel": "FIG2Bii",
+      "figure_id": "FIG2",
+      "slug": "three_tissue_ora_barplot",
+      "title": "Enriched pathways among the features differential in all three tissues",
+      "script": "figure_2/FIG2.R",
+      "output": "outputs/panels/figure_2/FIG2Bii_three_tissue_ora_barplot.pdf",
+      "width_in": 6.25,
+      "height_in": 6.25,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "Epigenomics differential-analysis tables, 5 files totalling 7.70 GB (ATAC muscle and PBMC, methylCap muscle, EDTA and adipose)",
+          "produced_by": "Downloaded by load_differential_analysis(epigen = TRUE) from the public CloudFront release. Same pull FIG2A makes.",
+          "env_var": null,
+          "status": "external",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "needs_external_inputs": true,
+      "displays_tables": [
+        "ST2e"
+      ]
+    },
+    {
+      "panel": "FIG2C",
+      "figure_id": "FIG2",
+      "slug": "three_tissue_shared_heatmap",
+      "title": "Features differentially abundant in all three tissues",
+      "script": "figure_2/FIG2.R",
+      "output": "outputs/panels/figure_2/FIG2C_three_tissue_shared_heatmap.pdf",
+      "width_in": 10,
+      "height_in": 10,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "Epigenomics differential-analysis tables, 5 files totalling 7.70 GB (ATAC muscle and PBMC, methylCap muscle, EDTA and adipose)",
+          "produced_by": "Downloaded by load_differential_analysis(epigen = TRUE) from the public CloudFront release. Same pull FIG2A makes.",
+          "env_var": null,
+          "status": "external",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "needs_external_inputs": true
+    },
+    {
+      "panel": "FIG2D",
+      "figure_id": "FIG2",
+      "slug": "myc_areg_trajectories",
+      "title": "MYC and AREG transcript trajectories, all three tissues",
+      "script": "figure_2/FIG2.R",
+      "output": "outputs/panels/figure_2/FIG2D_myc_areg_trajectories.pdf",
+      "width_in": 5.1,
+      "height_in": 3.08,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": []
+    },
+    {
+      "panel": "FIG2E",
+      "figure_id": "FIG2",
+      "slug": "adipose_muscle_phospho_heatmap",
+      "title": "Phosphosites differentially abundant in both adipose and muscle",
+      "script": "figure_2/FIG2.R",
+      "output": "outputs/panels/figure_2/FIG2E_adipose_muscle_phospho_heatmap.pdf",
+      "width_in": 6.25,
+      "height_in": 8.75,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "Epigenomics differential-analysis tables, 5 files totalling 7.70 GB (ATAC muscle and PBMC, methylCap muscle, EDTA and adipose)",
+          "produced_by": "Downloaded by load_differential_analysis(epigen = TRUE) from the public CloudFront release. Same pull FIG2A makes.",
+          "env_var": null,
+          "status": "external",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "needs_external_inputs": true
+    },
+    {
+      "panel": "FIG2F",
+      "figure_id": "FIG2",
+      "slug": "cross_tissue_ora_heatmap",
+      "title": "Pathway enrichment across the tissue-membership sets",
+      "script": "figure_2/FIG2.R",
+      "output": "outputs/panels/figure_2/FIG2F_cross_tissue_ora_heatmap.pdf",
+      "width_in": 10.6,
+      "height_in": 9.4,
+      "device": "cairo_pdf",
+      "device_reason": "TMSig::enrichmap builds its adjusted-p legend labels with U+2265. Base pdf() substitutes \">=\" for it; FIG3B is pinned to cairo_pdf for the same reason.",
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "Epigenomics differential-analysis tables, 5 files totalling 7.70 GB (ATAC muscle and PBMC, methylCap muscle, EDTA and adipose)",
+          "produced_by": "Downloaded by load_differential_analysis(epigen = TRUE) from the public CloudFront release. Same pull FIG2A makes.",
+          "env_var": null,
+          "status": "external",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "needs_external_inputs": true,
+      "displays_tables": [
+        "ST2e"
+      ]
+    },
+    {
+      "panel": "ED2A",
+      "figure_id": "ED2",
+      "slug": "da_hit_type_signed_bars",
+      "title": "Signed differential-abundance hit types by ome and tissue",
+      "script": "figure_2/ED2.R",
+      "output": "outputs/panels/extended_data_2/ED2A_da_hit_type_signed_bars.pdf",
+      "width_in": 9,
+      "height_in": 8,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "Epigenomics differential-analysis tables, 5 files totalling 7.7 GB (ATAC muscle and PBMC at v2.1, methylCap muscle, EDTA and adipose at v1.2).",
+          "produced_by": "Downloaded over HTTPS by load_differential_analysis(epigen = TRUE) from the public c2.0 CloudFront release https://d1yw74buhe0ts0.cloudfront.net/data/analysis/human_presuspension_sed_adu/c2.0/epigenomics/da/. No gsutil and no credentials. Not cached: every call downloads again. A failed download is an error. ED2A shares acute_da() with ED2C, ED2E and ED2F, so all five files are downloaded; the panel filters methylCap out afterwards.",
+          "env_var": null,
+          "status": "external",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "needs_external_inputs": true
+    },
+    {
+      "panel": "ED2B",
+      "figure_id": "ED2",
+      "slug": "hit_type_example_trajectories",
+      "title": "Example single-feature trajectories per hit type",
+      "script": "figure_2/ED2.R",
+      "output": "outputs/panels/extended_data_2/ED2B_hit_type_example_trajectories.pdf",
+      "width_in": 4,
+      "height_in": 2.8,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": []
+    },
+    {
+      "panel": "ED2C",
+      "figure_id": "ED2",
+      "slug": "per_ome_tissue_upset",
+      "title": "Cross-tissue overlap of differential features, one panel per ome",
+      "script": "figure_2/ED2.R",
+      "output": "outputs/panels/extended_data_2/ED2C_per_ome_tissue_upset.pdf",
+      "width_in": 10,
+      "height_in": 6.25,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "Epigenomics differential-analysis tables, 5 files totalling 7.70 GB (ATAC muscle and PBMC, methylCap muscle, EDTA and adipose)",
+          "produced_by": "Downloaded by load_differential_analysis(epigen = TRUE) from the public CloudFront release. Same pull FIG2A makes.",
+          "env_var": null,
+          "status": "external",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "needs_external_inputs": true
+    },
+    {
+      "panel": "ED2D",
+      "figure_id": "ED2",
+      "slug": "nr4a1_nfkbiz_trajectories",
+      "title": "NR4A1 and NFKBIZ transcript trajectories, all three tissues",
+      "script": "figure_2/ED2.R",
+      "output": "outputs/panels/extended_data_2/ED2D_nr4a1_nfkbiz_trajectories.pdf",
+      "width_in": 5.1,
+      "height_in": 3.08,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": []
+    },
+    {
+      "panel": "ED2E",
+      "figure_id": "ED2",
+      "slug": "phospho_ora_heatmap",
+      "title": "Kinase and perturbation signatures enriched in the shared phosphosites",
+      "script": "figure_2/ED2.R",
+      "output": "outputs/panels/extended_data_2/ED2E_phospho_ora_heatmap.pdf",
+      "width_in": 10.6,
+      "height_in": 9.4,
+      "device": "cairo_pdf",
+      "device_reason": "TMSig::enrichmap builds its adjusted-p legend labels with U+2265, which base pdf() cannot encode.",
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis",
+        "MotrpacHumanPreSuspensionData"
+      ],
+      "external_inputs": [
+        {
+          "what": "PTMsigDB over-representation result (837 rows over three phosphosite sets)",
+          "produced_by": "Published PTMsigDB ORA result. This is what ED2E draws and what ST2f carries. The panel also recomputes the pass on every build using per-tissue site confidence and reports the difference to the build log, but nothing from that recomputation reaches the figure or the table.",
+          "status": "vendored",
+          "path": "sources/extended_data_2/landscape_figureED2_PTMSigDB_ORA_results_v2_Aug2026.csv",
+          "override_env_var": "ED2E_PTMSIGDB_ORA_CSV",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "Epigenomics differential-analysis tables, 5 files totalling 7.70 GB (ATAC muscle and PBMC, methylCap muscle, EDTA and adipose)",
+          "produced_by": "Downloaded by load_differential_analysis(epigen = TRUE) from the public CloudFront release. Same pull FIG2A makes.",
+          "env_var": null,
+          "status": "external",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "needs_external_inputs": true,
+      "co_generated_tables": [
+        "ST2f"
+      ],
+      "displays_tables": [
+        "ST2f"
+      ]
+    },
+    {
+      "panel": "ED2F",
+      "figure_id": "ED2",
+      "slug": "within_tissue_ome_upset",
+      "title": "Overlap between omes within each tissue",
+      "script": "figure_2/ED2.R",
+      "output": "outputs/panels/extended_data_2/ED2F_within_tissue_ome_upset.pdf",
+      "width_in": 7.5,
+      "height_in": 11.25,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "Epigenomics differential-analysis tables, 5 files totalling 7.70 GB (ATAC muscle and PBMC, methylCap muscle, EDTA and adipose)",
+          "produced_by": "Downloaded by load_differential_analysis(epigen = TRUE) from the public CloudFront release. Same pull FIG2A makes.",
+          "env_var": null,
+          "status": "external",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "needs_external_inputs": true
+    },
+    {
+      "panel": "FIG3A",
+      "figure_id": "FIG3",
+      "slug": "re_vs_ee_logfc_scatter",
+      "title": "logFC resistance vs endurance exercise, per tissue x ome, with UpSet bars",
+      "script": "figure_3/FIG3.R",
+      "output": "outputs/panels/figure_3/FIG3A_re_vs_ee_logfc_scatter.pdf",
+      "width_in": 12,
+      "height_in": 8,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": []
+    },
+    {
+      "panel": "FIG3B",
+      "figure_id": "FIG3",
+      "slug": "muscle_pathway_enrichment_dotplot",
+      "title": "Muscle transcriptomics pathway enrichment, RE vs EE",
+      "script": "figure_3/FIG3.R",
+      "output": "outputs/panels/figure_3/FIG3B_muscle_pathway_enrichment_dotplot.pdf",
+      "width_in": 7.5,
+      "height_in": 7.5,
+      "device": "cairo_pdf",
+      "device_reason": "TMSig::enrichmap builds its adjusted-p legend labels with U+2265. Base pdf() substitutes '>=' for it; the Analysis package's own plot_enrich_heatmap uses cairo_pdf for the same reason.",
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [],
+      "co_generated_tables": [
+        "ST3a",
+        "ST3b",
+        "ST3c"
+      ],
+      "displays_tables": [
+        "ST3c"
+      ]
+    },
+    {
+      "panel": "FIG3C",
+      "figure_id": "FIG3",
+      "slug": "opposite_ee_re_scatter",
+      "title": "Features responding in opposite directions to endurance and resistance exercise",
+      "script": "figure_3/FIG3.R",
+      "output": "outputs/panels/figure_3/FIG3C_opposite_ee_re_scatter.pdf",
+      "width_in": 6,
+      "height_in": 6,
+      "device": "cairo_pdf",
+      "device_reason": "Ported from a ggsave(device = cairo_pdf) call; ggrepel labels carry gene and metabolite names whose glyphs base pdf() may not encode.",
+      "seed": 0,
+      "stochastic": [
+        "ggrepel label placement"
+      ],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": []
+    },
+    {
+      "panel": "FIG3D",
+      "figure_id": "FIG3",
+      "slug": "diverging_feature_trajectories",
+      "title": "Feature trajectories diverging between RE and EE: CAR 6:0, BCKDHB, CBFA2T3, LRRC14B",
+      "script": "figure_3/FIG3.R",
+      "output": "outputs/panels/figure_3/FIG3D_diverging_feature_trajectories.pdf",
+      "width_in": 3.43,
+      "height_in": 3.08,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": []
+    },
+    {
+      "panel": "FIG3EFG",
+      "figure_id": "FIG3",
+      "slug": "vo2max_dumbbell_combined",
+      "title": "VO2peak association and acute response, EE-specific, RE-specific and shared transcripts",
+      "script": "figure_3/FIG3.R",
+      "output": "outputs/panels/figure_3/FIG3EFG_vo2max_dumbbell_combined.pdf",
+      "width_in": 19,
+      "height_in": 22,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "Baseline clinical x omics association table (clinical_omics_associations.tsv)",
+          "produced_by": "figure_3/clinical_omics_fit.R",
+          "produced_by_script": "figure_3/clinical_omics_fit.R",
+          "env_var": "CLINICAL_OMICS_TABLE",
+          "must_exist": true,
+          "status": "derived",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "needs_external_inputs": true
+    },
+    {
+      "panel": "ED3A",
+      "figure_id": "ED3",
+      "slug": "sex_concordance_blood_scatter",
+      "title": "Male vs female blood transcriptional response concordance, labelled per timepoint",
+      "script": "extended_data_3/ED3.R",
+      "output": "outputs/panels/extended_data_3/ED3A_sex_concordance_blood_scatter.pdf",
+      "width_in": 9,
+      "height_in": 11,
+      "seed": 0,
+      "stochastic": [
+        "ggrepel label placement"
+      ],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "Sex-stratified differential-analysis tables (*_da_dream-sex_differences_*.txt)",
+          "produced_by": "extended_data_3/sex_da_fit.R, which fits ~ 0 + sex_group_timepoint + <covariates> + (1 | pid) and writes one table per tissue x ome. Was an operator-supplied directory of tables fitted by hand from code that is now retired upstream; the blood RNA-seq table alone is ~258 MB.",
+          "env_var": "SEX_STRATIFIED_DA_DIR",
+          "status": "derived",
+          "produced_by_script": "extended_data_3/sex_da_fit.R",
+          "must_exist": true,
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "needs_external_inputs": true,
+      "co_generated_tables": [
+        "ST2g",
+        "ST2h"
+      ],
+      "displays_tables": [
+        "ST2g"
+      ]
+    },
+    {
+      "panel": "ED3B",
+      "figure_id": "ED3",
+      "slug": "ppargc1a_sex_trajectory",
+      "title": "PPARGC1A muscle transcript trajectory, split by sex",
+      "script": "extended_data_3/ED3.R",
+      "output": "outputs/panels/extended_data_3/ED3B_ppargc1a_sex_trajectory.pdf",
+      "width_in": 6.72,
+      "height_in": 3.55,
+      "device": "cairo_pdf",
+      "device_reason": "The plot title separates the feature label from the ome with an em dash (U+2014), which base pdf() cannot encode.",
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionData",
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": []
+    },
+    {
+      "panel": "ED3C",
+      "figure_id": "ED3",
+      "slug": "ccn1_sex_trajectory",
+      "title": "CCN1 transcript trajectory in muscle and adipose, split by sex",
+      "script": "extended_data_3/ED3.R",
+      "output": "outputs/panels/extended_data_3/ED3C_ccn1_sex_trajectory.pdf",
+      "width_in": 6.72,
+      "height_in": 3.55,
+      "device": "cairo_pdf",
+      "device_reason": "The plot title separates the feature label from the ome with an em dash (U+2014), which base pdf() cannot encode.",
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionData",
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": []
+    },
+    {
+      "panel": "ED3D",
+      "figure_id": "ED3",
+      "slug": "cibersortx_vs_cbc_neutrophil",
+      "title": "CIBERSORTx neutrophil estimates vs measured CBC neutrophil fraction",
+      "script": "extended_data_3/ED3.R",
+      "output": "outputs/panels/extended_data_3/ED3D_cibersortx_vs_cbc_neutrophil.pdf",
+      "width_in": 7,
+      "height_in": 7,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionData"
+      ],
+      "external_inputs": [
+        {
+          "what": "CIBERSORTx deconvolution result CSV (CIBERSORTx_PrecovidBlood_RNADecon_Results_081226.csv), 951 mixtures x 22 LM22 subsets plus P-value, Correlation and RMSE. Run 2026-08-12 against LM22.update-gene-symbols.txt with batch correction disabled, quantile normalisation disabled, relative run mode and 100 permutations.",
+          "status": "vendored",
+          "path": "sources/extended_data_3/CIBERSORTx_PrecovidBlood_RNADecon_Results_081226.csv",
+          "override_env_var": "ED3D_CIBERSORTX_CSV",
+          "also_read_by_stage": "06_celltype_da",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ]
+    },
+    {
+      "panel": "ED3E",
+      "figure_id": "ED3",
+      "slug": "cell_type_covariate_robustness",
+      "title": "Blood RNA-seq differential abundance with and without cell-type covariates",
+      "script": "extended_data_3/ED3.R",
+      "output": "outputs/panels/extended_data_3/ED3E_cell_type_covariate_robustness.pdf",
+      "width_in": 8,
+      "height_in": 4,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "Blood RNA-seq DA re-fit including cell-type covariates (*_da_dream-acute-cell_types_*.txt, ~330 MB)",
+          "produced_by": "extended_data_3/celltype_da_fit.R, which rebuilds the five z-scored cell-fraction covariates from the vendored CIBERSORTx result and re-runs the released acute dream model on the blood RSEM gene counts with them in the design. Was a hand-produced 318 MB artifact whose generator read an intermediate nothing produced any more and sourced a data-raw directory that has since been retired.",
+          "env_var": "CELLTYPE_DA_DIR",
+          "override_env_var": "ED3E_DA_WITH_CELL_TYPES",
+          "status": "derived",
+          "produced_by_script": "extended_data_3/celltype_da_fit.R",
+          "must_exist": true,
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "needs_external_inputs": true
+    },
+    {
+      "panel": "FIG4A",
+      "figure_id": "FIG4",
+      "slug": "camera_transcriptomics_heatmap",
+      "title": "Curated transcriptomics pathways enriched in the acute response",
+      "script": "figure_4/FIG4.R",
+      "output": "outputs/panels/figure_4/FIG4A_camera_transcriptomics_heatmap.pdf",
+      "width_in": 14.1,
+      "height_in": 9.0,
+      "device": "cairo_pdf",
+      "device_reason": "TMSig::enrichmap builds its adjusted-p legend labels with U+2265, which base pdf() cannot encode.",
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [],
+      "needs_external_inputs": false,
+      "notes": "Page size is the width and height plot_enrich_heatmap(return_drawing = TRUE) returns, passed to export_panel(); width_in and height_in here are what the current selection produces and are not what the panel is drawn at."
+    },
+    {
+      "panel": "FIG4B",
+      "figure_id": "FIG4",
+      "slug": "camera_proteomics_heatmap",
+      "title": "Curated proteomics pathways enriched in the acute response",
+      "script": "figure_4/FIG4.R",
+      "output": "outputs/panels/figure_4/FIG4B_camera_proteomics_heatmap.pdf",
+      "width_in": 9.3,
+      "height_in": 9.0,
+      "device": "cairo_pdf",
+      "device_reason": "TMSig::enrichmap builds its adjusted-p legend labels with U+2265, which base pdf() cannot encode.",
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [],
+      "needs_external_inputs": false,
+      "notes": "Page size is the width and height plot_enrich_heatmap(return_drawing = TRUE) returns, passed to export_panel(); width_in and height_in here are what the current selection produces and are not what the panel is drawn at."
+    },
+    {
+      "panel": "FIG4C",
+      "figure_id": "FIG4",
+      "slug": "cluster_centroid_sparklines",
+      "title": "Fuzzy c-means cluster centroid trajectories, labelled",
+      "script": "figure_4/FIG4.R",
+      "output": "outputs/panels/figure_4/FIG4C_cluster_centroid_sparklines.pdf",
+      "width_in": 4.5,
+      "height_in": 0.9,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": []
+    },
+    {
+      "panel": "FIG4D",
+      "figure_id": "FIG4",
+      "slug": "cluster_composition_enrichment",
+      "title": "Cluster ome composition and top pathway enrichment",
+      "script": "figure_4/FIG4.R",
+      "output": "outputs/panels/figure_4/FIG4D_cluster_composition_enrichment.pdf",
+      "width_in": 7,
+      "height_in": 1.6,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": []
+    },
+    {
+      "panel": "FIG4E",
+      "figure_id": "FIG4",
+      "slug": "cluster_centroid_sparklines_spaced",
+      "title": "Fuzzy c-means cluster centroid trajectories, peak-spaced labels",
+      "script": "figure_4/FIG4.R",
+      "output": "outputs/panels/figure_4/FIG4E_cluster_centroid_sparklines_spaced.pdf",
+      "width_in": 1.5,
+      "height_in": 0.9,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": []
+    },
+    {
+      "panel": "FIG4F",
+      "figure_id": "FIG4",
+      "slug": "vegf_muscle_late_heatmap",
+      "title": "VEGF signalling features in the late muscle cluster",
+      "script": "figure_4/FIG4.R",
+      "output": "outputs/panels/figure_4/FIG4F_vegf_muscle_late_heatmap.pdf",
+      "width_in": 10,
+      "height_in": 11,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": []
+    },
+    {
+      "panel": "FIG4G",
+      "figure_id": "FIG4",
+      "slug": "crosstissue_rna_plier_bubbleheatmap",
+      "title": "Cross-tissue RNA latent variables against the acute response",
+      "script": "figure_4/FIG4.R",
+      "output": "outputs/panels/figure_4/FIG4G_crosstissue_rna_plier_bubbleheatmap.pdf",
+      "width_in": 12,
+      "height_in": 8,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "Cross-tissue PLIER fits (crosstissue_{rna,metab}_{plier,input,response}.rds)",
+          "produced_by": "figure_4/plier_fit.R, which fits one PLIER per ome over every tissue at once and derives the LV x comparison response grid off it. The legacy wrote both fits to .rds files in the analyst's working directory; neither is in any repo.",
+          "produced_by_script": "figure_4/plier_fit.R",
+          "env_var": "PLIER_DIR",
+          "must_exist": true,
+          "status": "derived",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "needs_external_inputs": true
+    },
+    {
+      "panel": "FIG4H",
+      "figure_id": "FIG4",
+      "slug": "crosstissue_rna_plier_pathways",
+      "title": "Top pathways of the selected cross-tissue RNA latent variables",
+      "script": "figure_4/FIG4.R",
+      "output": "outputs/panels/figure_4/FIG4H_crosstissue_rna_plier_pathways.pdf",
+      "width_in": 8,
+      "height_in": 8,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "Cross-tissue PLIER fits (crosstissue_{rna,metab}_{plier,input,response}.rds)",
+          "produced_by": "figure_4/plier_fit.R, which fits one PLIER per ome over every tissue at once and derives the LV x comparison response grid off it. The legacy wrote both fits to .rds files in the analyst's working directory; neither is in any repo.",
+          "produced_by_script": "figure_4/plier_fit.R",
+          "env_var": "PLIER_DIR",
+          "must_exist": true,
+          "status": "derived",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "needs_external_inputs": true
+    },
+    {
+      "panel": "FIG4I",
+      "figure_id": "FIG4",
+      "slug": "tamalin_trajectories",
+      "title": "TAMALIN transcript trajectory in adipose, blood and muscle",
+      "script": "figure_4/FIG4.R",
+      "output": "outputs/panels/figure_4/FIG4I_tamalin_trajectories.pdf",
+      "width_in": 5.145,
+      "height_in": 1.54,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": []
+    },
+    {
+      "panel": "ED4A",
+      "figure_id": "ED4",
+      "slug": "tissue_by_modality_upset",
+      "title": "Differential features shared across tissue and exercise modality",
+      "script": "figure_3/ED4.R",
+      "output": "outputs/panels/extended_data_4/ED4A_tissue_by_modality_upset.pdf",
+      "width_in": 12.5,
+      "height_in": 5,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "Epigenomics differential-analysis tables, 5 files totalling 7.70 GB (ATAC muscle and PBMC, methylCap muscle, EDTA and adipose)",
+          "produced_by": "Downloaded by load_differential_analysis(epigen = TRUE) from the public CloudFront release. Same pull FIG2A makes.",
+          "env_var": null,
+          "status": "external",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "needs_external_inputs": true
+    },
+    {
+      "panel": "ED4B",
+      "figure_id": "ED4",
+      "slug": "pathway_enrichment_triangle",
+      "title": "Group-level pathway enrichment triangle, RE vs EE",
+      "script": "figure_3/ED4.R",
+      "output": "outputs/panels/extended_data_4/ED4B_pathway_enrichment_triangle.pdf",
+      "width_in": 10,
+      "height_in": 12,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [],
+      "needs_external_inputs": false,
+      "co_generated_tables": [
+        "ST3d"
+      ],
+      "displays_tables": [
+        "ST3c",
+        "ST3d"
+      ]
+    },
+    {
+      "panel": "ED4C",
+      "figure_id": "ED4",
+      "slug": "hsf1_activation_heatmap",
+      "title": "REACTOME_HSF1_ACTIVATION feature heatmap, all three tissues",
+      "script": "figure_3/ED4.R",
+      "output": "outputs/panels/extended_data_4/ED4C_hsf1_activation_heatmap.pdf",
+      "width_in": 11,
+      "height_in": 9,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": []
+    },
+    {
+      "panel": "ED4D",
+      "figure_id": "ED4",
+      "slug": "hsph1_muscle_trajectory",
+      "title": "HSPH1 muscle transcript trajectory",
+      "script": "figure_3/ED4.R",
+      "output": "outputs/panels/extended_data_4/ED4D_hsph1_muscle_trajectory.pdf",
+      "width_in": 2.45,
+      "height_in": 1.54,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": []
+    },
+    {
+      "panel": "ED4E",
+      "figure_id": "ED4",
+      "slug": "muscle_diverging_feature_grid",
+      "title": "Diverging feature grid: FHOD1, MYOG, ZBTB4, NOL3, MYOT and an lncRNA (ENSG00000257298.1, labelled lncRNA on the panel)",
+      "script": "figure_3/ED4.R",
+      "output": "outputs/panels/extended_data_4/ED4E_muscle_diverging_feature_grid.pdf",
+      "width_in": 3.43,
+      "height_in": 4.64,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": []
+    },
+    {
+      "panel": "ED4F",
+      "figure_id": "ED4",
+      "slug": "muscle_opposite_ee_re_scatter",
+      "title": "Skeletal muscle features responding in opposite directions to EE and RE",
+      "script": "figure_3/ED4.R",
+      "output": "outputs/panels/extended_data_4/ED4F_muscle_opposite_ee_re_scatter.pdf",
+      "width_in": 6,
+      "height_in": 6,
+      "device": "cairo_pdf",
+      "device_reason": "ggrepel labels carry metabolite names with characters base pdf() cannot encode, the same reason FIG3C sets it.",
+      "seed": 0,
+      "stochastic": [
+        "ggrepel label placement"
+      ],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [],
+      "needs_external_inputs": false,
+      "notes": "FIG3C restricted to muscle, from the same frame and label rule in helpers/FIG3_ED4.R. Shape carries the timepoint, which FIG3C spends on the tissue outline."
+    },
+    {
+      "panel": "ED4G",
+      "figure_id": "ED4",
+      "slug": "clinical_omics_hit_matrix",
+      "title": "Baseline features associated with each clinical trait",
+      "script": "figure_3/ED4.R",
+      "output": "outputs/panels/extended_data_4/ED4G_clinical_omics_hit_matrix.pdf",
+      "width_in": 9,
+      "height_in": 10,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis",
+        "MotrpacHumanPreSuspensionData"
+      ],
+      "external_inputs": [
+        {
+          "what": "Baseline clinical x omics association table (clinical_omics_associations.tsv)",
+          "produced_by": "figure_3/clinical_omics_fit.R",
+          "produced_by_script": "figure_3/clinical_omics_fit.R",
+          "env_var": "CLINICAL_OMICS_TABLE",
+          "must_exist": true,
+          "status": "derived",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "needs_external_inputs": true,
+      "co_generated_tables": [
+        "ST3f"
+      ]
+    },
+    {
+      "panel": "ED5A",
+      "figure_id": "ED5",
+      "slug": "camera_metabolomics_heatmap",
+      "title": "RefMet classes enriched in the acute metabolomics response",
+      "script": "figure_4/ED5.R",
+      "output": "outputs/panels/extended_data_5/ED5A_camera_metabolomics_heatmap.pdf",
+      "width_in": 9.1,
+      "height_in": 9.0,
+      "device": "cairo_pdf",
+      "device_reason": "TMSig::enrichmap builds its adjusted-p legend labels with U+2265, which base pdf() cannot encode.",
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [],
+      "needs_external_inputs": false,
+      "notes": "Page size is the width and height plot_enrich_heatmap(return_drawing = TRUE) returns, passed to export_panel(); width_in and height_in here are what the current selection produces and are not what the panel is drawn at."
+    },
+    {
+      "panel": "ED5B",
+      "figure_id": "ED5",
+      "slug": "cluster_composition_enrichment_all",
+      "title": "Cluster ome composition and enrichment across the curated pathways",
+      "script": "figure_4/ED5.R",
+      "output": "outputs/panels/extended_data_5/ED5B_cluster_composition_enrichment_all.pdf",
+      "width_in": 7,
+      "height_in": 2.5,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [],
+      "needs_external_inputs": false
+    },
+    {
+      "panel": "ED5C",
+      "figure_id": "ED5",
+      "slug": "vegf_cluster_upset",
+      "title": "Overlap of VEGF signalling features across enriched clusters",
+      "script": "figure_4/ED5.R",
+      "output": "outputs/panels/extended_data_5/ED5C_vegf_cluster_upset.pdf",
+      "width_in": 2.3,
+      "height_in": 1.68,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": []
+    },
+    {
+      "panel": "ED5D",
+      "figure_id": "ED5",
+      "slug": "vegf_muscle_adipose_early_heatmap",
+      "title": "VEGF signalling features shared by the early muscle and adipose clusters",
+      "script": "figure_4/ED5.R",
+      "output": "outputs/panels/extended_data_5/ED5D_vegf_muscle_adipose_early_heatmap.pdf",
+      "width_in": 10,
+      "height_in": 6,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": []
+    },
+    {
+      "panel": "ED5E",
+      "figure_id": "ED5",
+      "slug": "vegf_muscle_blood_middle_heatmap",
+      "title": "VEGF signalling features shared by the middle muscle and blood clusters",
+      "script": "figure_4/ED5.R",
+      "output": "outputs/panels/extended_data_5/ED5E_vegf_muscle_blood_middle_heatmap.pdf",
+      "width_in": 10,
+      "height_in": 6,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": []
+    },
+    {
+      "panel": "ED6A",
+      "figure_id": "ED6",
+      "slug": "crosstissue_rna_lv_trajectories",
+      "title": "Each selected cross-tissue RNA latent variable across every sample",
+      "script": "figure_4/ED6.R",
+      "output": "outputs/panels/extended_data_6/ED6A_crosstissue_rna_lv_trajectories.pdf",
+      "width_in": 12,
+      "height_in": 20,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "Cross-tissue PLIER fits (crosstissue_{rna,metab}_{plier,input,response}.rds)",
+          "produced_by": "figure_4/plier_fit.R, which fits one PLIER per ome over every tissue at once and derives the LV x comparison response grid off it. The legacy wrote both fits to .rds files in the analyst's working directory; neither is in any repo.",
+          "produced_by_script": "figure_4/plier_fit.R",
+          "env_var": "PLIER_DIR",
+          "must_exist": true,
+          "status": "derived",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "needs_external_inputs": true
+    },
+    {
+      "panel": "ED6Aii",
+      "figure_id": "ED6",
+      "slug": "crosstissue_rna_lv_top_pathways",
+      "title": "Top pathways of the three latent variables ED6A highlights",
+      "script": "figure_4/ED6.R",
+      "output": "outputs/panels/extended_data_6/ED6Aii_crosstissue_rna_lv_top_pathways.pdf",
+      "width_in": 8,
+      "height_in": 9,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "Cross-tissue PLIER fits (crosstissue_{rna,metab}_{plier,input,response}.rds)",
+          "produced_by": "figure_4/plier_fit.R, which fits one PLIER per ome over every tissue at once and derives the LV x comparison response grid off it. The legacy wrote both fits to .rds files in the analyst's working directory; neither is in any repo.",
+          "produced_by_script": "figure_4/plier_fit.R",
+          "env_var": "PLIER_DIR",
+          "must_exist": true,
+          "status": "derived",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "needs_external_inputs": true
+    },
+    {
+      "panel": "ED6B",
+      "figure_id": "ED6",
+      "slug": "crosstissue_rna_lv_tissue_correlation",
+      "title": "Cross-tissue agreement of each selected RNA latent variable",
+      "script": "figure_4/ED6.R",
+      "output": "outputs/panels/extended_data_6/ED6B_crosstissue_rna_lv_tissue_correlation.pdf",
+      "width_in": 4,
+      "height_in": 4,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "Cross-tissue PLIER fits (crosstissue_{rna,metab}_{plier,input,response}.rds)",
+          "produced_by": "figure_4/plier_fit.R, which fits one PLIER per ome over every tissue at once and derives the LV x comparison response grid off it. The legacy wrote both fits to .rds files in the analyst's working directory; neither is in any repo.",
+          "produced_by_script": "figure_4/plier_fit.R",
+          "env_var": "PLIER_DIR",
+          "must_exist": true,
+          "status": "derived",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "needs_external_inputs": true
+    },
+    {
+      "panel": "ED6C",
+      "figure_id": "ED6",
+      "slug": "crosstissue_rna_lv_membership",
+      "title": "Transcripts belonging to each selected RNA latent variable",
+      "script": "figure_4/ED6.R",
+      "output": "outputs/panels/extended_data_6/ED6C_crosstissue_rna_lv_membership.pdf",
+      "width_in": 4,
+      "height_in": 3,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "Cross-tissue PLIER fits (crosstissue_{rna,metab}_{plier,input,response}.rds)",
+          "produced_by": "figure_4/plier_fit.R, which fits one PLIER per ome over every tissue at once and derives the LV x comparison response grid off it. The legacy wrote both fits to .rds files in the analyst's working directory; neither is in any repo.",
+          "produced_by_script": "figure_4/plier_fit.R",
+          "env_var": "PLIER_DIR",
+          "must_exist": true,
+          "status": "derived",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "needs_external_inputs": true
+    },
+    {
+      "panel": "ED6D",
+      "figure_id": "ED6",
+      "slug": "crosstissue_rna_lv_marker_heatmap",
+      "title": "Strongest transcripts of one RNA latent variable, across every sample",
+      "script": "figure_4/ED6.R",
+      "output": "outputs/panels/extended_data_6/ED6D_crosstissue_rna_lv_marker_heatmap.pdf",
+      "width_in": 8,
+      "height_in": 3.6,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "Cross-tissue PLIER fits (crosstissue_{rna,metab}_{plier,input,response}.rds)",
+          "produced_by": "figure_4/plier_fit.R, which fits one PLIER per ome over every tissue at once and derives the LV x comparison response grid off it. The legacy wrote both fits to .rds files in the analyst's working directory; neither is in any repo.",
+          "produced_by_script": "figure_4/plier_fit.R",
+          "env_var": "PLIER_DIR",
+          "must_exist": true,
+          "status": "derived",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "needs_external_inputs": true
+    },
+    {
+      "panel": "ED6E",
+      "figure_id": "ED6",
+      "slug": "crosstissue_metab_plier_bubbleheatmap",
+      "title": "Cross-tissue metabolomics latent variables against the acute response",
+      "script": "figure_4/ED6.R",
+      "output": "outputs/panels/extended_data_6/ED6E_crosstissue_metab_plier_bubbleheatmap.pdf",
+      "width_in": 12,
+      "height_in": 8,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "Cross-tissue PLIER fits (crosstissue_{rna,metab}_{plier,input,response}.rds)",
+          "produced_by": "figure_4/plier_fit.R, which fits one PLIER per ome over every tissue at once and derives the LV x comparison response grid off it. The legacy wrote both fits to .rds files in the analyst's working directory; neither is in any repo.",
+          "produced_by_script": "figure_4/plier_fit.R",
+          "env_var": "PLIER_DIR",
+          "must_exist": true,
+          "status": "derived",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "needs_external_inputs": true
+    },
+    {
+      "panel": "ED6F",
+      "figure_id": "ED6",
+      "slug": "crosstissue_metab_plier_classes",
+      "title": "RefMet classes of the selected cross-tissue metabolomics latent variables",
+      "script": "figure_4/ED6.R",
+      "output": "outputs/panels/extended_data_6/ED6F_crosstissue_metab_plier_classes.pdf",
+      "width_in": 6,
+      "height_in": 4,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "Cross-tissue PLIER fits (crosstissue_{rna,metab}_{plier,input,response}.rds)",
+          "produced_by": "figure_4/plier_fit.R, which fits one PLIER per ome over every tissue at once and derives the LV x comparison response grid off it. The legacy wrote both fits to .rds files in the analyst's working directory; neither is in any repo.",
+          "produced_by_script": "figure_4/plier_fit.R",
+          "env_var": "PLIER_DIR",
+          "must_exist": true,
+          "status": "derived",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "needs_external_inputs": true
+    },
+    {
+      "panel": "ED6G",
+      "figure_id": "ED6",
+      "slug": "crosstissue_metab_lv_tissue_correlation",
+      "title": "Cross-tissue agreement of each selected metabolomics latent variable",
+      "script": "figure_4/ED6.R",
+      "output": "outputs/panels/extended_data_6/ED6G_crosstissue_metab_lv_tissue_correlation.pdf",
+      "width_in": 4,
+      "height_in": 4,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "Cross-tissue PLIER fits (crosstissue_{rna,metab}_{plier,input,response}.rds)",
+          "produced_by": "figure_4/plier_fit.R, which fits one PLIER per ome over every tissue at once and derives the LV x comparison response grid off it. The legacy wrote both fits to .rds files in the analyst's working directory; neither is in any repo.",
+          "produced_by_script": "figure_4/plier_fit.R",
+          "env_var": "PLIER_DIR",
+          "must_exist": true,
+          "status": "derived",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "needs_external_inputs": true
+    },
+    {
+      "panel": "ED6H",
+      "figure_id": "ED6",
+      "slug": "crosstissue_metab_lv_membership",
+      "title": "Metabolites belonging to each selected metabolomics latent variable",
+      "script": "figure_4/ED6.R",
+      "output": "outputs/panels/extended_data_6/ED6H_crosstissue_metab_lv_membership.pdf",
+      "width_in": 4,
+      "height_in": 3,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "Cross-tissue PLIER fits (crosstissue_{rna,metab}_{plier,input,response}.rds)",
+          "produced_by": "figure_4/plier_fit.R, which fits one PLIER per ome over every tissue at once and derives the LV x comparison response grid off it. The legacy wrote both fits to .rds files in the analyst's working directory; neither is in any repo.",
+          "produced_by_script": "figure_4/plier_fit.R",
+          "env_var": "PLIER_DIR",
+          "must_exist": true,
+          "status": "derived",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "needs_external_inputs": true
+    },
+    {
+      "panel": "ED6I",
+      "figure_id": "ED6",
+      "slug": "crosstissue_metab_lv_marker_heatmap",
+      "title": "Strongest metabolites of one metabolomics latent variable, across every sample",
+      "script": "figure_4/ED6.R",
+      "output": "outputs/panels/extended_data_6/ED6I_crosstissue_metab_lv_marker_heatmap.pdf",
+      "width_in": 8,
+      "height_in": 3.6,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "Cross-tissue PLIER fits (crosstissue_{rna,metab}_{plier,input,response}.rds)",
+          "produced_by": "figure_4/plier_fit.R, which fits one PLIER per ome over every tissue at once and derives the LV x comparison response grid off it. The legacy wrote both fits to .rds files in the analyst's working directory; neither is in any repo.",
+          "produced_by_script": "figure_4/plier_fit.R",
+          "env_var": "PLIER_DIR",
+          "must_exist": true,
+          "status": "derived",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "needs_external_inputs": true
+    },
+    {
+      "panel": "FIG5A",
+      "figure_id": "FIG5",
+      "slug": "homer_input_deg_counts",
+      "title": "Nominally significant transcripts (p < 0.05, exercise vs control), per tissue, arm and timepoint",
+      "script": "figure_5/FIG5.R",
+      "output": "outputs/panels/figure_5/FIG5A_homer_input_deg_counts.pdf",
+      "width_in": 5,
+      "height_in": 7,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": []
+    },
+    {
+      "panel": "FIG5B",
+      "figure_id": "FIG5",
+      "slug": "significant_tf_counts",
+      "title": "Motifs enriched at q < 0.05, per tissue, arm and timepoint",
+      "script": "figure_5/FIG5.R",
+      "output": "outputs/panels/figure_5/FIG5B_significant_tf_counts.pdf",
+      "width_in": 5,
+      "height_in": 7,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "HOMER findMotifs.pl knownResults for 22 tissue x arm x timepoint DEG lists",
+          "produced_by": "findMotifs.pl run outside R on the nominally significant transcript DEG list of each comparison, against the human background. Vendored under sources/figure_5/.",
+          "env_var": null,
+          "status": "vendored",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "displays_tables": [
+        "ST5a"
+      ]
+    },
+    {
+      "panel": "FIG5C",
+      "figure_id": "FIG5",
+      "slug": "top_tf_enrichment_heatmap",
+      "title": "Enrichment of the five strongest motifs of every comparison, across all 22",
+      "script": "figure_5/FIG5.R",
+      "output": "outputs/panels/figure_5/FIG5C_top_tf_enrichment_heatmap.pdf",
+      "width_in": 5,
+      "height_in": 7,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "HOMER findMotifs.pl knownResults for 22 tissue x arm x timepoint DEG lists",
+          "produced_by": "findMotifs.pl run outside R on the nominally significant transcript DEG list of each comparison, against the human background. Vendored under sources/figure_5/.",
+          "env_var": null,
+          "status": "vendored",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "tfproanno.RDS, the curated HOMER motif -> gene-symbol table carried over from PASS1B",
+          "produced_by": "PASS1B. Only its Gene.Name column is read; its Ensembl and per-tissue protein ids are rat. Vendored under sources/figure_5/.",
+          "env_var": null,
+          "status": "vendored",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "displays_tables": [
+        "ST5a"
+      ]
+    },
+    {
+      "panel": "FIG5D",
+      "figure_id": "FIG5",
+      "slug": "muscle_tf_phospho_bubbleheatmap",
+      "title": "Phosphosites on transcription factors responding to exercise in muscle",
+      "script": "figure_5/FIG5.R",
+      "output": "outputs/panels/figure_5/FIG5D_muscle_tf_phospho_bubbleheatmap.pdf",
+      "width_in": 5,
+      "height_in": 12,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "HOMER findMotifs.pl knownResults for 22 tissue x arm x timepoint DEG lists",
+          "produced_by": "findMotifs.pl run outside R on the nominally significant transcript DEG list of each comparison, against the human background. Vendored under sources/figure_5/.",
+          "env_var": null,
+          "status": "vendored",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "tfproanno.RDS, the curated HOMER motif -> gene-symbol table carried over from PASS1B",
+          "produced_by": "PASS1B. Only its Gene.Name column is read; its Ensembl and per-tissue protein ids are rat. Vendored under sources/figure_5/.",
+          "env_var": null,
+          "status": "vendored",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ]
+    },
+    {
+      "panel": "FIG5E",
+      "figure_id": "FIG5",
+      "slug": "ee_vs_re_transcript_scatter",
+      "title": "Endurance against resistance transcript response of TF genes at 3.5/4 hr",
+      "script": "figure_5/FIG5.R",
+      "output": "outputs/panels/figure_5/FIG5E_ee_vs_re_transcript_scatter.pdf",
+      "width_in": 5,
+      "height_in": 5,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "HOMER findMotifs.pl knownResults for 22 tissue x arm x timepoint DEG lists",
+          "produced_by": "findMotifs.pl run outside R on the nominally significant transcript DEG list of each comparison, against the human background. Vendored under sources/figure_5/.",
+          "env_var": null,
+          "status": "vendored",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "tfproanno.RDS, the curated HOMER motif -> gene-symbol table carried over from PASS1B",
+          "produced_by": "PASS1B. Only its Gene.Name column is read; its Ensembl and per-tissue protein ids are rat. Vendored under sources/figure_5/.",
+          "env_var": null,
+          "status": "vendored",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ]
+    },
+    {
+      "panel": "FIG5F",
+      "figure_id": "FIG5",
+      "slug": "ee_vs_re_phospho_scatter",
+      "title": "Endurance against resistance phosphosite response of TFs at 3.5/4 hr",
+      "script": "figure_5/FIG5.R",
+      "output": "outputs/panels/figure_5/FIG5F_ee_vs_re_phospho_scatter.pdf",
+      "width_in": 5,
+      "height_in": 5,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "HOMER findMotifs.pl knownResults for 22 tissue x arm x timepoint DEG lists",
+          "produced_by": "findMotifs.pl run outside R on the nominally significant transcript DEG list of each comparison, against the human background. Vendored under sources/figure_5/.",
+          "env_var": null,
+          "status": "vendored",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "tfproanno.RDS, the curated HOMER motif -> gene-symbol table carried over from PASS1B",
+          "produced_by": "PASS1B. Only its Gene.Name column is read; its Ensembl and per-tissue protein ids are rat. Vendored under sources/figure_5/.",
+          "env_var": null,
+          "status": "vendored",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ]
+    },
+    {
+      "panel": "FIG5G",
+      "figure_id": "FIG5",
+      "slug": "tf_activity_bars",
+      "title": "Transcription factors by exercise response and motif enrichment, three tissues",
+      "script": "figure_5/FIG5.R",
+      "output": "outputs/panels/figure_5/FIG5G_tf_activity_bars.pdf",
+      "width_in": 6,
+      "height_in": 12,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "HOMER findMotifs.pl knownResults for 22 tissue x arm x timepoint DEG lists",
+          "produced_by": "findMotifs.pl run outside R on the nominally significant transcript DEG list of each comparison, against the human background. Vendored under sources/figure_5/.",
+          "env_var": null,
+          "status": "vendored",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "tfproanno.RDS, the curated HOMER motif -> gene-symbol table carried over from PASS1B",
+          "produced_by": "PASS1B. Only its Gene.Name column is read; its Ensembl and per-tissue protein ids are rat. Vendored under sources/figure_5/.",
+          "env_var": null,
+          "status": "vendored",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ]
+    },
+    {
+      "panel": "FIG5H",
+      "figure_id": "FIG5",
+      "slug": "muscle_tf_enrichment_phospho_heatmap",
+      "title": "Muscle motifs enriched for DEGs whose transcription factor is also phosphorylated",
+      "script": "figure_5/FIG5.R",
+      "output": "outputs/panels/figure_5/FIG5H_muscle_tf_enrichment_phospho_heatmap.pdf",
+      "width_in": 6,
+      "height_in": 6,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "HOMER findMotifs.pl knownResults for 22 tissue x arm x timepoint DEG lists",
+          "produced_by": "findMotifs.pl run outside R on the nominally significant transcript DEG list of each comparison, against the human background. Vendored under sources/figure_5/.",
+          "env_var": null,
+          "status": "vendored",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "tfproanno.RDS, the curated HOMER motif -> gene-symbol table carried over from PASS1B",
+          "produced_by": "PASS1B. Only its Gene.Name column is read; its Ensembl and per-tissue protein ids are rat. Vendored under sources/figure_5/.",
+          "env_var": null,
+          "status": "vendored",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "displays_tables": [
+        "ST5a"
+      ]
+    },
+    {
+      "panel": "ED7A",
+      "figure_id": "ED7",
+      "slug": "tf_transcript_bubbleheatmap_first_half",
+      "title": "Transcription-factor transcript responses across three tissues, first half",
+      "script": "figure_5/ED7.R",
+      "output": "outputs/panels/extended_data_7/ED7A_tf_transcript_bubbleheatmap_first_half.pdf",
+      "width_in": 8,
+      "height_in": 16,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "HOMER findMotifs.pl knownResults for 22 tissue x arm x timepoint DEG lists",
+          "produced_by": "findMotifs.pl run outside R on the nominally significant transcript DEG list of each comparison, against the human background. Vendored under sources/figure_5/.",
+          "env_var": null,
+          "status": "vendored",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "tfproanno.RDS, the curated HOMER motif -> gene-symbol table carried over from PASS1B",
+          "produced_by": "PASS1B. Only its Gene.Name column is read; its Ensembl and per-tissue protein ids are rat. Vendored under sources/figure_5/.",
+          "env_var": null,
+          "status": "vendored",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ]
+    },
+    {
+      "panel": "ED7B",
+      "figure_id": "ED7",
+      "slug": "tf_transcript_bubbleheatmap_second_half",
+      "title": "Transcription-factor transcript responses across three tissues, second half",
+      "script": "figure_5/ED7.R",
+      "output": "outputs/panels/extended_data_7/ED7B_tf_transcript_bubbleheatmap_second_half.pdf",
+      "width_in": 8,
+      "height_in": 16,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "HOMER findMotifs.pl knownResults for 22 tissue x arm x timepoint DEG lists",
+          "produced_by": "findMotifs.pl run outside R on the nominally significant transcript DEG list of each comparison, against the human background. Vendored under sources/figure_5/.",
+          "env_var": null,
+          "status": "vendored",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "tfproanno.RDS, the curated HOMER motif -> gene-symbol table carried over from PASS1B",
+          "produced_by": "PASS1B. Only its Gene.Name column is read; its Ensembl and per-tissue protein ids are rat. Vendored under sources/figure_5/.",
+          "env_var": null,
+          "status": "vendored",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ]
+    },
+    {
+      "panel": "FIG6C",
+      "figure_id": "FIG6",
+      "slug": "tfeb_phosphosite_heatmap",
+      "title": "TFEB phosphosite log fold change in muscle, EE and RE",
+      "script": "figure_6/FIG6.R",
+      "output": "outputs/panels/figure_6/FIG6C_tfeb_phosphosite_heatmap.pdf",
+      "width_in": 8,
+      "height_in": 8,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": []
+    },
+    {
+      "panel": "FIG6D",
+      "figure_id": "FIG6",
+      "slug": "tfeb_chip_target_ora",
+      "title": "ORA of ChIP-bound TFEB targets up or down at 3.5-4 h, EE and RE",
+      "script": "figure_6/FIG6.R",
+      "output": "outputs/panels/figure_6/FIG6D_tfeb_chip_target_ora.pdf",
+      "width_in": 10,
+      "height_in": 16,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "Gambardella et al. 2020 TFEB ChIP-seq peak table (Sci. Adv. 6, eabb0205, table S2, sheet 2)",
+          "produced_by": "Published supplementary table. A gene counts as bound when a peak is annotated to its promoter within 1 kb.",
+          "env_var": null,
+          "status": "vendored",
+          "path": "sources/figure_6/Gambardella-et-al-2020-table-s2.xlsx",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "MSigDB TFEB_TARGET_GENES gene set (v2024.1.Hs), from GTRD",
+          "produced_by": "MSigDB C3 GTRD set TFEB_TARGET_GENES, exported as TSV; the gene list is the 18th row's comma-separated second field.",
+          "env_var": null,
+          "status": "vendored",
+          "path": "sources/figure_6/TFEB_TARGET_GENES.v2024.1.Hs.tsv",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "Doronzo et al. 2019 TFEB ChIP-seq peaks, GEO GSM2354032 (hg19 BED)",
+          "produced_by": "Published peak calls. Annotated with annotatr against hg19_basicgenes; a gene counts as bound by a promoter or 1-5 kb peak.",
+          "env_var": null,
+          "status": "vendored",
+          "path": "sources/figure_6/GSM2354032_TFEB_e5_peaks.bed",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "The 705 muscle transcripts SC-ION predicts as TFEB targets in the merged EE+RE network",
+          "produced_by": "precovid-analyses PR #104 (figures/landscape/figure_7/TFEB_targets_v2.xlsx). Read off the merged Cytoscape network; no script in the PR writes it, and FIG6E derives the same list from the edge table as a check.",
+          "env_var": null,
+          "status": "vendored",
+          "path": "sources/figure_6/TFEB_targets_v2.xlsx",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "co_generated_tables": [
+        "ST6c",
+        "ST6d",
+        "ST6e",
+        "ST6f",
+        "ST6g"
+      ],
+      "displays_tables": [
+        "ST6d",
+        "ST6e",
+        "ST6f",
+        "ST6g"
+      ]
+    },
+    {
+      "panel": "FIG6E",
+      "figure_id": "FIG6",
+      "slug": "tfeb_rxra_shared_targets_heatmap",
+      "title": "Muscle transcript response of the shared SC-ION targets of TFEB and RXRA",
+      "script": "figure_6/FIG6.R",
+      "output": "outputs/panels/figure_6/FIG6E_tfeb_rxra_shared_targets_heatmap.pdf",
+      "width_in": 8,
+      "height_in": 6,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "Every edge of the merged EE+RE SC-ION network after the 0.1 weight trim (116,419 rows)",
+          "produced_by": "precovid-analyses PR #104 (figures/landscape/figure_7/SCION_supplemental_table_edges.csv): the Cytoscape export of the merged network with regulator_id filled from the edge name for metabolite regulators. The SC-ION inference, permutation trim and Cytoscape merge that produced it are not in the PR.",
+          "env_var": null,
+          "status": "vendored",
+          "path": "sources/figure_6/SCION_supplemental_table_edges.csv",
+          "documented_in": "docs/external_dependencies.md",
+          "override_env_var": "FIG6_SCION_EDGES_CSV"
+        }
+      ],
+      "displays_tables": [
+        "ST6a"
+      ]
+    },
+    {
+      "panel": "FIG6F",
+      "figure_id": "FIG6",
+      "slug": "lactic_acid_trajectories",
+      "title": "Lactic acid across the three tissues",
+      "script": "figure_6/FIG6.R",
+      "output": "outputs/panels/figure_6/FIG6F_lactic_acid_trajectories.pdf",
+      "width_in": 4.5,
+      "height_in": 1.5,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": []
+    },
+    {
+      "panel": "ED8A",
+      "figure_id": "ED8",
+      "slug": "tfeb_chip_target_heatmap",
+      "title": "Muscle transcript response of the ChIP-supported SC-ION targets of TFEB",
+      "script": "figure_6/ED8.R",
+      "output": "outputs/panels/extended_data_8/ED8A_tfeb_chip_target_heatmap.pdf",
+      "width_in": 8,
+      "height_in": 30,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "Gambardella et al. 2020 TFEB ChIP-seq peak table (Sci. Adv. 6, eabb0205, table S2, sheet 2)",
+          "produced_by": "Published supplementary table. A gene counts as bound when a peak is annotated to its promoter within 1 kb.",
+          "env_var": null,
+          "status": "vendored",
+          "path": "sources/figure_6/Gambardella-et-al-2020-table-s2.xlsx",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "MSigDB TFEB_TARGET_GENES gene set (v2024.1.Hs), from GTRD",
+          "produced_by": "MSigDB C3 GTRD set TFEB_TARGET_GENES, exported as TSV; the gene list is the 18th row's comma-separated second field.",
+          "env_var": null,
+          "status": "vendored",
+          "path": "sources/figure_6/TFEB_TARGET_GENES.v2024.1.Hs.tsv",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "Doronzo et al. 2019 TFEB ChIP-seq peaks, GEO GSM2354032 (hg19 BED)",
+          "produced_by": "Published peak calls. Annotated with annotatr against hg19_basicgenes; a gene counts as bound by a promoter or 1-5 kb peak.",
+          "env_var": null,
+          "status": "vendored",
+          "path": "sources/figure_6/GSM2354032_TFEB_e5_peaks.bed",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "The 705 muscle transcripts SC-ION predicts as TFEB targets in the merged EE+RE network",
+          "produced_by": "precovid-analyses PR #104 (figures/landscape/figure_7/TFEB_targets_v2.xlsx). Read off the merged Cytoscape network; no script in the PR writes it, and FIG6E derives the same list from the edge table as a check.",
+          "env_var": null,
+          "status": "vendored",
+          "path": "sources/figure_6/TFEB_targets_v2.xlsx",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "displays_tables": [
+        "ST6c"
+      ]
+    },
+    {
+      "panel": "ED8B",
+      "figure_id": "ED8",
+      "slug": "tfeb_trajectories",
+      "title": "TFEB transcript across the three tissues",
+      "script": "figure_6/ED8.R",
+      "output": "outputs/panels/extended_data_8/ED8B_tfeb_trajectories.pdf",
+      "width_in": 4.5,
+      "height_in": 1.5,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": []
+    },
+    {
+      "panel": "ED8C",
+      "figure_id": "ED8",
+      "slug": "pp2a_subunit_heatmap",
+      "title": "PP2A subunit transcripts quantified in both blood and muscle",
+      "script": "figure_6/ED8.R",
+      "output": "outputs/panels/extended_data_8/ED8C_pp2a_subunit_heatmap.pdf",
+      "width_in": 8,
+      "height_in": 8,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": []
+    },
+    {
+      "panel": "ED8D",
+      "figure_id": "ED8",
+      "slug": "hsp90aa1_trajectories",
+      "title": "HSP90AA1 transcript across the three tissues",
+      "script": "figure_6/ED8.R",
+      "output": "outputs/panels/extended_data_8/ED8D_hsp90aa1_trajectories.pdf",
+      "width_in": 4.5,
+      "height_in": 1.5,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": []
+    },
+    {
+      "panel": "ED8E",
+      "figure_id": "ED8",
+      "slug": "tfeb_autophagy_target_heatmap",
+      "title": "ChIP-supported TFEB targets in GO-BP Regulation of Autophagy, up at 3.5-4 h",
+      "script": "figure_6/ED8.R",
+      "output": "outputs/panels/extended_data_8/ED8E_tfeb_autophagy_target_heatmap.pdf",
+      "width_in": 8,
+      "height_in": 7.5,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "Gambardella et al. 2020 TFEB ChIP-seq peak table (Sci. Adv. 6, eabb0205, table S2, sheet 2)",
+          "produced_by": "Published supplementary table. A gene counts as bound when a peak is annotated to its promoter within 1 kb.",
+          "env_var": null,
+          "status": "vendored",
+          "path": "sources/figure_6/Gambardella-et-al-2020-table-s2.xlsx",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "MSigDB TFEB_TARGET_GENES gene set (v2024.1.Hs), from GTRD",
+          "produced_by": "MSigDB C3 GTRD set TFEB_TARGET_GENES, exported as TSV; the gene list is the 18th row's comma-separated second field.",
+          "env_var": null,
+          "status": "vendored",
+          "path": "sources/figure_6/TFEB_TARGET_GENES.v2024.1.Hs.tsv",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "Doronzo et al. 2019 TFEB ChIP-seq peaks, GEO GSM2354032 (hg19 BED)",
+          "produced_by": "Published peak calls. Annotated with annotatr against hg19_basicgenes; a gene counts as bound by a promoter or 1-5 kb peak.",
+          "env_var": null,
+          "status": "vendored",
+          "path": "sources/figure_6/GSM2354032_TFEB_e5_peaks.bed",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "displays_tables": [
+        "ST6c"
+      ]
+    },
+    {
+      "panel": "ED8F",
+      "figure_id": "ED8",
+      "slug": "leucine_trajectories",
+      "title": "Leucine and Leu-Ile in blood and muscle",
+      "script": "figure_6/ED8.R",
+      "output": "outputs/panels/extended_data_8/ED8F_leucine_trajectories.pdf",
+      "width_in": 6.5,
+      "height_in": 1.5,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": []
+    },
+    {
+      "panel": "FIG7A",
+      "figure_id": "FIG7",
+      "slug": "exerkine_candidate_heatmap",
+      "title": "Exerkine candidates: tissue direction against plasma direction",
+      "script": "figure_7/FIG7.R",
+      "output": "outputs/panels/figure_7/FIG7A_exerkine_candidate_heatmap.pdf",
+      "width_in": 5,
+      "height_in": 10,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "COMPARTMENTS integrated channel, extracellular locations (compartments_extracellular.tsv)",
+          "status": "vendored",
+          "path": "sources/figure_7/compartments_extracellular.tsv",
+          "override_env_var": "ACUTE_COMPARTMENTS_TSV",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "needs_external_inputs": true,
+      "co_generated_tables": [
+        "ST7a"
+      ]
+    },
+    {
+      "panel": "FIG7B",
+      "figure_id": "FIG7",
+      "slug": "cx3cl1_trajectories",
+      "title": "CX3CL1 (fractalkine) across muscle and adipose transcript and Olink",
+      "script": "figure_7/FIG7.R",
+      "output": "outputs/panels/figure_7/FIG7B_cx3cl1_trajectories.pdf",
+      "width_in": 5.7783,
+      "height_in": 1.6522,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": []
+    },
+    {
+      "panel": "FIG7C",
+      "figure_id": "FIG7",
+      "slug": "ccn1_trajectories",
+      "title": "CCN1 across muscle and adipose transcript, blood Olink and muscle protein",
+      "script": "figure_7/FIG7.R",
+      "output": "outputs/panels/figure_7/FIG7C_ccn1_trajectories.pdf",
+      "width_in": 4,
+      "height_in": 3.08,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": []
+    },
+    {
+      "panel": "FIG7D",
+      "figure_id": "FIG7",
+      "slug": "ccn1_receptor_correlation",
+      "title": "CCN1 against its receptor transcripts, within tissue, arm and timepoint",
+      "script": "figure_7/FIG7.R",
+      "output": "outputs/panels/figure_7/FIG7D_ccn1_receptor_correlation.pdf",
+      "width_in": 3.5,
+      "height_in": 7,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionData",
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": []
+    },
+    {
+      "panel": "ED9A",
+      "figure_id": "ED9",
+      "slug": "exerkine_tissue_upset",
+      "title": "Exerkine candidates shared across tissues, by exercise arm",
+      "script": "figure_7/ED9.R",
+      "output": "outputs/panels/extended_data_9/ED9A_exerkine_tissue_upset.pdf",
+      "width_in": 8,
+      "height_in": 12,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "COMPARTMENTS integrated channel, extracellular locations (compartments_extracellular.tsv)",
+          "status": "vendored",
+          "path": "sources/figure_7/compartments_extracellular.tsv",
+          "override_env_var": "ACUTE_COMPARTMENTS_TSV",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "needs_external_inputs": true
+    },
+    {
+      "panel": "ED9B",
+      "figure_id": "ED9",
+      "slug": "exerkine_candidate_heatmap_rest",
+      "title": "Exerkine candidates not shown in FIG7A",
+      "script": "figure_7/ED9.R",
+      "output": "outputs/panels/extended_data_9/ED9B_exerkine_candidate_heatmap_rest.pdf",
+      "width_in": 4.5,
+      "height_in": 15,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "COMPARTMENTS integrated channel, extracellular locations (compartments_extracellular.tsv)",
+          "status": "vendored",
+          "path": "sources/figure_7/compartments_extracellular.tsv",
+          "override_env_var": "ACUTE_COMPARTMENTS_TSV",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "needs_external_inputs": true
+    },
+    {
+      "panel": "ED9C",
+      "figure_id": "ED9",
+      "slug": "flna_phosphosite_trajectory",
+      "title": "FLNA phosphosite S1533, muscle and adipose",
+      "script": "figure_7/ED9.R",
+      "output": "outputs/panels/extended_data_9/ED9C_flna_phosphosite_trajectory.pdf",
+      "width_in": 2.38,
+      "height_in": 3.08,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": []
+    },
+    {
+      "panel": "ED9D",
+      "figure_id": "ED9",
+      "slug": "ccn1_adipose_muscle_scatter",
+      "title": "CCN1 transcript in adipose against muscle, per timepoint",
+      "script": "figure_7/ED9.R",
+      "output": "outputs/panels/extended_data_9/ED9D_ccn1_adipose_muscle_scatter.pdf",
+      "width_in": 10,
+      "height_in": 10,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionData",
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": []
+    },
+    {
+      "panel": "SF1A",
+      "figure_id": "SF1",
+      "slug": "sample_prep_by_participant_heatmap",
+      "title": "Nuclei isolation batch, isolation-to-tagmentation lag and sequencing batch per participant and timepoint",
+      "script": "supplementary_figure_1/SF1.R",
+      "output": "outputs/panels/supplementary_figure_1/SF1A_sample_prep_by_participant_heatmap.pdf",
+      "width_in": 3.2,
+      "height_in": 7.5,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionData",
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "The muscle epigen-atac-seq QC object (log-CPM plus sample metadata), ~0.5 GB, cached locally. The same cache ED1B and ED1D fill.",
+          "produced_by": "Downloaded at run time by load_qc(epigen = TRUE) from the c2.0 data-hub prefix gs://motrpac-data-hub/analysis/human-precovid-sed-adu/c2.0, and cached under the directory EPIGEN_QC_DIR names. Neither data package ships it.",
+          "env_var": "EPIGEN_QC_DIR",
+          "status": "external",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "device": "cairo_pdf",
+      "device_reason": "The lag legend reads ≥1, which base pdf() cannot encode."
+    },
+    {
+      "panel": "SF1B",
+      "figure_id": "SF1",
+      "slug": "frip_by_group_boxplot",
+      "title": "Fraction of reads in peaks per timepoint and exercise group",
+      "script": "supplementary_figure_1/SF1.R",
+      "output": "outputs/panels/supplementary_figure_1/SF1B_frip_by_group_boxplot.pdf",
+      "width_in": 3,
+      "height_in": 2,
+      "seed": 0,
+      "stochastic": [
+        "geom_jitter"
+      ],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionData",
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "The muscle epigen-atac-seq QC object (log-CPM plus sample metadata), ~0.5 GB, cached locally. The same cache ED1B and ED1D fill.",
+          "produced_by": "Downloaded at run time by load_qc(epigen = TRUE) from the c2.0 data-hub prefix gs://motrpac-data-hub/analysis/human-precovid-sed-adu/c2.0, and cached under the directory EPIGEN_QC_DIR names. Neither data package ships it.",
+          "env_var": "EPIGEN_QC_DIR",
+          "status": "external",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ]
+    },
+    {
+      "panel": "SF1C",
+      "figure_id": "SF1",
+      "slug": "pca_covariate_correlation_heatmap",
+      "title": "Correlation of PC1-PC5 with participant, sample-prep and QC covariates, unadjusted and M0-adjusted",
+      "script": "supplementary_figure_1/SF1.R",
+      "output": "outputs/panels/supplementary_figure_1/SF1C_pca_covariate_correlation_heatmap.pdf",
+      "width_in": 3.5,
+      "height_in": 6.5,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionData",
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "The muscle epigen-atac-seq QC object (log-CPM plus sample metadata), ~0.5 GB, cached locally. The same cache ED1B and ED1D fill.",
+          "produced_by": "Downloaded at run time by load_qc(epigen = TRUE) from the c2.0 data-hub prefix gs://motrpac-data-hub/analysis/human-precovid-sed-adu/c2.0, and cached under the directory EPIGEN_QC_DIR names. Neither data package ships it.",
+          "env_var": "EPIGEN_QC_DIR",
+          "status": "external",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "Raw muscle ATAC peak counts (chrom, start, end, one column per library), gzipped, under QUANT_BUCKET.",
+          "produced_by": "Resolved by listing QUANT_BUCKET and downloaded through MotrpacBicQC::dl_read_gcp() into EPIGEN_QC_DIR. Neither data package ships them; voom log-CPM is computed from them at run time.",
+          "env_var": null,
+          "status": "external",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ]
+    },
+    {
+      "panel": "SF1D",
+      "figure_id": "SF1",
+      "slug": "pc1_by_nuclei_isolation_batch",
+      "title": "M0-adjusted PC1 against nuclei isolation batch",
+      "script": "supplementary_figure_1/SF1.R",
+      "output": "outputs/panels/supplementary_figure_1/SF1D_pc1_by_nuclei_isolation_batch.pdf",
+      "width_in": 3,
+      "height_in": 2,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionData",
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "The muscle epigen-atac-seq QC object (log-CPM plus sample metadata), ~0.5 GB, cached locally. The same cache ED1B and ED1D fill.",
+          "produced_by": "Downloaded at run time by load_qc(epigen = TRUE) from the c2.0 data-hub prefix gs://motrpac-data-hub/analysis/human-precovid-sed-adu/c2.0, and cached under the directory EPIGEN_QC_DIR names. Neither data package ships it.",
+          "env_var": "EPIGEN_QC_DIR",
+          "status": "external",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "Raw muscle ATAC peak counts (chrom, start, end, one column per library), gzipped, under QUANT_BUCKET.",
+          "produced_by": "Resolved by listing QUANT_BUCKET and downloaded through MotrpacBicQC::dl_read_gcp() into EPIGEN_QC_DIR. Neither data package ships them; voom log-CPM is computed from them at run time.",
+          "env_var": null,
+          "status": "external",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ]
+    },
+    {
+      "panel": "SF1E",
+      "figure_id": "SF1",
+      "slug": "pc2_by_frozen_nuclei",
+      "title": "M0-adjusted PC2 by exercise group, frozen against fresh nuclei",
+      "script": "supplementary_figure_1/SF1.R",
+      "output": "outputs/panels/supplementary_figure_1/SF1E_pc2_by_frozen_nuclei.pdf",
+      "width_in": 2.8,
+      "height_in": 2,
+      "seed": 0,
+      "stochastic": [
+        "position_jitterdodge"
+      ],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionData",
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "The muscle epigen-atac-seq QC object (log-CPM plus sample metadata), ~0.5 GB, cached locally. The same cache ED1B and ED1D fill.",
+          "produced_by": "Downloaded at run time by load_qc(epigen = TRUE) from the c2.0 data-hub prefix gs://motrpac-data-hub/analysis/human-precovid-sed-adu/c2.0, and cached under the directory EPIGEN_QC_DIR names. Neither data package ships it.",
+          "env_var": "EPIGEN_QC_DIR",
+          "status": "external",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "Raw muscle ATAC peak counts (chrom, start, end, one column per library), gzipped, under QUANT_BUCKET.",
+          "produced_by": "Resolved by listing QUANT_BUCKET and downloaded through MotrpacBicQC::dl_read_gcp() into EPIGEN_QC_DIR. Neither data package ships them; voom log-CPM is computed from them at run time.",
+          "env_var": null,
+          "status": "external",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ]
+    },
+    {
+      "panel": "SF1F",
+      "figure_id": "SF1",
+      "slug": "m0_pca_scatter",
+      "title": "M0-adjusted PC1 against PC2 with a 95% ellipse per group and timepoint",
+      "script": "supplementary_figure_1/SF1.R",
+      "output": "outputs/panels/supplementary_figure_1/SF1F_m0_pca_scatter.pdf",
+      "width_in": 4,
+      "height_in": 2,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionData",
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "The muscle epigen-atac-seq QC object (log-CPM plus sample metadata), ~0.5 GB, cached locally. The same cache ED1B and ED1D fill.",
+          "produced_by": "Downloaded at run time by load_qc(epigen = TRUE) from the c2.0 data-hub prefix gs://motrpac-data-hub/analysis/human-precovid-sed-adu/c2.0, and cached under the directory EPIGEN_QC_DIR names. Neither data package ships it.",
+          "env_var": "EPIGEN_QC_DIR",
+          "status": "external",
+          "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "Raw muscle ATAC peak counts (chrom, start, end, one column per library), gzipped, under QUANT_BUCKET.",
+          "produced_by": "Resolved by listing QUANT_BUCKET and downloaded through MotrpacBicQC::dl_read_gcp() into EPIGEN_QC_DIR. Neither data package ships them; voom log-CPM is computed from them at run time.",
+          "env_var": null,
+          "status": "external",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ]
+    },
+    {
+      "panel": "SF1G",
+      "figure_id": "SF1",
+      "slug": "significant_peak_counts",
+      "title": "Significant peaks per exercise arm and timepoint under the two contrast types, and their overlap",
+      "script": "supplementary_figure_1/SF1.R",
+      "output": "outputs/panels/supplementary_figure_1/SF1G_significant_peak_counts.pdf",
+      "width_in": 6,
+      "height_in": 1.3,
+      "seed": 0,
+      "stochastic": [],
+      "data_packages": [
+        "MotrpacHumanPreSuspensionAnalysis"
+      ],
+      "external_inputs": [
+        {
+          "what": "The muscle epigen-atac-seq acute differential-analysis table (v2.1).",
+          "produced_by": "Downloaded over HTTPS by load_differential_analysis(epigen = TRUE) from the public c2.0 CloudFront release https://d1yw74buhe0ts0.cloudfront.net/data/analysis/human_presuspension_sed_adu/c2.0/epigenomics/da/. No gsutil and no credentials. Not cached: every call downloads again. A failed download is an error. Only the muscle ATAC file is requested.",
+          "env_var": null,
+          "status": "external",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ]
+    }
+  ]
+}

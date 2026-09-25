@@ -1,0 +1,64 @@
+# Packages the figure scripts, the fits and the shared helpers under lib/
+# import. Install these before a first run.
+#
+# Maintained by hand. No script in this repo reads this file; it is the list the
+# README and the `why:` hint on a missing-package failure point at. Change it
+# when a script starts or stops loading a package.
+#
+# Versions are not recorded here. config/required_packages.tsv pins the five
+# whose version changes a panel, and outputs/panels/export_manifest.tsv records
+# the data-package versions each PDF was drawn from.
+#
+# Not listed:
+#
+#   base, grDevices, grid, stats, utils, methods, ...
+#       base-priority, versioned with R itself.
+#
+#   MotrpacHumanPreSuspensionData, MotrpacHumanPreSuspensionAnalysis
+#       the two data packages, installed from source; pinned in
+#       config/required_packages.tsv.
+#
+#   MotrpacHumanPreSuspension
+#       a third package the legacy figure scripts called plot_single_feature()
+#       from. No script here names it.
+#
+# Two entries are not on CRAN or Bioconductor and install from GitHub:
+# MotrpacBicQC (MoTrPAC/MotrpacBicQC@v2.0.0) and PLIER (wgmao/PLIER).
+
+annotatr
+BiocParallel
+circlize
+ComplexHeatmap
+ComplexUpset
+data.table
+dplyr
+edgeR
+forcats
+geomtextpath
+ggh4x
+ggnewscale
+ggplot2
+ggpubr
+ggrastr
+ggrepel
+gplots
+gridExtra
+jsonlite
+latex2exp
+limma
+lme4
+MotrpacBicQC
+openxlsx
+patchwork
+pheatmap
+PLIER
+ragg
+RColorBrewer
+readxl
+scales
+stringr
+tibble
+tidyr
+TMSig
+variancePartition
+WGCNA

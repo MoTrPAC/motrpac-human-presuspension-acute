@@ -1,0 +1,571 @@
+{
+  "$comment": [
+    "Curated highlights for figures/landscape/: every pathway selection and every named gene, site",
+    "or metabolite a panel or sub-table draws because someone chose it, not because a",
+    "computation selected it. Panel and table scripts read them through scripts/lib/highlights.R.",
+    "",
+    "pathways: one selection per key. match_on names the field a script matches the ORA",
+    "or CAMERA results on; the other fields are for reading. panels and tables name who",
+    "reads the selection; provenance names where it was curated before it moved here.",
+    "",
+    "features: the single-feature plots, keyed by panel and then by plot. tissues and omes",
+    "are passed to plot_single_feature() as selected_tissues and selected_omes; title,",
+    "where present, replaces the plot title.",
+    "",
+    "gene_lists: a hand-picked set of gene symbols a heatmap draws, keyed by panel.",
+    "",
+    "named_features: the features discussed in the manuscript, for ST1e (and ED1C).",
+    "notes carries the symbol and site the manuscript uses.",
+    "",
+    "clinical_omics_features: the baseline clinical x omics features the manuscript selected",
+    "for EDT1, keyed by table. trait is the Stage 07 name, timepoint the acute response the",
+    "manuscript reports, notes the molecule description."
+  ],
+  "schema_version": "1.0.0",
+  "pathways": {
+    "FIG2Bii": {
+      "panels": ["FIG2Bii"],
+      "match_on": "set",
+      "provenance": "curated_pathways_v2.xlsx, sheet 2B",
+      "sets": [
+        {"set": "PID_AP1_PATHWAY"},
+        {"set": "GOBP_POSITIVE_REGULATION_OF_RNA_METABOLIC_PROCESS"},
+        {"set": "GOBP_HEMOPOIESIS"},
+        {"set": "GOBP_POSITIVE_REGULATION_OF_CELL_POPULATION_PROLIFERATION"},
+        {"set": "GOBP_LEUKOCYTE_DIFFERENTIATION"},
+        {"set": "GOBP_MONONUCLEAR_CELL_DIFFERENTIATION"},
+        {"set": "CELLMARKER_Microglial Cell Embryonic Prefrontal Cortex Human"},
+        {"set": "WP_TGF_BETA_SIGNALING_PATHWAY"},
+        {"set": "WP_MAPK_SIGNALING_PATHWAY"},
+        {"set": "WP_VEGFA_VEGFR2_SIGNALING"},
+        {"set": "REACTOME_MAPK_FAMILY_SIGNALING_CASCADES"},
+        {"set": "CELLMARKER_CD1C-CD141- Dendritic Cell Blood Human"},
+        {"set": "GOBP_REGULATION_OF_PROGRAMMED_CELL_DEATH"},
+        {"set": "GOBP_APOPTOTIC_PROCESS"},
+        {"set": "GOBP_RESPONSE_TO_LIPID"},
+        {"set": "GOBP_ANIMAL_ORGAN_MORPHOGENESIS"}
+      ]
+    },
+    "FIG2F": {
+      "panels": ["FIG2F"],
+      "match_on": "set",
+      "provenance": "curated_pathways_v2.xlsx, sheet 2F_v3",
+      "sets": [
+        {"set": "GOBP_EMBRYO_DEVELOPMENT"},
+        {"set": "GOBP_REGULATION_OF_CATABOLIC_PROCESS"},
+        {"set": "PID_TELOMERASE_PATHWAY"},
+        {"set": "GOBP_LEUKOCYTE_DIFFERENTIATION"},
+        {"set": "WP_TGF_BETA_SIGNALING_PATHWAY"},
+        {"set": "GOMF_TRANSCRIPTION_REGULATOR_ACTIVITY"},
+        {"set": "GOBP_MITOTIC_CELL_CYCLE_PROCESS"},
+        {"set": "PID_AP1_PATHWAY"},
+        {"set": "PID_PDGFRA_PATHWAY"},
+        {"set": "PID_RHOA_PATHWAY"},
+        {"set": "GOBP_CELLULAR_RESPONSE_TO_STRESS"},
+        {"set": "GOBP_APOPTOTIC_PROCESS"},
+        {"set": "WP_VEGFA_VEGFR2_SIGNALING"},
+        {"set": "REACTOME_SIGNALING_BY_EGFR"},
+        {"set": "PID_IL6_7_PATHWAY"},
+        {"set": "GOBP_WOUND_HEALING"},
+        {"set": "REACTOME_CLASS_I_MHC_MEDIATED_ANTIGEN_PROCESSING_PRESENTATION"},
+        {"set": "GOCC_ANCHORING_JUNCTION"},
+        {"set": "GOBP_NEUROGENESIS"},
+        {"set": "GOCC_SYNAPSE"},
+        {"set": "GOCC_VACUOLE"},
+        {"set": "GOMF_KINASE_BINDING"},
+        {"set": "CELLMARKER_Multilymphoid Progenitor Cell Umbilical Cord Blood Human"},
+        {"set": "GOBP_DNA_REPAIR"},
+        {"set": "PID_HIF1_TFPATHWAY"},
+        {"set": "REACTOME_CELLULAR_RESPONSE_TO_HEAT_STRESS"},
+        {"set": "GOBP_CYTOSKELETON_ORGANIZATION"},
+        {"set": "REACTOME_SIGNALING_BY_WNT"},
+        {"set": "GOCC_MITOCHONDRION"},
+        {"set": "PID_KIT_PATHWAY"}
+      ]
+    },
+    "ED2E": {
+      "panels": ["ED2E"],
+      "match_on": "set_id",
+      "provenance": "curated_pathways_v2.xlsx, sheet ED2e",
+      "sets": [
+        {"set_id": "15487", "set": "PTMSIGDB_PERT-P100-DIA2_BYL719"},
+        {"set_id": "15560", "set": "PTMSIGDB_PERT-P100-DIA2_RO4929097"},
+        {"set_id": "15251", "set": "PTMSIGDB_KINASE-iKiP_MAP2K2"},
+        {"set_id": "15276", "set": "PTMSIGDB_KINASE-iKiP_MAPK3.ERK1"},
+        {"set_id": "15580", "set": "PTMSIGDB_PERT-P100-DIA2_TRETINOIN"},
+        {"set_id": "14925", "set": "PTMSIGDB_KINASE-PSP_ERK1/MAPK3"},
+        {"set_id": "14946", "set": "PTMSIGDB_KINASE-PSP_GSK3B"},
+        {"set_id": "14926", "set": "PTMSIGDB_KINASE-PSP_ERK2/MAPK1"},
+        {"set_id": "15425", "set": "PTMSIGDB_PATH-BI_ISCHEMIA"},
+        {"set_id": "15548", "set": "PTMSIGDB_PERT-P100-DIA2_OLMESARTAN"},
+        {"set_id": "14895", "set": "PTMSIGDB_KINASE-PSP_CDK5"},
+        {"set_id": "14892", "set": "PTMSIGDB_KINASE-PSP_CDK2"},
+        {"set_id": "14793", "set": "PTMSIGDB_DISEASE-PSP_Parkinsons_disease"},
+        {"set_id": "15108", "set": "PTMSIGDB_KINASE-PSP_mTOR/MTOR"},
+        {"set_id": "15509", "set": "PTMSIGDB_PERT-P100-DIA2_ENDOTHELIN"},
+        {"set_id": "15533", "set": "PTMSIGDB_PERT-P100-DIA2_KN-62"},
+        {"set_id": "15497", "set": "PTMSIGDB_PERT-P100-DIA2_CPI-169"},
+        {"set_id": "14776", "set": "PTMSIGDB_DISEASE-PSP_Alzheimers_disease"},
+        {"set_id": "15519", "set": "PTMSIGDB_PERT-P100-DIA2_FLECAINIDE"},
+        {"set_id": "15146", "set": "PTMSIGDB_KINASE-iKiP_CDK1-CCNB1"},
+        {"set_id": "14920", "set": "PTMSIGDB_KINASE-PSP_DYRK1A"},
+        {"set_id": "15490", "set": "PTMSIGDB_PERT-P100-DIA2_CALPAIN_INHIBITOR_II"},
+        {"set_id": "15644", "set": "PTMSIGDB_PERT-PSP_EGF"}
+      ]
+    },
+    "ED4B": {
+      "panels": ["ED4B"],
+      "tables": ["ST3d"],
+      "match_on": "set_id",
+      "provenance": "curated_pathways.xlsx, sheet 5",
+      "sets": [
+        {"set_id": "12955", "set": "REACTOME_MITOCHONDRIAL_TRANSLATION"},
+        {"set_id": "01798", "set": "GOBP_FATTY_ACID_BETA_OXIDATION"},
+        {"set_id": "10098", "set": "GOMF_OXIDOREDUCTASE_ACTIVITY_ACTING_ON_CH_OH_GROUP_OF_DONORS"},
+        {"set_id": "07678", "set": "GOBP_TRICARBOXYLIC_ACID_CYCLE"},
+        {"set_id": "00573", "set": "GOBP_ATP_BIOSYNTHETIC_PROCESS"},
+        {"set_id": "12940", "set": "REACTOME_MHC_CLASS_II_ANTIGEN_PRESENTATION"},
+        {"set_id": "00135", "set": "BIOCARTA_IGF1_PATHWAY"},
+        {"set_id": "04838", "set": "GOBP_POSITIVE_REGULATION_OF_MYOBLAST_FUSION"},
+        {"set_id": "14364", "set": "WP_INTERLEUKIN_1_IL_1_STRUCTURAL_PATHWAY"},
+        {"set_id": "02065", "set": "GOBP_GROWTH_HORMONE_RECEPTOR_SIGNALING_PATHWAY_VIA_JAK_STAT"},
+        {"set_id": "07757", "set": "GOBP_T_CELL_RECEPTOR_SIGNALING_PATHWAY"},
+        {"set_id": "03898", "set": "GOBP_NEUTROPHIL_DEGRANULATION"},
+        {"set_id": "12753", "set": "REACTOME_HSF1_ACTIVATION"},
+        {"set_id": "00983", "set": "GOBP_CELLULAR_RESPONSE_TO_STARVATION"},
+        {"set_id": "06315", "set": "GOBP_REGULATION_OF_MRNA_SPLICING_VIA_SPLICEOSOME"},
+        {"set_id": "14323", "set": "WP_HYPERTROPHY_MODEL"}
+      ]
+    },
+    "ED5B": {
+      "panels": ["ED5B"],
+      "match_on": "set",
+      "provenance": "curated_pathways.xlsx, sheet 3, as of motrpac-human-presuspension-acute PR #4 (fbec29f)",
+      "sets": [
+        {"set": "GOBP_PROCESS_UTILIZING_AUTOPHAGIC_MECHANISM", "label": "Autophagy"},
+        {"set": "PSP_PRKAA1", "label": "AMPK (PRKAA1)"},
+        {"set": "PSP_MTOR", "label": "mTOR Signaling"},
+        {"set": "GOBP_LIPID_METABOLIC_PROCESS", "label": "Lipid Metabolism"},
+        {"set": "PID_PDGFRB_PATHWAY", "label": "PDGFRB Pathway"},
+        {"set": "GOBP_CHROMATIN_REMODELING", "label": "Chromatin Remodeling"},
+        {"set": "REFMET_TG", "label": "Triglycerides"},
+        {"set": "REFMET_Unsaturated FA", "label": "Unsaturated FAs"},
+        {"set": "GOBP_NEUROGENESIS", "label": "Neurogenesis"},
+        {"set": "REFMET_PC", "label": "Phosphatidylcholines"},
+        {"set": "MITOCARTA_OXPHOS", "label": "Oxidative Phosphorylation"},
+        {"set": "GOBP_WOUND_HEALING", "label": "Wound Healing"},
+        {"set": "GOBP_LYMPHOCYTE_ACTIVATION", "label": "Lymphocyte Activation"},
+        {"set": "WP_VEGFA_VEGFR2_SIGNALING", "label": "VEGFA/VEGFR2 Signaling"},
+        {"set": "REACTOME_CYTOKINE_SIGNALING_IN_IMMUNE_SYSTEM", "label": "Cytokine Signaling"}
+      ]
+    },
+    "ED4C": {
+      "panels": ["ED4C"],
+      "match_on": "set",
+      "provenance": "ED4C_hsf1_activation_heatmap.R",
+      "sets": [{"set": "REACTOME_HSF1_ACTIVATION"}]
+    },
+    "cmeans": {
+      "panels": ["FIG4D", "FIG4F", "ED5C", "ED5D", "ED5E"],
+      "match_on": "set",
+      "provenance": "CURRENT_PATHWAY in c-means_main_figure.Rmd (precovid-analyses figures/landscape/figure_3); label as in the ED5B selection",
+      "sets": [{"set": "WP_VEGFA_VEGFR2_SIGNALING", "label": "VEGFA/VEGFR2 Signaling"}]
+    },
+    "FIG6D": {
+      "panels": ["FIG6D"],
+      "match_on": "set",
+      "provenance": "TFEB_ChIP_targets_DA_3.5_4_hr_ORA_oct2025_highlighted.xlsx, sheet Heatmap terms (precovid-analyses figures/landscape/figure_7)",
+      "sets": [
+        {"set": "GOCC_EARLY_ENDOSOME"},
+        {"set": "GOBP_RESPONSE_TO_STARVATION"},
+        {"set": "GOBP_CELLULAR_CATABOLIC_PROCESS"},
+        {"set": "GOBP_REGULATION_OF_AUTOPHAGY"},
+        {"set": "GOBP_REGULATION_OF_LIPID_METABOLIC_PROCESS"},
+        {"set": "WP_VEGFA_VEGFR2_SIGNALING"},
+        {"set": "GOBP_CHROMATIN_REMODELING"},
+        {"set": "GOBP_MITOTIC_CELL_CYCLE"},
+        {"set": "GOMF_TRANSCRIPTION_COREGULATOR_ACTIVITY"},
+        {"set": "GOBP_REGULATION_OF_CELL_CYCLE"},
+        {"set": "GOBP_REGULATION_OF_PROGRAMMED_CELL_DEATH"},
+        {"set": "GOBP_APOPTOTIC_PROCESS"},
+        {"set": "REACTOME_CYTOKINE_SIGNALING_IN_IMMUNE_SYSTEM"},
+        {"set": "GOBP_RNA_SPLICING"},
+        {"set": "GOBP_CELLULAR_RESPONSE_TO_STRESS"},
+        {"set": "GOBP_RIBOSOME_BIOGENESIS"},
+        {"set": "REACTOME_INNATE_IMMUNE_SYSTEM"},
+        {"set": "GOBP_PROTEOLYSIS"},
+        {"set": "GOBP_RESPONSE_TO_GROWTH_FACTOR"},
+        {"set": "REACTOME_MAPK_FAMILY_SIGNALING_CASCADES"},
+        {"set": "GOMF_TRANSCRIPTION_REGULATOR_ACTIVITY"},
+        {"set": "GOBP_DNA_REPAIR"},
+        {"set": "GOMF_ZINC_ION_BINDING"},
+        {"set": "GOMF_TRANSCRIPTION_COREPRESSOR_ACTIVITY"},
+        {"set": "GOMF_TRANSITION_METAL_ION_BINDING"},
+        {"set": "GOBP_EMBRYONIC_ORGAN_DEVELOPMENT"},
+        {"set": "REACTOME_CIRCADIAN_CLOCK"}
+      ]
+    },
+    "ED8E": {
+      "panels": ["ED8E"],
+      "match_on": "set",
+      "provenance": "TFEB_ORA_category_heatmaps_v2.R (precovid-analyses PR #104), the autophagy category",
+      "sets": [{"set": "GOBP_REGULATION_OF_AUTOPHAGY", "label": "Autophagy"}]
+    },
+    "FIG4A": {
+      "panels": ["FIG4A"],
+      "match_on": "set_id",
+      "provenance": "Curated_multi-tissue_10.3.2025.xlsx, sheet rna, from precovid-analyses PR #64 (figures/landscape/CAMERA-PR/data/). These twelve are the assembled Figure 4 panel a's rows, in its order; set_id is CAMERA_RESULTS$set_id.",
+      "sets": [
+        {"set_id": "14756", "set": "WP_VEGFA_VEGFR2_SIGNALING"},
+        {"set_id": "11618", "set": "PID_IL6_7_PATHWAY"},
+        {"set_id": "11530", "set": "PID_AP1_PATHWAY"},
+        {"set_id": "11663", "set": "PID_PDGFRB_PATHWAY"},
+        {"set_id": "12755", "set": "REACTOME_HSP90_CHAPERONE_CYCLE_FOR_STEROID_HORMONE_RECEPTORS_SHR_IN_THE_PRESENCE_OF_LIGAND"},
+        {"set_id": "11528", "set": "PID_ANGIOPOIETIN_RECEPTOR_PATHWAY"},
+        {"set_id": "12259", "set": "REACTOME_AUTOPHAGY"},
+        {"set_id": "12358", "set": "REACTOME_CIRCADIAN_CLOCK"},
+        {"set_id": "16399", "set": "CELLMARKER_Mesenchymal Stem Cell Undefined Human"},
+        {"set_id": "11463", "set": "MITOCARTA_OXPHOS subunits"},
+        {"set_id": "14019", "set": "WP_ADIPOGENESIS"},
+        {"set_id": "11575", "set": "PID_ERBB1_DOWNSTREAM_PATHWAY"}
+      ]
+    },
+    "FIG4B": {
+      "panels": ["FIG4B"],
+      "match_on": "set_id",
+      "provenance": "Read off the assembled Figure 4 panel b, because no list in precovid-analyses produces it. PR #64 vendors two curations and neither matches: Figure_4_curated_CAMERA-PR_terms_2025-05-05.xlsx is a 41-term candidate pool, and Curated_multi-tissue_10.3.2025.xlsx sheet prot is a later 8-term selection sharing only GOCC_PROTEASOME_COMPLEX, GOMF_TRANSLATION_INITIATION_FACTOR_ACTIVITY and MITOCARTA_OXPHOS with the published panel. A computed top-n does not produce it either: n_top = 6 over prot-pr returns 37 sets. The ten below are the panel's own row labels, resolved against CAMERA_RESULTS$set.",
+      "sets": [
+        {"set_id": "13443", "set": "REACTOME_SCAVENGING_OF_HEME_FROM_PLASMA"},
+        {"set_id": "01232", "set": "GOBP_COMPLEMENT_ACTIVATION"},
+        {"set_id": "12592", "set": "REACTOME_FCERI_MEDIATED_NF_KB_ACTIVATION"},
+        {"set_id": "08704", "set": "GOCC_PROTEASOME_COMPLEX"},
+        {"set_id": "02037", "set": "GOBP_GMP_BIOSYNTHETIC_PROCESS"},
+        {"set_id": "00455", "set": "GOBP_AMP_BIOSYNTHETIC_PROCESS"},
+        {"set_id": "10641", "set": "GOMF_TRANSLATION_INITIATION_FACTOR_ACTIVITY"},
+        {"set_id": "01311", "set": "GOBP_CYTOPLASMIC_TRANSLATION"},
+        {"set_id": "11452", "set": "MITOCARTA_Mitochondrial ribosome"},
+        {"set_id": "11461", "set": "MITOCARTA_OXPHOS"}
+      ]
+    }
+  },
+  "features": {
+    "FIG2D": {
+      "myc": {"feature": "MYC", "gene": "MYC", "tissues": ["all"], "omes": ["all"]},
+      "areg": {"feature": "ENSG00000109321.11", "gene": "AREG", "tissues": ["all"], "omes": ["all"]}
+    },
+    "ED2B": {
+      "ppargc1a": {
+        "feature": "PPARGC1A",
+        "gene": "PPARGC1A",
+        "tissues": ["muscle"],
+        "omes": ["transcript-rna-seq"]
+      },
+      "per2": {"feature": "PER2", "gene": "PER2", "tissues": ["muscle"], "omes": ["transcript-rna-seq"]},
+      "alloisoleucine": {"feature": "Alloisoleucine", "tissues": ["adipose"], "omes": ["all"]},
+      "hspa4": {"feature": "P34932_S76s", "gene": "HSPA4 S76", "tissues": ["muscle"], "omes": ["prot-ph"]}
+    },
+    "ED2D": {
+      "nr4a1": {"feature": "ENSG00000123358.20", "gene": "NR4A1", "tissues": ["all"], "omes": ["all"]},
+      "nfkbiz": {"feature": "NFKBIZ", "gene": "NFKBIZ", "tissues": ["all"], "omes": ["all"]}
+    },
+    "ED3B": {
+      "ppargc1a": {
+        "feature": "PPARGC1A",
+        "gene": "PPARGC1A",
+        "tissues": ["muscle"],
+        "omes": ["transcript-rna-seq"]
+      }
+    },
+    "ED3C": {
+      "ccn1": {
+        "feature": "ENSG00000142871.18",
+        "gene": "CCN1",
+        "tissues": ["muscle", "adipose"],
+        "omes": ["transcript-rna-seq"]
+      }
+    },
+    "FIG3D": {
+      "car_6_0": {"feature": "CAR 6:0", "tissues": ["blood"], "omes": ["all"]},
+      "bckdhb": {"feature": "BCKDHB", "gene": "BCKDHB", "tissues": ["muscle"], "omes": ["transcript-rna-seq"]},
+      "cbfa2t3": {
+        "feature": "CBFA2T3",
+        "gene": "CBFA2T3",
+        "tissues": ["muscle"],
+        "omes": ["transcript-rna-seq"]
+      },
+      "lrrc14b": {
+        "feature": "LRRC14B",
+        "gene": "LRRC14B",
+        "tissues": ["muscle"],
+        "omes": ["transcript-rna-seq"]
+      }
+    },
+    "FIG4I": {
+      "adipose": {
+        "feature": "TAMALIN",
+        "gene": "TAMALIN",
+        "tissues": ["adipose"],
+        "omes": ["transcript-rna-seq"]
+      },
+      "blood": {
+        "feature": "TAMALIN",
+        "gene": "TAMALIN",
+        "tissues": ["blood"],
+        "omes": ["transcript-rna-seq"]
+      },
+      "muscle": {
+        "feature": "TAMALIN",
+        "gene": "TAMALIN",
+        "tissues": ["muscle"],
+        "omes": ["transcript-rna-seq"]
+      }
+    },
+    "ED4D": {
+      "hsph1": {"feature": "HSPH1", "gene": "HSPH1", "tissues": ["muscle"], "omes": ["transcript-rna-seq"]}
+    },
+    "ED4E": {
+      "fhod1": {
+        "feature": "Q9Y613_S1078s",
+        "gene": "FHOD1 S1078",
+        "tissues": ["muscle"],
+        "omes": ["prot-ph"]
+      },
+      "myog": {"feature": "MYOG", "gene": "MYOG", "tissues": ["muscle"], "omes": ["transcript-rna-seq"]},
+      "zbtb4": {"feature": "ZBTB4", "gene": "ZBTB4", "tissues": ["muscle"], "omes": ["transcript-rna-seq"]},
+      "nol3": {"feature": "O60936_T114t", "gene": "NOL3 T114", "tissues": ["muscle"], "omes": ["prot-ph"]},
+      "myot": {"feature": "Q9UBF9_T145t", "gene": "MYOT T145", "tissues": ["muscle"], "omes": ["prot-ph"]},
+      "lncrna": {
+        "feature": "ENSG00000257298.1",
+        "tissues": ["muscle"],
+        "omes": ["transcript-rna-seq"],
+        "title": "lncRNA"
+      }
+    },
+    "FIG7C": {
+      "muscle_transcript": {"feature": "CCN1", "gene": "CCN1", "tissues": ["muscle"], "omes": ["transcript-rna-seq"]},
+      "adipose_transcript": {"feature": "CCN1", "gene": "CCN1", "tissues": ["adipose"], "omes": ["transcript-rna-seq"]},
+      "blood_olink": {"feature": "CCN1", "gene": "CCN1", "tissues": ["blood"], "omes": ["prot-ol"]},
+      "muscle_protein": {"feature": "CCN1", "gene": "CCN1", "tissues": ["muscle"], "omes": ["prot-pr"]}
+    },
+    "FIG7B": {
+      "muscle_transcript": {"feature": "CX3CL1", "gene": "CX3CL1", "tissues": ["muscle"], "omes": ["transcript-rna-seq"]},
+      "adipose_transcript": {
+        "feature": "CX3CL1",
+        "gene": "CX3CL1",
+        "tissues": ["adipose"],
+        "omes": ["transcript-rna-seq"]
+      },
+      "olink": {"feature": "CX3CL1", "gene": "CX3CL1", "tissues": ["all"], "omes": ["prot-ol"]}
+    },
+    "FIG6F": {
+      "lactic_acid": {"feature": "Lactic acid", "tissues": ["all"], "omes": ["metab"]}
+    },
+    "ED8B": {
+      "tfeb": {"feature": "TFEB", "gene": "TFEB", "tissues": ["all"], "omes": ["transcript-rna-seq"]}
+    },
+    "ED8D": {
+      "hsp90aa1": {"feature": "HSP90AA1", "gene": "HSP90AA1", "tissues": ["all"], "omes": ["transcript-rna-seq"]}
+    },
+    "ED8F": {
+      "leucine": {"feature": "Leucine", "tissues": ["blood", "muscle"], "omes": ["metab"]},
+      "leu_ile": {"feature": "Leu-Ile", "tissues": ["blood", "muscle"], "omes": ["metab"]}
+    },
+    "ED9C": {
+      "muscle_s1533": {"feature": "P21333-2_S1533s", "gene": "FLNA S1533", "tissues": ["all"], "omes": ["prot-ph"]},
+      "adipose_s1533": {"feature": "P21333_S1533s", "gene": "FLNA S1533", "tissues": ["all"], "omes": ["prot-ph"]}
+    }
+  },
+  "gene_lists": {
+    "ED8C": {
+      "panels": ["ED8C"],
+      "provenance": "Figure_S7_script.R (precovid-analyses figures/landscape/figure_7), PP2a_subunits",
+      "genes": ["PPP2R1A", "PPP2R1B", "PPP2R2A", "PPP2R2B", "PPP2R2C", "PPP2R2D", "PPP2R3A", "PPP2R3B", "PPP2R3C", "PPP2R4", "PPP2R5A", "PPP2R5B", "PPP2R5C", "PPP2R5D", "PPP2R5E", "PPP2CA", "PPP2CB"]
+    }
+  },
+  "named_features": {
+    "panels": ["ED1C"],
+    "tables": ["ST1e"],
+    "provenance": "extended_data_1/sources/motrpac_named_features.csv",
+    "features": [
+      {"feature_id": "PPARGC1A", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "PER2", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "P34932_S76s", "tissue": "muscle", "assay": "prot-ph", "notes": "HSPA4 S76"},
+      {"feature_id": "Alloisoleucine", "tissue": "adipose", "assay": "metab"},
+      {"feature_id": "MYC", "tissue": "blood", "assay": "transcript-rna-seq"},
+      {"feature_id": "MYC", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "MYC", "tissue": "adipose", "assay": "transcript-rna-seq"},
+      {"feature_id": "AREG", "tissue": "blood", "assay": "transcript-rna-seq"},
+      {"feature_id": "AREG", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "AREG", "tissue": "adipose", "assay": "transcript-rna-seq"},
+      {"feature_id": "Carnitine", "tissue": "blood", "assay": "metab"},
+      {"feature_id": "Carnitine", "tissue": "muscle", "assay": "metab"},
+      {"feature_id": "Carnitine", "tissue": "adipose", "assay": "metab"},
+      {"feature_id": "Glutamic acid", "tissue": "blood", "assay": "metab"},
+      {"feature_id": "Glutamic acid", "tissue": "muscle", "assay": "metab"},
+      {"feature_id": "Glutamic acid", "tissue": "adipose", "assay": "metab"},
+      {"feature_id": "PC 33:2", "tissue": "blood", "assay": "metab"},
+      {"feature_id": "PC 33:2", "tissue": "muscle", "assay": "metab"},
+      {"feature_id": "PC 33:2", "tissue": "adipose", "assay": "metab"},
+      {"feature_id": "Q9P266_S1194s", "tissue": "adipose", "assay": "prot-ph", "notes": "JCAD S1194"},
+      {"feature_id": "Q9P266_S1194s", "tissue": "muscle", "assay": "prot-ph", "notes": "JCAD S1194"},
+      {"feature_id": "Q53EU6_S68s", "tissue": "adipose", "assay": "prot-ph", "notes": "GPAT3 S68"},
+      {"feature_id": "Q53EU6_S68s", "tissue": "muscle", "assay": "prot-ph", "notes": "GPAT3 S68"},
+      {"feature_id": "GZMB", "tissue": "blood", "assay": "transcript-rna-seq"},
+      {"feature_id": "CD177", "tissue": "blood", "assay": "transcript-rna-seq"},
+      {"feature_id": "MMP8", "tissue": "blood", "assay": "transcript-rna-seq"},
+      {"feature_id": "HSPH1", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "CAR 6:0", "tissue": "blood", "assay": "metab"},
+      {"feature_id": "CAR 10:1", "tissue": "blood", "assay": "metab"},
+      {"feature_id": "CAR 10:1", "tissue": "muscle", "assay": "metab"},
+      {"feature_id": "CAR 11:0", "tissue": "blood", "assay": "metab"},
+      {"feature_id": "CAR 11:0", "tissue": "muscle", "assay": "metab"},
+      {"feature_id": "CBFA2T3", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "LDHA", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "PDK4", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "PFKP", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "BCKDHB", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "LRRC14B", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "O60936_T114t", "tissue": "muscle", "assay": "prot-ph", "notes": "NOL3 T114"},
+      {"feature_id": "Q9UBF9_T145t", "tissue": "muscle", "assay": "prot-ph", "notes": "MYOT T145"},
+      {"feature_id": "LRRC25", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "PRRT4", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "CCN2", "tissue": "adipose", "assay": "transcript-rna-seq"},
+      {"feature_id": "EDEM1", "tissue": "blood", "assay": "transcript-rna-seq"},
+      {"feature_id": "KCNJ2", "tissue": "blood", "assay": "transcript-rna-seq"},
+      {"feature_id": "NSUN7", "tissue": "blood", "assay": "transcript-rna-seq"},
+      {"feature_id": "ANGPTL4", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "CPT1A", "tissue": "blood", "assay": "transcript-rna-seq"},
+      {"feature_id": "DBP", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "PFKFB4", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "PREB", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "TXNIP", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "ACSL3", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "CKB", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "FUT1", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "HSPB1", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "NCL", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "PDLIM3", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "PITPNM1", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "RAD9A", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "SLC19A2", "tissue": "adipose", "assay": "transcript-rna-seq"},
+      {"feature_id": "SLC25A5", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "SRSF11", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "Q4VC12", "tissue": "muscle", "assay": "prot-pr", "notes": "MSS51"},
+      {"feature_id": "SDCBP", "tissue": "blood", "assay": "transcript-rna-seq"},
+      {"feature_id": "SDCBP", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "HLX", "tissue": "blood", "assay": "transcript-rna-seq"},
+      {"feature_id": "HLX", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "INPP4B", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "AMOT", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "NAPA", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "AP2S1", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "NR4A1", "tissue": "blood", "assay": "transcript-rna-seq"},
+      {"feature_id": "NR4A1", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "NR4A1", "tissue": "adipose", "assay": "transcript-rna-seq"},
+      {"feature_id": "NR4A2", "tissue": "blood", "assay": "transcript-rna-seq"},
+      {"feature_id": "NR4A2", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "NR4A2", "tissue": "adipose", "assay": "transcript-rna-seq"},
+      {"feature_id": "ADAMTS1", "tissue": "blood", "assay": "transcript-rna-seq"},
+      {"feature_id": "ADAMTS1", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "ADAMTS1", "tissue": "adipose", "assay": "transcript-rna-seq"},
+      {"feature_id": "TAMALIN", "tissue": "blood", "assay": "transcript-rna-seq"},
+      {"feature_id": "TAMALIN", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "TAMALIN", "tissue": "adipose", "assay": "transcript-rna-seq"},
+      {"feature_id": "HADHA", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "MLYCD", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "ACAA2", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "JUN", "tissue": "blood", "assay": "transcript-rna-seq"},
+      {"feature_id": "JUN", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "JUN", "tissue": "adipose", "assay": "transcript-rna-seq"},
+      {"feature_id": "MAFF", "tissue": "blood", "assay": "transcript-rna-seq"},
+      {"feature_id": "MAFF", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "MAFF", "tissue": "adipose", "assay": "transcript-rna-seq"},
+      {"feature_id": "FOSL2", "tissue": "blood", "assay": "transcript-rna-seq"},
+      {"feature_id": "FOSL2", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "FOSL2", "tissue": "adipose", "assay": "transcript-rna-seq"},
+      {"feature_id": "SRF", "tissue": "blood", "assay": "transcript-rna-seq"},
+      {"feature_id": "SRF", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "SRF", "tissue": "adipose", "assay": "transcript-rna-seq"},
+      {"feature_id": "EGR1", "tissue": "blood", "assay": "transcript-rna-seq"},
+      {"feature_id": "EGR1", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "EGR1", "tissue": "adipose", "assay": "transcript-rna-seq"},
+      {"feature_id": "P18846_S198s", "tissue": "muscle", "assay": "prot-ph", "notes": "ATF1 S198"},
+      {"feature_id": "P17544_S44s", "tissue": "muscle", "assay": "prot-ph", "notes": "ATF7 S44"},
+      {"feature_id": "Q15853_S222s", "tissue": "muscle", "assay": "prot-ph", "notes": "USF2 S222"},
+      {"feature_id": "O75030_S504s", "tissue": "muscle", "assay": "prot-ph", "notes": "MITF S504"},
+      {"feature_id": "O00327_S42s", "tissue": "muscle", "assay": "prot-ph", "notes": "BMAL1 S42 (ARNTL)"},
+      {"feature_id": "Q13469_S217s", "tissue": "muscle", "assay": "prot-ph", "notes": "NFATC2 S217"},
+      {"feature_id": "Q13469_S236s", "tissue": "muscle", "assay": "prot-ph", "notes": "NFATC2 S236"},
+      {"feature_id": "P23511_S326s", "tissue": "muscle", "assay": "prot-ph", "notes": "NFYA S326 (NFY)"},
+      {"feature_id": "P11831_S103s", "tissue": "muscle", "assay": "prot-ph", "notes": "SRF S103 (CARG)"},
+      {"feature_id": "P11831_S224s", "tissue": "muscle", "assay": "prot-ph", "notes": "SRF S224 (CARG)"},
+      {"feature_id": "P11831_S370s", "tissue": "muscle", "assay": "prot-ph", "notes": "SRF S370 (CARG)"},
+      {"feature_id": "NFYA", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "PITX3", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "STAT5B", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "RXRA", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "CEBPB", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "TFEB", "tissue": "blood", "assay": "transcript-rna-seq"},
+      {"feature_id": "TFEB", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "TFEB", "tissue": "adipose", "assay": "transcript-rna-seq"},
+      {"feature_id": "P19484_S109s", "tissue": "muscle", "assay": "prot-ph", "notes": "TFEB S109s"},
+      {"feature_id": "P19484_S114s", "tissue": "muscle", "assay": "prot-ph", "notes": "TFEB S114s"},
+      {"feature_id": "P19484_S122s", "tissue": "muscle", "assay": "prot-ph", "notes": "TFEB S122s"},
+      {"feature_id": "P19484_S109sS114s", "tissue": "muscle", "assay": "prot-ph", "notes": "TFEB S109sS114s"},
+      {"feature_id": "P19484_S109sS114sS122s", "tissue": "muscle", "assay": "prot-ph", "notes": "TFEB S109sS114sS122s"},
+      {"feature_id": "P19484_S114sS122s", "tissue": "muscle", "assay": "prot-ph", "notes": "TFEB S114sS122s"},
+      {"feature_id": "P19484_S334s", "tissue": "muscle", "assay": "prot-ph", "notes": "TFEB S334s"},
+      {"feature_id": "P19484_S423s", "tissue": "muscle", "assay": "prot-ph", "notes": "TFEB S423s"},
+      {"feature_id": "HSP90AA1", "tissue": "blood", "assay": "transcript-rna-seq"},
+      {"feature_id": "HSP90AA1", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "HSP90AA1", "tissue": "adipose", "assay": "transcript-rna-seq"},
+      {"feature_id": "Leucine", "tissue": "blood", "assay": "metab"},
+      {"feature_id": "Isoleucine", "tissue": "blood", "assay": "metab"},
+      {"feature_id": "Leu-Ile", "tissue": "blood", "assay": "metab"},
+      {"feature_id": "Lactic acid", "tissue": "blood", "assay": "metab"},
+      {"feature_id": "Lactic acid", "tissue": "muscle", "assay": "metab"},
+      {"feature_id": "Lactic acid", "tissue": "adipose", "assay": "metab"},
+      {"feature_id": "OID20822", "tissue": "blood", "assay": "prot-ol", "notes": "PXN"},
+      {"feature_id": "OID20834", "tissue": "blood", "assay": "prot-ol", "notes": "NOS3"},
+      {"feature_id": "OID21463", "tissue": "blood", "assay": "prot-ol", "notes": "ANGPT2"},
+      {"feature_id": "CX3CL1", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "CX3CL1", "tissue": "adipose", "assay": "transcript-rna-seq"},
+      {"feature_id": "OID20976", "tissue": "blood", "assay": "prot-ol", "notes": "CX3CL1"},
+      {"feature_id": "CCN1", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "CCN1", "tissue": "adipose", "assay": "transcript-rna-seq"},
+      {"feature_id": "OID21368", "tissue": "blood", "assay": "prot-ol", "notes": "CCN1"},
+      {"feature_id": "O00622", "tissue": "muscle", "assay": "prot-pr", "notes": "CCN1"},
+      {"feature_id": "SDC4", "tissue": "muscle", "assay": "transcript-rna-seq"},
+      {"feature_id": "P21333-2_S1533s", "tissue": "muscle", "assay": "prot-ph", "notes": "FLNA S1533"},
+      {"feature_id": "P21333_S1533s", "tissue": "adipose", "assay": "prot-ph", "notes": "FLNA S1533"}
+    ]
+  },
+  "clinical_omics_features": {
+    "EDT1": {
+      "tables": ["EDT1"],
+      "provenance": "Extended Data Table 1, Reorg of PreCAWG Landscape - Working Group Draft.docx",
+      "features": [
+      {"trait": "HOMA_IR", "tissue": "adipose", "assay": "transcript-rna-seq", "feature_id": "ENSG00000118523.6", "gene": "CCN2", "timepoint": "post_15_30_45_min", "notes": "Matricellular protein regulating cell adhesion"},
+      {"trait": "lp_rest_corrected_rmat", "tissue": "blood", "assay": "transcript-rna-seq", "feature_id": "ENSG00000142207.7", "gene": "URB1", "timepoint": "post_3.5_4_hr", "notes": "Nucleolar protein involved in ribosome production and rRNA processing"},
+      {"trait": "lp_rest_corrected_rmat", "tissue": "blood", "assay": "transcript-rna-seq", "feature_id": "ENSG00000165506.15", "gene": "DNAAF2", "timepoint": "post_3.5_4_hr", "notes": "Protein crucial for cilia assembly"},
+      {"trait": "lp_rest_corrected_rmat", "tissue": "blood", "assay": "transcript-rna-seq", "feature_id": "ENSG00000214756.8", "gene": "CSKMT", "timepoint": "during_40_min", "notes": "Mitochondrial enzyme; methylates citrate synthase"},
+      {"trait": "NEFA", "tissue": "muscle", "assay": "transcript-rna-seq", "feature_id": "ENSG00000167772.12", "gene": "ANGPTL4", "timepoint": "post_3.5_4_hr", "notes": "Secreted glycoprotein regulating metabolism"},
+      {"trait": "NEFA", "tissue": "blood", "assay": "transcript-rna-seq", "feature_id": "ENSG00000110090.13", "gene": "CPT1A", "timepoint": "during_40_min", "notes": "Fatty acid transporter in mitochondrial membrane"},
+      {"trait": "NEFA", "tissue": "muscle", "assay": "transcript-rna-seq", "feature_id": "ENSG00000105516.11", "gene": "DBP", "timepoint": "post_3.5_4_hr", "notes": "Transcription factor involved in circadian clock regulation"},
+      {"trait": "NEFA", "tissue": "muscle", "assay": "transcript-rna-seq", "feature_id": "ENSG00000004799.8", "gene": "PDK4", "timepoint": "post_3.5_4_hr", "notes": "Kinase that inhibits the pyruvate dehydrogenase complex"},
+      {"trait": "NEFA", "tissue": "muscle", "assay": "transcript-rna-seq", "feature_id": "ENSG00000114268.12", "gene": "PFKFB4", "timepoint": "post_3.5_4_hr", "notes": "Bifunctional kinase/phosphatase regulating fructose-2,6-bisphosphate"},
+      {"trait": "NEFA", "tissue": "muscle", "assay": "transcript-rna-seq", "feature_id": "ENSG00000138073.14", "gene": "PREB", "timepoint": "post_24_hr", "notes": "Transcriptional and protein transport regulator"},
+      {"trait": "NEFA", "tissue": "muscle", "assay": "transcript-rna-seq", "feature_id": "ENSG00000265972.6", "gene": "TXNIP", "timepoint": "post_3.5_4_hr", "notes": "Regulator of cellular redox signaling"},
+      {"trait": "VO2max_L", "tissue": "muscle", "assay": "transcript-rna-seq", "feature_id": "ENSG00000166165.14", "gene": "CKB", "timepoint": "post_24_hr", "notes": "Creatine kinase"},
+      {"trait": "VO2max_L", "tissue": "muscle", "assay": "transcript-rna-seq", "feature_id": "ENSG00000174951.12", "gene": "FUT1", "timepoint": "post_15_30_45_min", "notes": "Fucosyltransferase"},
+      {"trait": "VO2max_L", "tissue": "muscle", "assay": "transcript-rna-seq", "feature_id": "ENSG00000106211.10", "gene": "HSPB1", "timepoint": "post_24_hr", "notes": "Heat shock protein affecting protein folding"},
+      {"trait": "VO2max_L", "tissue": "muscle", "assay": "transcript-rna-seq", "feature_id": "ENSG00000115053.17", "gene": "NCL", "timepoint": "post_24_hr", "notes": "Nucleolin involved in synthesis and maturation of ribosomes"},
+      {"trait": "VO2max_L", "tissue": "muscle", "assay": "transcript-rna-seq", "feature_id": "ENSG00000154553.16", "gene": "PDLIM3", "timepoint": "post_24_hr", "notes": "Cytoskeletal protein"},
+      {"trait": "VO2max_L", "tissue": "muscle", "assay": "transcript-rna-seq", "feature_id": "ENSG00000110697.13", "gene": "PITPNM1", "timepoint": "post_24_hr", "notes": "Phosphatidylinositol transfer protein"},
+      {"trait": "VO2max_L", "tissue": "muscle", "assay": "transcript-rna-seq", "feature_id": "ENSG00000109819.9", "gene": "PPARGC1A", "timepoint": "post_3.5_4_hr", "notes": "Transcriptional coactivator regulating metabolic gene expression"},
+      {"trait": "VO2max_L", "tissue": "muscle", "assay": "transcript-rna-seq", "feature_id": "ENSG00000224940.9", "gene": "PRRT4", "timepoint": "post_24_hr", "notes": "Membrane protein"},
+      {"trait": "VO2max_L", "tissue": "muscle", "assay": "transcript-rna-seq", "feature_id": "ENSG00000116754.14", "gene": "SRSF11", "timepoint": "post_15_30_45_min", "notes": "Splicing factor"}
+      ]
+    }
+  }
+}

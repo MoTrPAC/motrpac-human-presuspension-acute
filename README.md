@@ -9,6 +9,41 @@ This repository also contains some of the quality control steps that visualize d
 Please review the`QC` folder to take a look at these visualizations and data processing steps, which will explain in a bit more detail. 
 
 
+## How this repo fits with the others
+
+The Pre-Suspension human work is split across four repositories. Individual-level molecular
+and phenotypic data cannot be distributed publicly, so they live in a separate, access-gated
+package, and everything that *can* be released publicly (aggregate results, all analysis
+code) is kept clear of them.
+
+```
+                  MoTrPAC BIC — consortium GCS buckets
+                        (raw assay data, gated)
+                                   │
+                   motrpac-human-presuspension-repro
+           normalizes omics data, applies statistical models,
+           builds every data object, versions it, uploads it,
+                   and carries it into both packages
+                                   │
+                ┌──────────────────┴──────────────────┐
+                ▼                                     ▼
+  MotrpacHumanPreSuspensionData       MotrpacHumanPreSuspensionAnalysis
+subject-level data — access-gated         aggregate results — public
+                └──────────────────┬──────────────────┘
+                                   ▼
+                   motrpac-human-presuspension-acute
+                 manuscript figure code + QC vignettes
+                                   ▼
+                              manuscripts
+```
+
+| Repository | What it holds | Access |
+|---|---|---|
+| [`motrpac-human-presuspension-repro`](https://github.com/MoTrPAC/motrpac-human-presuspension-repro) | the end-to-end rebuild pipeline and its pinned software environment | code; a full run needs consortium bucket access |
+| [`MotrpacHumanPreSuspensionData`](https://github.com/MoTrPAC/MotrpacHumanPreSuspensionData) | subject-level molecular and phenotypic data objects | formal data-access request to the consortium |
+| [`MotrpacHumanPreSuspensionAnalysis`](https://github.com/MoTrPAC/MotrpacHumanPreSuspensionAnalysis) | differential analysis, group summary statistics, enrichment, clustering, feature-to-gene map, plotting functions | public |
+| [`motrpac-human-presuspension-acute`](https://github.com/MoTrPAC/motrpac-human-presuspension-acute) | per-manuscript figure code and QC vignettes | code public; some panels need Data access |
+
 ## Repository Structure
 
 ```

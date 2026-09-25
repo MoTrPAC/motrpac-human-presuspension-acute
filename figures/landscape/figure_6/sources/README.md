@@ -14,7 +14,7 @@ All from `MoTrPAC/precovid-analyses` PR #104 (branch `nmclark2/Figure7_v2.0`, co
 | `Merged_Network_combined_NMS_v2.csv` | Network Motif Score per node, 10,052 rows | ST6b; override `FIG6_SCION_NMS_CSV` |
 
 The fourth ChIP source, Settembre et al. 2013 (Nat. Cell Biol. 15, 647), is two genes by
-ChIP-qPCR (TFEB, PPARGC1A) and is coded in `helpers/FIG6_ED8.R` rather than read from a file.
+ChIP-qPCR (TFEB, PPARGC1A) and is coded in `figure_6/FIG6_ED8_helpers.R` rather than read from a file.
 
 The SC-ION runs, the permutation trim and the Cytoscape merge that produced the two network
-tables are not reproduced here. See `docs/external_dependencies.md`.
+tables are not reproduced here. See [`docs/external_dependencies.md`](../../docs/external_dependencies.md).

@@ -9,7 +9,7 @@ directory under `figures/blood/`, `figures/muscle/`, `figures/adipose/` and
 figure and living in the folder of the figure group it belongs to: `figure_2/FIG2.R`,
 `figure_4/ED6.R`, `supplementary_figure_1/SF1.R`, and so on. Each script builds every panel of
 that figure, one vector PDF per panel, and nothing else. Supplementary tables that are not a
-panel's own numbers are built the same way by an `ST*.R` script in the same folder.
+panel's own numbers are built the same way by an `ST*.R` (or `EDT1.R`) script in the same folder.
 
 A main figure and its Extended Data supplement share a folder, because they are usually one
 computation split across two figure numbers. The **figure index below gives the script path for
@@ -17,7 +17,7 @@ every figure**; you should not have to guess it.
 
 - **94 panels across 17 figures.** Five further panels are made outside R and are not built
   here.
-- **31 of the 36 numbered supplementary sub-tables.** The other five belong to other analysts.
+- **31 of the 36 numbered tables** (35 supplementary sub-tables plus `EDT1`). The other five belong to other analysts.
 - `config/panel_map.json` and `config/table_map.json` are authoritative for the numbering. A
   script reads its own output path, page size and RNG seed from the manifest, so renumbering a
   panel is an edit to one JSON file and nowhere else.
@@ -39,7 +39,7 @@ needed. `LANDSCAPE_ROOT` overrides that if you need it to.
 ## Figure index
 
 | Figure | Script | Panels | Title |
-|---|---|---|
+|---|---|---|---|
 | FIG1 | `figure_1/FIG1.R` | FIG1C | Study design and cohort overview |
 | ED1 | `figure_1/ED1.R` | ED1A, ED1B, ED1C, ED1D | Extended Data 1 - cohort and data overview |
 | FIG2 | `figure_2/FIG2.R` | FIG2A, FIG2B, FIG2Bii, FIG2C, FIG2D, FIG2E, FIG2F | Differential abundance landscape |
@@ -105,7 +105,7 @@ what the scripts emit.
 
 **A sub-table whose numbers are a panel's numbers is written by that panel's figure script**, in
 the same run, from the same in-memory object. Nineteen of the 31 built here are produced that
-way. The remaining twelve come from the standalone `ST*.R` scripts, each in its figure's folder.
+way. The remaining twelve come from the standalone `ST*.R` scripts and `figure_3/EDT1.R`, each in its figure's folder.
 
 | Table | Sub-table | Built here | Written by |
 |---|---|---|---|
@@ -158,10 +158,11 @@ published legend, which states 0.05 for both.
 
 ## What cannot be run or released
 
-Three input files carry values attributable to individual MoTrPAC participants and may not be
+Two input files carry values attributable to individual MoTrPAC participants and may not be
 published. **They are not in this repository, and no copy of them belongs in it.** A reader
-with consortium access points an environment variable at a copy held outside the checkout;
-there is no ignore rule for them, so a copy placed inside could be committed.
+with consortium access points an environment variable at a copy held outside the checkout.
+`.gitignore` matches them by filename at any depth, so a copy placed inside the checkout is not
+committed by accident; keep it outside regardless.
 
 | File | What it is | Read by |
 |---|---|---|
@@ -182,7 +183,7 @@ so the 1000 Genomes cloud the participants are projected onto comes from the gat
 `1kg_samples.tsv` is individual-level and ships here. It is the public 1000 Genomes sample
 table, one row per 1000 Genomes individual with sex and population, freely redistributable, and
 it contains no MoTrPAC participants. Individual-level and publishable are independent
-properties, and the three files above are withheld because they are both.
+properties, and the two files above are withheld because they are both.
 
 ### This is not the same question as data access
 
@@ -190,8 +191,8 @@ Two separate things:
 
 | Question | Answer |
 |---|---|
-| Can this code be **run**? | Most of it needs `MotrpacHumanPreSuspensionData`, which is subject-level and requires a formal MoTrPAC consortium data-access request. That is true of this manuscript as a whole, not just the three files above. Several panels also read epigenomics QC matrices from a consortium GCS prefix that neither package ships. The epigenomics DA tables are a public download and need no access. |
-| Can a file in this repository be **published**? | Yes for everything present. A script that reads restricted data holds none of it, which is what makes the code publishable while its input is not. The three files above are the exception, and they are absent. |
+| Can this code be **run**? | Most of it needs `MotrpacHumanPreSuspensionData`, which is subject-level and requires a formal MoTrPAC consortium data-access request. That is true of this manuscript as a whole, not just the two files above. Several panels also read epigenomics QC matrices from a consortium GCS prefix that neither package ships. The epigenomics DA tables are a public download and need no access. |
+| Can a file in this repository be **published**? | Yes for everything present. A script that reads restricted data holds none of it, which is what makes the code publishable while its input is not. The two files above are the exception, and they are absent. |
 
 A panel that declares only `MotrpacHumanPreSuspensionAnalysis` runs from the public aggregate
 layer. `data_packages` in `config/panel_map.json` records which per panel.
@@ -231,7 +232,7 @@ analysis code, is kept clear of them.
 | [`MotrpacHumanPreSuspensionData`](https://github.com/MoTrPAC/MotrpacHumanPreSuspensionData) | subject-level molecular and phenotypic data objects | formal data-access request to the consortium |
 | [`MotrpacHumanPreSuspensionAnalysis`](https://github.com/MoTrPAC/MotrpacHumanPreSuspensionAnalysis) | differential analysis, group summary statistics, enrichment, clustering, feature-to-gene map, plotting functions | public |
 | [`MotrpacBicQC`](https://github.com/MoTrPAC/MotrpacBicQC) | consortium QC conventions and the GCS read helpers the packages call | public |
-| [`motrpac-human-presuspension-acute`](https://github.com/MoTrPAC/motrpac-human-presuspension-acute) | per-manuscript figure code and QC vignettes; this repository | code public; three panels need Data access, see above |
+| [`motrpac-human-presuspension-acute`](https://github.com/MoTrPAC/motrpac-human-presuspension-acute) | per-manuscript figure code and QC vignettes; this repository | code public; three panels need gated inputs, see above |
 
 Every palette, timepoint order, ome name, tissue name, exercise-group label and sex label comes
 from `MotrpacHumanPreSuspensionAnalysis` rather than from a figure script.
@@ -295,7 +296,7 @@ one line per panel and carries on past a failure:
 [ OK ] FIG2A    outputs/panels/figure_2/FIG2A_da_feature_matrix.pdf
 [SKIP] ED1A     input not in this repository: 1kg.motrpac...pca.RDS
 [FAIL] FIG2B    <the error>
-        7 panel(s): 6 ok, 1 failed, 0 skipped
+        3 panel(s): 1 ok, 1 failed, 1 skipped
 ```
 
 An unknown panel id is an error that lists the ids the script does build.
@@ -354,7 +355,7 @@ refitting per panel would let two panels draw two different LV 33s.
 is missing skips rather than fails.
 
 | Run this | Fits | Before you can build | Configured by |
-|---|---|---|
+|---|---|---|---|
 | `extended_data_3/sex_da_fit.R` | sex-stratified differential analysis | ED3A, and `ST2g`, `ST2h` through it | `extended_data_3/sex_da.env` |
 | `extended_data_3/celltype_da_fit.R` | blood DA re-fit with cell-type covariates | ED3E | `extended_data_3/celltype_da.env` |
 | `figure_3/clinical_omics_fit.R` | baseline clinical x omics regression | FIG3EFG, ED4G, `ST3f`, `ST3g`, `ST3h`, `EDT1` | `figure_3/clinical_omics.env` |
@@ -393,7 +394,8 @@ figures/landscape/
 ├── supplementary_figure_1/                 SF1
 ├── run_all.R                               build every figure and table
 ├── single_feature_plots.R                  the sixteen single-feature panels, defined once
-├── assembled/                              the figures and tables as submitted (§ below)
+├── assembled/                              the figures and tables as submitted (see `assembled/README.md`)
+├── docs/                                   external_dependencies.md: every input the data packages do not carry
 ├── lib/                                    panel and table export, highlights, shared helpers
 ├── config/                                 panel_map.json, table_map.json, highlights.json,
 │                                           landscape.env, package manifests

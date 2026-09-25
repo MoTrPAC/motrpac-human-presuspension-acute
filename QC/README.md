@@ -1,5 +1,5 @@
-# Overview
+# QC reports
 
-This folder of items aims to give an overview of the analysis steps that helped to guide some of the decisions. Each of the individual reports requires access to sample level data, and often requires raw-level data that is not intended to be released. Therefore, we release just the html knitouts that provide the code, figures, and rationale for how some decisions were made.
+This folder gives an overview of the analysis steps that guided some processing decisions. Each report requires sample-level data, and often raw data, that are not intended for release, so only the knitted HTML reports are provided, with the code, figures, and rationale for each decision.
 
-Some of the code used is now outdated and may have parameters or syntax that is unlike the code used in the modernized `/figures/` folder. Nonetheless, it should give a general idea of what the structure looks like. If you are only interested in reviewing what the data looks like after going through omic-specific normalization steps, please review the data and vignettes found in `MotrpacHumanPreSuspensionAnalysis`. 
+Some of the code used is now outdated and may have parameters or syntax that is unlike the code used in the modernized [`figures/`](../figures/) folder. Nonetheless, it shows the general structure of each analysis. To review the data after omic-specific normalization, see the data objects and vignettes in `MotrpacHumanPreSuspensionAnalysis`.

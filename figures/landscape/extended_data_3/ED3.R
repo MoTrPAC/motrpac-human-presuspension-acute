@@ -149,15 +149,11 @@ ed3a <- function() {
     single_matrix = TRUE
   ) %>%
     dplyr::filter(contrast_type == "exercise_with_controls") %>%
-    # No CI.L/CI.R. The released acute DA does not carry them: precovid-repro's
-    # writer drops them deliberately, because variancePartition's topTable computes
-    # them wrongly for a dream fit (df.total is a features x contrasts matrix and
-    # `top` indexes it linearly, so every contrast gets the first contrast's df).
-    #
-    # Nothing is lost. This table is used only for its adj_p_value — which
-    # transcripts were significant in the primary analysis — and the error bars
-    # this panel draws come from the sex-stratified table, where
-    # analysis/01_sex_da.R rebuilds the interval correctly per contrast.
+    # CI.L_calculated/CI.R_calculated are not selected. This table is used only
+    # for its adj_p_value (which transcripts were significant in the primary
+    # analysis). The error bars this panel draws come from the sex-stratified
+    # fit, a different model, so the primary table's interval does not
+    # substitute for them.
     dplyr::select(tissue, assay, feature_id, logFC, adj_p_value,
                   randomGroupCode, Timepoint)
 

@@ -384,12 +384,10 @@ run_dream_acute <- function(expression_object,
 #' which drops the covariate coefficients — including the five cell-type ones.
 #'
 #' The column set matches the released acute DA, which is what ED3E joins this
-#' table against. CI.L/CI.R are not among them: the freeze does not ship them for
-#' the acute model, and variancePartition's topTable computes them wrongly for a
-#' dream fit anyway (every contrast's interval uses the first contrast's df,
-#' because df.total is a features x contrasts matrix indexed linearly).
-#' analysis/01_sex_da.R rebuilds them because ED3A draws error bars; ED3E does
-#' not, so they are left out rather than shipped wrong.
+#' table against, minus CI.L_calculated/CI.R_calculated: ED3E draws no error
+#' bars. topTable's CI.L/CI.R are also dropped; variancePartition computes them
+#' wrongly for a dream fit (every contrast's interval uses the first contrast's
+#' df, because df.total is a features x contrasts matrix indexed linearly).
 #'
 #' @param fit A fit from run_dream_acute().
 #' @param formula The model formula, recorded in the full_model column.

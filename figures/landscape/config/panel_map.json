@@ -332,7 +332,7 @@
       "external_inputs": [
         {
           "what": "ATAC-seq and methylCap-seq QC objects, downloaded into EPIGEN_QC_DIR by load_qc(epigen = TRUE)",
-          "produced_by": "Downloaded at run time by load_qc(epigen = TRUE) from the epigenomics staging prefix, and cached under the directory EPIGEN_QC_DIR names. Neither data package ships them.",
+          "produced_by": "Downloaded at run time by load_qc(epigen = TRUE) from the c2.0 data-hub prefix gs://motrpac-data-hub/analysis/human-precovid-sed-adu/c2.0, and cached under the directory EPIGEN_QC_DIR names. Neither data package ships them.",
           "env_var": null,
           "status": "derived",
           "documented_in": "docs/external_dependencies.md"
@@ -406,7 +406,7 @@
       "external_inputs": [
         {
           "what": "The five epigen QC objects (ATAC log-CPM and methylCap beta values for the tissues that have them, plus their sample metadata), about 6 GB, cached locally",
-          "produced_by": "Downloaded at run time by load_qc(epigen = TRUE) from the epigenomics staging prefix, and cached under the directory EPIGEN_QC_DIR names. Neither data package ships them.",
+          "produced_by": "Downloaded at run time by load_qc(epigen = TRUE) from the c2.0 data-hub prefix gs://motrpac-data-hub/analysis/human-precovid-sed-adu/c2.0, and cached under the directory EPIGEN_QC_DIR names. Neither data package ships them.",
           "env_var": "EPIGEN_QC_DIR",
           "status": "external",
           "documented_in": "docs/external_dependencies.md"
@@ -454,7 +454,7 @@
       "external_inputs": [
         {
           "what": "The two epigen-atac-seq QC objects (muscle and PBMC log-CPM, plus their sample metadata), ~1 GB, cached locally. methylCap is excluded from this panel, so its 4 GB is not fetched for it.",
-          "produced_by": "Downloaded at run time by load_qc(epigen = TRUE) from the epigenomics staging prefix, and cached under the directory EPIGEN_QC_DIR names. Neither data package ships them. EPIGEN_QC_DIR is the same cache ED1B fills.",
+          "produced_by": "Downloaded at run time by load_qc(epigen = TRUE) from the c2.0 data-hub prefix gs://motrpac-data-hub/analysis/human-precovid-sed-adu/c2.0, and cached under the directory EPIGEN_QC_DIR names. Neither data package ships them. EPIGEN_QC_DIR is the same cache ED1B fills.",
           "env_var": "EPIGEN_QC_DIR",
           "status": "external",
           "documented_in": "docs/external_dependencies.md"
@@ -478,7 +478,7 @@
       "external_inputs": [
         {
           "what": "Epigenomics differential-analysis tables, 5 files totalling 7.7 GB (ATAC muscle and PBMC at v2.1, methylCap muscle, EDTA and adipose at v1.2).",
-          "produced_by": "Listed with `gsutil ls -R` from the staging bucket gs://pre-cawg/staging_20260806 and downloaded through MotrpacBicQC::dl_read_gcp() by load_differential_analysis(epigen = TRUE). Requires gsutil on PATH and consortium read access. Cached under EPIGEN_QC_DIR/data/tmp, so only the first build downloads. The cache is consulted per file AFTER the bucket listing names it, so an expired credential yields no epigen data at all rather than a cache hit.",
+          "produced_by": "Downloaded over HTTPS by load_differential_analysis(epigen = TRUE) from the public c2.0 CloudFront release https://d1yw74buhe0ts0.cloudfront.net/data/analysis/human_presuspension_sed_adu/c2.0/epigenomics/da/. No gsutil and no credentials. Not cached: every call downloads again. A failed download is an error.",
           "env_var": null,
           "status": "external",
           "documented_in": "docs/external_dependencies.md"
@@ -506,7 +506,7 @@
       "external_inputs": [
         {
           "what": "Epigenomics differential-analysis tables, 5 files totalling 7.70 GB (ATAC muscle and PBMC, methylCap muscle, EDTA and adipose)",
-          "produced_by": "Fetched at run time by load_differential_analysis(epigen = TRUE) into EPIGEN_QC_DIR. Same pull FIG2A makes.",
+          "produced_by": "Downloaded by load_differential_analysis(epigen = TRUE) from the public CloudFront release. Same pull FIG2A makes.",
           "env_var": null,
           "status": "external",
           "documented_in": "docs/external_dependencies.md"
@@ -534,7 +534,7 @@
       "external_inputs": [
         {
           "what": "Epigenomics differential-analysis tables, 5 files totalling 7.70 GB (ATAC muscle and PBMC, methylCap muscle, EDTA and adipose)",
-          "produced_by": "Fetched at run time by load_differential_analysis(epigen = TRUE) into EPIGEN_QC_DIR. Same pull FIG2A makes.",
+          "produced_by": "Downloaded by load_differential_analysis(epigen = TRUE) from the public CloudFront release. Same pull FIG2A makes.",
           "env_var": null,
           "status": "external",
           "documented_in": "docs/external_dependencies.md"
@@ -562,7 +562,7 @@
       "external_inputs": [
         {
           "what": "Epigenomics differential-analysis tables, 5 files totalling 7.70 GB (ATAC muscle and PBMC, methylCap muscle, EDTA and adipose)",
-          "produced_by": "Fetched at run time by load_differential_analysis(epigen = TRUE) into EPIGEN_QC_DIR. Same pull FIG2A makes.",
+          "produced_by": "Downloaded by load_differential_analysis(epigen = TRUE) from the public CloudFront release. Same pull FIG2A makes.",
           "env_var": null,
           "status": "external",
           "documented_in": "docs/external_dependencies.md"
@@ -600,7 +600,16 @@
       "data_packages": [
         "MotrpacHumanPreSuspensionAnalysis"
       ],
-      "external_inputs": []
+      "external_inputs": [
+        {
+          "what": "Epigenomics differential-analysis tables, 5 files totalling 7.70 GB (ATAC muscle and PBMC, methylCap muscle, EDTA and adipose)",
+          "produced_by": "Downloaded by load_differential_analysis(epigen = TRUE) from the public CloudFront release. Same pull FIG2A makes.",
+          "env_var": null,
+          "status": "external",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
+      "needs_external_inputs": true
     },
     {
       "panel": "FIG2F",
@@ -621,7 +630,7 @@
       "external_inputs": [
         {
           "what": "Epigenomics differential-analysis tables, 5 files totalling 7.70 GB (ATAC muscle and PBMC, methylCap muscle, EDTA and adipose)",
-          "produced_by": "Fetched at run time by load_differential_analysis(epigen = TRUE) into EPIGEN_QC_DIR. Same pull FIG2A makes.",
+          "produced_by": "Downloaded by load_differential_analysis(epigen = TRUE) from the public CloudFront release. Same pull FIG2A makes.",
           "env_var": null,
           "status": "external",
           "documented_in": "docs/external_dependencies.md"
@@ -648,8 +657,8 @@
       ],
       "external_inputs": [
         {
-          "what": "Epigenomics ATAC differential-analysis tables, 2 files totalling 4.6 GB (muscle and PBMC, v2.1).",
-          "produced_by": "Listed with `gsutil ls -R` from the staging bucket gs://pre-cawg/staging_20260806 and downloaded through MotrpacBicQC::dl_read_gcp() by load_differential_analysis(epigen = TRUE). Requires gsutil on PATH and consortium read access. Cached under EPIGEN_QC_DIR/data/tmp, so only the first build downloads. The cache is consulted per file AFTER the bucket listing names it, so an expired credential yields no epigen data at all rather than a cache hit. methylCap is excluded here, which is why this is smaller than FIG2A's pull.",
+          "what": "Epigenomics differential-analysis tables, 5 files totalling 7.7 GB (ATAC muscle and PBMC at v2.1, methylCap muscle, EDTA and adipose at v1.2).",
+          "produced_by": "Downloaded over HTTPS by load_differential_analysis(epigen = TRUE) from the public c2.0 CloudFront release https://d1yw74buhe0ts0.cloudfront.net/data/analysis/human_presuspension_sed_adu/c2.0/epigenomics/da/. No gsutil and no credentials. Not cached: every call downloads again. A failed download is an error. ED2A shares acute_da() with ED2C, ED2E and ED2F, so all five files are downloaded; the panel filters methylCap out afterwards.",
           "env_var": null,
           "status": "external",
           "documented_in": "docs/external_dependencies.md"
@@ -690,7 +699,7 @@
       "external_inputs": [
         {
           "what": "Epigenomics differential-analysis tables, 5 files totalling 7.70 GB (ATAC muscle and PBMC, methylCap muscle, EDTA and adipose)",
-          "produced_by": "Fetched at run time by load_differential_analysis(epigen = TRUE) into EPIGEN_QC_DIR. Same pull FIG2A makes.",
+          "produced_by": "Downloaded by load_differential_analysis(epigen = TRUE) from the public CloudFront release. Same pull FIG2A makes.",
           "env_var": null,
           "status": "external",
           "documented_in": "docs/external_dependencies.md"
@@ -739,6 +748,13 @@
           "path": "sources/extended_data_2/landscape_figureED2_PTMSigDB_ORA_results_v2_Aug2026.csv",
           "override_env_var": "ED2E_PTMSIGDB_ORA_CSV",
           "documented_in": "docs/external_dependencies.md"
+        },
+        {
+          "what": "Epigenomics differential-analysis tables, 5 files totalling 7.70 GB (ATAC muscle and PBMC, methylCap muscle, EDTA and adipose)",
+          "produced_by": "Downloaded by load_differential_analysis(epigen = TRUE) from the public CloudFront release. Same pull FIG2A makes.",
+          "env_var": null,
+          "status": "external",
+          "documented_in": "docs/external_dependencies.md"
         }
       ],
       "needs_external_inputs": true,
@@ -766,7 +782,7 @@
       "external_inputs": [
         {
           "what": "Epigenomics differential-analysis tables, 5 files totalling 7.70 GB (ATAC muscle and PBMC, methylCap muscle, EDTA and adipose)",
-          "produced_by": "Fetched at run time by load_differential_analysis(epigen = TRUE) into EPIGEN_QC_DIR. Same pull FIG2A makes.",
+          "produced_by": "Downloaded by load_differential_analysis(epigen = TRUE) from the public CloudFront release. Same pull FIG2A makes.",
           "env_var": null,
           "status": "external",
           "documented_in": "docs/external_dependencies.md"
@@ -1024,7 +1040,7 @@
       ],
       "external_inputs": [],
       "needs_external_inputs": false,
-      "notes": "Page size is computed from the row count by camera_helpers.R and passed to export_panel(); width_in and height_in here are what the current selection produces and are not what the panel is drawn at."
+      "notes": "Page size is the width and height plot_enrich_heatmap(return_drawing = TRUE) returns, passed to export_panel(); width_in and height_in here are what the current selection produces and are not what the panel is drawn at."
     },
     {
       "panel": "FIG4B",
@@ -1044,7 +1060,7 @@
       ],
       "external_inputs": [],
       "needs_external_inputs": false,
-      "notes": "Page size is computed from the row count by camera_helpers.R and passed to export_panel(); width_in and height_in here are what the current selection produces and are not what the panel is drawn at."
+      "notes": "Page size is the width and height plot_enrich_heatmap(return_drawing = TRUE) returns, passed to export_panel(); width_in and height_in here are what the current selection produces and are not what the panel is drawn at."
     },
     {
       "panel": "FIG4C",
@@ -1197,7 +1213,7 @@
       "external_inputs": [
         {
           "what": "Epigenomics differential-analysis tables, 5 files totalling 7.70 GB (ATAC muscle and PBMC, methylCap muscle, EDTA and adipose)",
-          "produced_by": "Fetched at run time by load_differential_analysis(epigen = TRUE) into EPIGEN_QC_DIR. Same pull FIG2A makes.",
+          "produced_by": "Downloaded by load_differential_analysis(epigen = TRUE) from the public CloudFront release. Same pull FIG2A makes.",
           "env_var": null,
           "status": "external",
           "documented_in": "docs/external_dependencies.md"
@@ -1348,7 +1364,7 @@
       ],
       "external_inputs": [],
       "needs_external_inputs": false,
-      "notes": "Page size is computed from the row count by camera_helpers.R and passed to export_panel(); width_in and height_in here are what the current selection produces and are not what the panel is drawn at."
+      "notes": "Page size is the width and height plot_enrich_heatmap(return_drawing = TRUE) returns, passed to export_panel(); width_in and height_in here are what the current selection produces and are not what the panel is drawn at."
     },
     {
       "panel": "ED5B",
@@ -2443,7 +2459,7 @@
       "external_inputs": [
         {
           "what": "The muscle epigen-atac-seq QC object (log-CPM plus sample metadata), ~0.5 GB, cached locally. The same cache ED1B and ED1D fill.",
-          "produced_by": "Downloaded at run time by load_qc(epigen = TRUE) from the epigenomics staging prefix, and cached under the directory EPIGEN_QC_DIR names. Neither data package ships it.",
+          "produced_by": "Downloaded at run time by load_qc(epigen = TRUE) from the c2.0 data-hub prefix gs://motrpac-data-hub/analysis/human-precovid-sed-adu/c2.0, and cached under the directory EPIGEN_QC_DIR names. Neither data package ships it.",
           "env_var": "EPIGEN_QC_DIR",
           "status": "external",
           "documented_in": "docs/external_dependencies.md"
@@ -2472,7 +2488,7 @@
       "external_inputs": [
         {
           "what": "The muscle epigen-atac-seq QC object (log-CPM plus sample metadata), ~0.5 GB, cached locally. The same cache ED1B and ED1D fill.",
-          "produced_by": "Downloaded at run time by load_qc(epigen = TRUE) from the epigenomics staging prefix, and cached under the directory EPIGEN_QC_DIR names. Neither data package ships it.",
+          "produced_by": "Downloaded at run time by load_qc(epigen = TRUE) from the c2.0 data-hub prefix gs://motrpac-data-hub/analysis/human-precovid-sed-adu/c2.0, and cached under the directory EPIGEN_QC_DIR names. Neither data package ships it.",
           "env_var": "EPIGEN_QC_DIR",
           "status": "external",
           "documented_in": "docs/external_dependencies.md"
@@ -2497,7 +2513,7 @@
       "external_inputs": [
         {
           "what": "The muscle epigen-atac-seq QC object (log-CPM plus sample metadata), ~0.5 GB, cached locally. The same cache ED1B and ED1D fill.",
-          "produced_by": "Downloaded at run time by load_qc(epigen = TRUE) from the epigenomics staging prefix, and cached under the directory EPIGEN_QC_DIR names. Neither data package ships it.",
+          "produced_by": "Downloaded at run time by load_qc(epigen = TRUE) from the c2.0 data-hub prefix gs://motrpac-data-hub/analysis/human-precovid-sed-adu/c2.0, and cached under the directory EPIGEN_QC_DIR names. Neither data package ships it.",
           "env_var": "EPIGEN_QC_DIR",
           "status": "external",
           "documented_in": "docs/external_dependencies.md"
@@ -2529,7 +2545,7 @@
       "external_inputs": [
         {
           "what": "The muscle epigen-atac-seq QC object (log-CPM plus sample metadata), ~0.5 GB, cached locally. The same cache ED1B and ED1D fill.",
-          "produced_by": "Downloaded at run time by load_qc(epigen = TRUE) from the epigenomics staging prefix, and cached under the directory EPIGEN_QC_DIR names. Neither data package ships it.",
+          "produced_by": "Downloaded at run time by load_qc(epigen = TRUE) from the c2.0 data-hub prefix gs://motrpac-data-hub/analysis/human-precovid-sed-adu/c2.0, and cached under the directory EPIGEN_QC_DIR names. Neither data package ships it.",
           "env_var": "EPIGEN_QC_DIR",
           "status": "external",
           "documented_in": "docs/external_dependencies.md"
@@ -2563,7 +2579,7 @@
       "external_inputs": [
         {
           "what": "The muscle epigen-atac-seq QC object (log-CPM plus sample metadata), ~0.5 GB, cached locally. The same cache ED1B and ED1D fill.",
-          "produced_by": "Downloaded at run time by load_qc(epigen = TRUE) from the epigenomics staging prefix, and cached under the directory EPIGEN_QC_DIR names. Neither data package ships it.",
+          "produced_by": "Downloaded at run time by load_qc(epigen = TRUE) from the c2.0 data-hub prefix gs://motrpac-data-hub/analysis/human-precovid-sed-adu/c2.0, and cached under the directory EPIGEN_QC_DIR names. Neither data package ships it.",
           "env_var": "EPIGEN_QC_DIR",
           "status": "external",
           "documented_in": "docs/external_dependencies.md"
@@ -2595,7 +2611,7 @@
       "external_inputs": [
         {
           "what": "The muscle epigen-atac-seq QC object (log-CPM plus sample metadata), ~0.5 GB, cached locally. The same cache ED1B and ED1D fill.",
-          "produced_by": "Downloaded at run time by load_qc(epigen = TRUE) from the epigenomics staging prefix, and cached under the directory EPIGEN_QC_DIR names. Neither data package ships it.",
+          "produced_by": "Downloaded at run time by load_qc(epigen = TRUE) from the c2.0 data-hub prefix gs://motrpac-data-hub/analysis/human-precovid-sed-adu/c2.0, and cached under the directory EPIGEN_QC_DIR names. Neither data package ships it.",
           "env_var": "EPIGEN_QC_DIR",
           "status": "external",
           "documented_in": "docs/external_dependencies.md"
@@ -2626,7 +2642,7 @@
       "external_inputs": [
         {
           "what": "The muscle epigen-atac-seq acute differential-analysis table (v2.1).",
-          "produced_by": "Listed with `gsutil ls -R` from the epigenomics staging prefix and downloaded through MotrpacBicQC::dl_read_gcp() by load_differential_analysis(epigen = TRUE). Cached under EPIGEN_QC_DIR/data/tmp. The cache is consulted per file AFTER the bucket listing names it, so an expired credential yields no table rather than a cache hit.",
+          "produced_by": "Downloaded over HTTPS by load_differential_analysis(epigen = TRUE) from the public c2.0 CloudFront release https://d1yw74buhe0ts0.cloudfront.net/data/analysis/human_presuspension_sed_adu/c2.0/epigenomics/da/. No gsutil and no credentials. Not cached: every call downloads again. A failed download is an error. Only the muscle ATAC file is requested.",
           "env_var": null,
           "status": "external",
           "documented_in": "docs/external_dependencies.md"

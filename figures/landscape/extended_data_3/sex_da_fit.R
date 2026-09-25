@@ -55,8 +55,7 @@ here <- dirname(sub("^--file=", "",
                     grep("^--file=", commandArgs(FALSE), value = TRUE)[1]))
 source(file.path(here, "..", "lib", "panel_export.R"))
 
-# The written tables carry CI.L and CI.R, which the released DA tables do not:
-# precovid-repro forbids those two columns on every DA schema. Here they are
+# The written tables carry CI.L and CI.R for the sex-stratified model. They are
 # produced by .add_confidence_interval() below — recomputed per contrast rather
 # than taken from topTable, whose version uses the first contrast's degrees of
 # freedom for every contrast — and ED3A draws its error bars from them.
@@ -369,9 +368,10 @@ run_dream_sex <- function(expression_object,
     # interval comes out computed with the FIRST contrast's degrees of freedom.
     # Still true as of variancePartition 1.41.5.
     #
-    # The released DA tables answer this by shipping no interval — precovid-repro
-    # forbids CI.L/CI.R on every DA schema. These tables keep them, recomputed
-    # correctly, because ED3A draws the error bars on both of its axes from them.
+    # The released DA tables ship their own recomputed interval
+    # (CI.L_calculated/CI.R_calculated) for the primary model, not this one.
+    # These tables recompute CI.L/CI.R for the sex-stratified fit because ED3A
+    # draws the error bars on both of its axes from them.
     res <- variancePartition::topTable(fit, coef = contrast, number = Inf,
                                        p.value = 1, confint = FALSE)
 

@@ -9,12 +9,13 @@
 # group=delta      a package this repo pins itself because the reference
 #                  manifest either lacks it — precovid-repro never loads it, so
 #                  its record cannot pin it — or records a version this repo
-#                  cannot use. Without the row preflight reads the reference's
-#                  version, or reports the package as unlisted and gates on it.
+#                  cannot use. Nothing in this repo reads this file; the
+#                  versions each PDF was drawn from are recorded in
+#                  outputs/panels/export_manifest.tsv.
 #
 # The package version and the collection version move independently, and the two
 # rows below are at different package versions for that reason. Both are built
-# from v2.0 collection objects, so config/pipeline.env's SEX_DA_VERSION stays
+# from v2.0 collection objects, so extended_data_3/sex_da.env's SEX_DA_VERSION stays
 # 2.0. Bump these rows for a package release; bump SEX_DA_VERSION only when the
 # collection the objects were built FROM is rebuilt.
 #
@@ -26,8 +27,8 @@
 #
 # 2.0.5 carries that forward and adds to it. The thirteen *_DA objects gain
 # CI.L_calculated and CI.R_calculated with no existing column or row changed,
-# and PTMSEA_INPUT is new; neither reaches a panel in scope. UTORONTO_TFs is a
-# BREAKING change - it is now the prot-ph TF regulator pool, 1,381 rows keyed by
+# and PTMSEA_INPUT is new; neither reaches a panel in scope. UTORONTO_TFs changes
+# shape - it is now the prot-ph TF regulator pool, 1,381 rows keyed by
 # phosphosite, where it was 2,765 rows keyed by Ensembl gene - but no panel or
 # sub-table in this repo reads it. Every panel built here has been drawn against
 # 2.0.5.
@@ -35,13 +36,24 @@
 # 2.0.6 changes COVARIATES_FILE only: the methylcap BMI and codedsiteid rows are
 # gone, as the MALAX model never used them. ST2a is the one table it reaches.
 #
-# 2.0.7 is BREAKING upstream and inert here. It removes the vendored assay_codes
-# snapshot and reads MotrpacBicQC live instead, raising that floor to 1.8.1 -
-# which is on the develop branch, not the v1.8.0 tag. FIG4 and ED5 are the only
-# readers and already call MotrpacBicQC::assay_codes, so no panel moves.
+# 2.0.7 removes the vendored assay_codes snapshot and reads MotrpacBicQC live
+# instead. FIG4 and ED5 are the only readers and already call
+# MotrpacBicQC::assay_codes, so no panel moves. It also moves
+# load_differential_analysis(epigen = TRUE) from the staging bucket to the
+# public c2.0 CloudFront release; those files are byte-identical to the
+# staging_20260806 objects the assembled figures were drawn from, so no panel
+# moves either.
 #
-# Data 2.0.3 adds feature_metadata columns to the four proteomics QC objects and
-# changes no row and no existing column, so no panel or sub-table moves either.
+# 2.0.8 adds plot_enrich_heatmap(return_drawing = TRUE), which FIG4A, FIG4B and
+# ED5A call in place of a vendored copy; same sets and page sizes as that copy.
+# It raises the MotrpacBicQC floor to 2.0.0, adds gridtext to Imports and cmapR
+# to Suggests.
+#
+# Data 2.0.3 adds feature_metadata columns to five QC objects: the four
+# proteomics objects and BLOOD_METAB_T_CLINICAL_QC. No row and no existing
+# column changes, so no panel or sub-table moves. load_qc(epigen = TRUE) reads
+# gs://motrpac-data-hub/analysis/human-precovid-sed-adu/c2.0; a build from
+# before 2026-09-24 reads the staging prefix under the same version number.
 #
 # The two postbuild rows are still blocking=no, which is now the only thing left
 # to decide rather than a consequence of the sentinel: flipping them to yes turns
@@ -52,19 +64,19 @@
 # written by export_panel() at the moment of export, so a build is never
 # mislabelled.
 #
-# The two delta rows are ggpubr and its dependency rstatix. Both ARE in the
-# reference manifest, at 0.6.3 and 0.7.3, so they are the second case the delta
-# group covers: pinned here INSTEAD of by the reference, because this repo needs
-# a version the reference does not record. ggpubr is blocking. It is the only
-# blocking row in this file, and it is blocking because the pin decides numbers
-# rather than appearance - see its note.
+# The three delta rows are MotrpacBicQC, ggpubr and ggpubr's dependency rstatix.
+# All three ARE in the reference manifest, at 1.9.0, 0.6.3 and 0.7.3, so they
+# are the second case the delta group covers: pinned here INSTEAD of by the
+# reference, because this repo needs a version the reference does not record.
+# ggpubr is blocking. It is the only blocking row in this file, and it is
+# blocking because the pin decides numbers rather than appearance - see its note.
 #
 # op is how the installed version is compared:  ==  exact,  >=  at least.
 #
 # columns: package  group  version  op  blocking  source  notes
 package	group	version	op	blocking	source	notes
-MotrpacHumanPreSuspensionData	postbuild	2.0.3	==	no	local source install	Individual-level data objects. 2.0.3 is the current head of the v2.0 line. It adds feature_metadata columns to the four proteomics QC objects: confident_score, ptm_score and redundant_ids on ADIPOSE_PROT_PH_QC and MUSCLE_PROT_PH_QC, and num_peptides, percent_coverage, protein_score and redundant_ids on ADIPOSE_PROT_PR_QC and MUSCLE_PROT_PR_QC. No row and no existing column changed against 2.0.2, so no panel or sub-table built here moves.
-MotrpacHumanPreSuspensionAnalysis	postbuild	2.0.7	==	no	local source install	Summary / DA / enrichment objects, and the canonical colour, timepoint and tissue constants every panel draws from. Carries the FCM results with blood clustered at k = 12 (FCM_ORA, FCM_CLUSTERS, FCM_CAMERA) and HUMAN_FEATURE_TO_GENE with the epigenomics peak annotation, and reads the epigenomics DA from the staging bucket. ST4a is built from FCM_ORA, so this pin decides its contents. 2.0.6 drops BMI and codedsiteid from the methylcap rows of COVARIATES_FILE, which ST2a lists. 2.0.7 removes the vendored assay_codes snapshot; FIG4 and ED5 already read MotrpacBicQC::assay_codes directly, so nothing here changes, but it raises the MotrpacBicQC floor to 1.8.1.
-MotrpacBicQC	delta	1.8.1	>=	no	GitHub MoTrPAC/MotrpacBicQC	Required at >= 1.8.1 by Analysis 2.0.7, which retired its vendored assay_codes snapshot in favour of reading this package live. FIG4 and ED5 read MotrpacBicQC::assay_codes. 1.8.1 is on the default develop branch; the newest tag v1.8.0 still carries the old 44-row table and is not sufficient. Installed at 1.8.1.
+MotrpacHumanPreSuspensionData	postbuild	2.0.3	==	no	local source install	Individual-level data objects. 2.0.3 is the current head of the v2.0 line. It adds feature_metadata columns to five QC objects: confident_score, ptm_score and redundant_ids on ADIPOSE_PROT_PH_QC and MUSCLE_PROT_PH_QC; num_peptides, percent_coverage, protein_score and redundant_ids on ADIPOSE_PROT_PR_QC and MUSCLE_PROT_PR_QC; is_named, num_NAs and pct_na_imputed on BLOOD_METAB_T_CLINICAL_QC. No row and no existing column changed against 2.0.2, so no panel or sub-table built here moves. load_qc(epigen = TRUE) lists and reads gs://motrpac-data-hub/analysis/human-precovid-sed-adu/c2.0, caches under the repo_local_dir it is given, and stops when the gsutil listing fails. That is the installed build (commit 2306c55, 2026-09-24); a build from before 2026-09-24 reads the staging prefix under the same version number. Requires Analysis >= 2.0.8 and MotrpacBicQC >= 2.0.0.
+MotrpacHumanPreSuspensionAnalysis	postbuild	2.0.8	==	no	local source install	Summary / DA / enrichment objects, and the canonical colour, timepoint and tissue constants every panel draws from. Carries the FCM results with blood clustered at k = 12 (FCM_ORA, FCM_CLUSTERS, FCM_CAMERA) and HUMAN_FEATURE_TO_GENE with the epigenomics peak annotation, and from 2.0.7 reads the epigenomics DA from the public c2.0 CloudFront release, byte-identical to the staging_20260806 objects the assembled figures were drawn from. ST4a is built from FCM_ORA, so this pin decides its contents. 2.0.6 drops BMI and codedsiteid from the methylcap rows of COVARIATES_FILE, which ST2a lists. 2.0.7 removes the vendored assay_codes snapshot; FIG4 and ED5 already read MotrpacBicQC::assay_codes directly, so nothing here changes. 2.0.8 adds plot_enrich_heatmap(return_drawing = TRUE), which FIG4A, FIG4B and ED5A call in place of a vendored copy, and raises the MotrpacBicQC floor to 2.0.0.
+MotrpacBicQC	delta	2.0.0	>=	no	GitHub MoTrPAC/MotrpacBicQC@v2.0.0	Required at >= 2.0.0 by Analysis 2.0.8 and Data 2.0.3, both of which Remotes the v2.0.0 tag. FIG4 and ED5 read MotrpacBicQC::assay_codes, unchanged from 1.9.0. 2.0.0 drops the archived inspectdf import. The reference manifest records 1.9.0, which is why this row pins it. Installed at 2.0.0.
 ggpubr	delta	1.0.0	>=	yes	CRAN	From 1.0.0, compare_means() adjusts p within each group.by level (upstream #200); through 0.6.3 it pooled across every row the call returned. Stage 08 calls it with group.by = "Timepoint", so 0.6.3 adjusts a tissue's 6 or 10 contrasts together and 1.0.0 adjusts the 2 at each timepoint. FIG4G and ED6E draw -log10 of that p as bubble area: 128 of ED6E's 154 cells move between the two versions and 8 cross the 0.05 outline. The reference manifest records 0.6.3, which is why this row pins it instead.
 rstatix	delta	1.0.0	>=	no	CRAN	Not imported by any script here; it is what ggpubr 1.0.0 requires. Installed at 1.1.0. The reference manifest records 0.7.3.

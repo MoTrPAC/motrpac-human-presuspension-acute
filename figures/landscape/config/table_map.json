@@ -509,7 +509,15 @@
         "n_query",
         "n_overlap"
       ],
-      "external_inputs": [],
+      "external_inputs": [
+        {
+          "what": "Epigenomics differential-analysis tables, 5 files totalling 7.7 GB (ATAC muscle and PBMC at v2.1, methylCap muscle, EDTA and adipose at v1.2).",
+          "produced_by": "Downloaded over HTTPS by load_differential_analysis(epigen = TRUE) from the public c2.0 CloudFront release https://d1yw74buhe0ts0.cloudfront.net/data/analysis/human_presuspension_sed_adu/c2.0/epigenomics/da/. No gsutil and no credentials. Not cached: every call downloads again. A failed download is an error. Same pull as FIG2A.",
+          "env_var": null,
+          "status": "external",
+          "documented_in": "docs/external_dependencies.md"
+        }
+      ],
       "co_generated_with": {
         "panels": [],
         "tables": [],

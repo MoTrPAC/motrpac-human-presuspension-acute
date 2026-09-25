@@ -275,6 +275,7 @@ ed1b <- function() {
 
   qc_object <- MotrpacHumanPreSuspensionData::load_qc(
     epigen = TRUE,
+    gsutil = Sys.getenv("GSUTIL", unset = "gsutil"),
     repo_local_dir = epigen_cache
   )
   pheno_object <- MotrpacHumanPreSuspensionData::load_pheno()
@@ -733,6 +734,7 @@ ed1d <- function() {
   qc_norm_list <- MotrpacHumanPreSuspensionData::load_qc(
     selected_omes = non_methyl,
     epigen = TRUE,
+    gsutil = Sys.getenv("GSUTIL", unset = "gsutil"),
     repo_local_dir = epigen_local_dir
   )
 

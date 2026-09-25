@@ -14,15 +14,15 @@
 # Tables:  ST3d  triangle selected pathways              (written by ED4B)
 #          ST3f  clinical x omics all significant associations  (written by ED4G)
 #
-# Needs consortium data access. ED4A reads one
-# load_differential_analysis(epigen = TRUE) pass; the ATAC and methylCap DA
-# tables are not in the data package and are downloaded into EPIGEN_QC_DIR on
-# first use, about 7.7 GB, then reused.
+# Only ED4G needs consortium data access. ED4A reads one
+# load_differential_analysis(epigen = TRUE) pass, which downloads the ATAC and
+# methylCap DA tables (about 7.7 GB) from the public c2.0 CloudFront release on
+# every run; nothing is cached.
 #
-# ED4G additionally reads the baseline clinical x omics fit, which is not in
-# this repository: run
+# ED4G reads the baseline clinical x omics fit, built from
+# MotrpacHumanPreSuspensionData and not in this repository: run
 #
-#   Rscript figures/landscape/analysis/03_clinical_omics.R
+#   Rscript figures/landscape/figure_3/clinical_omics_fit.R
 #
 # once and it is cached. Without it ED4G reports SKIPPED and the other six
 # panels still build.
@@ -341,7 +341,7 @@ write_st3d <- function(selected_pathways_long) {
 # the block the panel exists to show.
 
 ed4c <- function() {
-  spec <- panel_init("ED4C")
+  panel_init("ED4C")
 
   # The signature, from config/highlights.json, resolved by name through
   # SET_TO_ID so a collection update moves the id without editing this file.
@@ -355,31 +355,15 @@ ed4c <- function() {
          " set ids, expected exactly one", call. = FALSE)
   }
 
-  # plot_feature_heatmap() draws by side effect and returns nothing. It finishes
-  # inside TMSig::enrichmap() with ComplexHeatmap::draw(), whose newpage default
-  # is TRUE, and it builds its own draw_args without exposing them - so unlike
-  # FIG3B there is no way to pass newpage = FALSE through. Left alone it starts a
-  # fresh page on the device export_panel() already opened, putting a blank page 1
-  # in front of the heatmap; Illustrator opens page 1 and drops the rest.
-  #
-  # grid.grabExpr() evaluates the call on a throwaway device and captures the grid
-  # output as a single grob, so the extra page is spent there and export_panel()
-  # receives one object to draw once. width and height match the manifest page:
-  # ComplexHeatmap sizes text against the device, so capturing at a different size
-  # would lay the heatmap out for a page it is not being drawn on.
-  #
-  # filename is deliberately not passed: supplying it would make the function open
-  # its own device and write its own file, outside the export contract.
-  hsf1_heatmap <- grid::grid.grabExpr(
-    MotrpacHumanPreSuspensionAnalysis::plot_feature_heatmap(
-      set_id = hsf1_set_id,
-      selected_ome = "transcript-rna-seq"
-    ),
-    width = spec$width_in,
-    height = spec$height_in
+  # return_drawing = TRUE draws with newpage = FALSE onto the device
+  # export_panel() opens, as cmeans_feature_heatmap() does.
+  hsf1_heatmap <- MotrpacHumanPreSuspensionAnalysis::plot_feature_heatmap(
+    set_id = hsf1_set_id,
+    selected_ome = "transcript-rna-seq",
+    return_drawing = TRUE
   )
 
-  export_panel(hsf1_heatmap, "ED4C")
+  export_panel(function() hsf1_heatmap$draw(), "ED4C")
 }
 
 # ---- ED4D — HSPH1 muscle transcript trajectory -----------------------------

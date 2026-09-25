@@ -216,11 +216,11 @@ panel_ids <- function() {
 
 #' The directory the ATAC and methylCap QC matrices are cached in.
 #'
-#' Neither data package ships them; load_qc(epigen = TRUE) downloads them on
-#' first use and reuses the cache afterwards. Panels pass this as its
-#' repo_local_dir. EPIGEN_QC_DIR overrides the default. The cache sits under
-#' staging/ rather than outputs/: it is 7.7 GB of downloaded consortium data,
-#' not something a run produces, and a clean of outputs/ must not discard it.
+#' load_qc(epigen = TRUE) downloads them here on first use (about 5.6 GB) and
+#' reuses them afterwards; SF1's raw counts are cached here too. Panels pass it
+#' as load_qc()'s repo_local_dir. EPIGEN_QC_DIR overrides the default. The
+#' cache sits under staging/ rather than outputs/ so a clean of outputs/ keeps
+#' it.
 epigen_qc_dir <- function() {
   dir <- Sys.getenv("EPIGEN_QC_DIR", unset = "")
   if (!nzchar(dir)) {
@@ -753,6 +753,11 @@ explain_failure <- function(e) {
     return(c("why: a data-package object is not on the search path.",
              "     Check MotrpacHumanPreSuspensionData and ...Analysis are installed",
              "     at the versions config/required_packages.tsv pins, and attached."))
+  }
+  if (hit("cannot open (the connection to|URL) 'https?://|Timeout of [0-9]+ seconds")) {
+    return(c("why: an HTTPS download failed (the public epigenomics DA release on",
+             "     CloudFront). No credentials are involved; check the network and",
+             "     that the URL above resolves."))
   }
   if (hit("gsutil|CommandException|AccessDenied|ServiceException|401|403|credential|not authenticated")) {
     return(c("why: a consortium bucket read failed.",

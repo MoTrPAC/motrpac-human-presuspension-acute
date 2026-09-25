@@ -190,7 +190,7 @@ Two separate things:
 
 | Question | Answer |
 |---|---|
-| Can this code be **run**? | Most of it needs `MotrpacHumanPreSuspensionData`, which is subject-level and requires a formal MoTrPAC consortium data-access request. That is true of this manuscript as a whole, not just the three files above. Several panels also read epigenomics QC and DA tables from consortium GCS prefixes that neither package ships. |
+| Can this code be **run**? | Most of it needs `MotrpacHumanPreSuspensionData`, which is subject-level and requires a formal MoTrPAC consortium data-access request. That is true of this manuscript as a whole, not just the three files above. Several panels also read epigenomics QC matrices from a consortium GCS prefix that neither package ships. The epigenomics DA tables are a public download and need no access. |
 | Can a file in this repository be **published**? | Yes for everything present. A script that reads restricted data holds none of it, which is what makes the code publishable while its input is not. The three files above are the exception, and they are absent. |
 
 A panel that declares only `MotrpacHumanPreSuspensionAnalysis` runs from the public aggregate
@@ -245,10 +245,10 @@ You need all five of these. Nothing here checks them for you.
 | | |
 |---|---|
 | **R 4.4.1** | the version every panel in `assembled/` was drawn under |
-| **The two data packages** | `MotrpacHumanPreSuspensionData` 2.0.3 and `MotrpacHumanPreSuspensionAnalysis` 2.0.7, installed from source. `Data` needs an approved consortium data-access request; `Analysis` is public |
-| **The packages in `config/panel_packages.txt`** | 37 CRAN and Bioconductor packages. `config/required_packages.tsv` pins the five whose version changes the numbers: the two data packages, `MotrpacBicQC`, and `ggpubr >= 1.0.0` with the `rstatix` it requires |
-| **`MotrpacBicQC` >= 1.8.1** | from the `develop` branch, not the `v1.8.0` tag. Analysis 2.0.7 reads it live rather than from a vendored snapshot |
-| **`gsutil` on `PATH`**, authenticated | several figures download epigenomics QC and differential-analysis tables at run time and cache them under `staging/` |
+| **The two data packages** | `MotrpacHumanPreSuspensionData` 2.0.3 and `MotrpacHumanPreSuspensionAnalysis` 2.0.8, installed from source. `Data` needs an approved consortium data-access request; `Analysis` is public. Data 2.0.3 requires Analysis >= 2.0.8 |
+| **The packages in `config/panel_packages.txt`** | 37 packages: 35 from CRAN and Bioconductor, plus `MotrpacBicQC` and `PLIER` (`wgmao/PLIER`) from GitHub. `config/required_packages.tsv` pins the five whose version changes the numbers: the two data packages, `MotrpacBicQC`, and `ggpubr >= 1.0.0` with the `rstatix` it requires |
+| **`MotrpacBicQC` >= 2.0.0** | from the `v2.0.0` tag. Both data packages declare it in `Remotes` (`MoTrPAC/MotrpacBicQC@v2.0.0`) |
+| **`gsutil` on `PATH`**, authenticated | for the epigenomics QC matrices (FIG1C, ED1B, ED1D, SF1, cached under `staging/`), the SF1C-SF1F raw ATAC counts, the ED1A ancestry PCs and the sex and cell-type DA fits. The epigenomics DA tables are a public HTTPS download and need no `gsutil` |
 
 Scripts must be run with **`Rscript`**, not sourced from an R console or RStudio. Each one locates
 this directory from its own file path, which a console session does not have.

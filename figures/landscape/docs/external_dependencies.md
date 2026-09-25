@@ -12,7 +12,7 @@ Most files take an environment-variable override, which is how you point a panel
 without editing it:
 
 ```bash
-ED3D_CIBERSORTX_CSV=/path/to/newer.csv Rscript figures/landscape/ED3.R ED3D
+ED3D_CIBERSORTX_CSV=/path/to/newer.csv Rscript figures/landscape/extended_data_3/ED3.R ED3D
 ```
 
 | Panel | File | Override |
@@ -46,14 +46,15 @@ under `sources/figure_5/` and ED7 reads them from there.
 
 ## What is still fetched at run time
 
-Six things. All but the last come from the consortium buckets rather than from a sibling repo:
+Six things. The epigenomics DA tables are a public HTTPS download and the clinical x omics fit is
+computed here; the other four come from the consortium buckets:
 
 | What | Who reads it | Cached to |
 |---|---|---|
 | The released ancestry PCs | ED1A | downloaded at run time; not kept in the repo |
 | ATAC / methylCap QC matrices | FIG1C, ED1B, ED1D, SF1A–SF1F | `staging/raw-files/` |
 | Raw RSEM gene counts | `analysis/01_sex_da.R`, `analysis/02_celltype_da.R` | `outputs/fits/*/raw-files/` |
-| Epigenomics DA tables | FIG2A, FIG2B, FIG2Bii, FIG2C, FIG2F, ED2A, ED2C, ED2F, ED4A, SF1G, ST2d | `EPIGEN_QC_DIR/data/tmp/` |
+| Epigenomics DA tables | FIG2A, FIG2B, FIG2Bii, FIG2C, FIG2E, FIG2F, ED2A, ED2C, ED2E, ED2F, ED4A, SF1G, ST2d | not cached; downloaded on every call |
 | Raw muscle ATAC peak counts | SF1C–SF1F | `EPIGEN_QC_DIR` |
 | The clinical x omics fit | ED4G, FIG3EFG, EDT1 | `outputs/fits/clinical_omics/` (`analysis/03_clinical_omics.R`) |
 
@@ -63,7 +64,7 @@ not existing yet is the normal first-run state. A panel that declares a fit outp
 is skipped rather than failed when it is absent, so a figure script still draws everything else.
 
 Every bucket read needs `gsutil` on `PATH` and consortium read access; without them the download
-fails where it is attempted rather than up front.
+fails where it is attempted rather than up front. The epigenomics DA download needs neither.
 
 ## FIG1C, ED1B and ED1D — the epigen QC matrices
 
@@ -74,9 +75,12 @@ five, for the vial labels on their columns; ED1D excludes methylCap, so it fetch
 ~0.5 GB ATAC matrices.
 
 They are loaded through **`load_qc(epigen = TRUE)`** from
-`MotrpacHumanPreSuspensionData`, which lists the epigenomics staging prefix, downloads what is
-missing through `MotrpacBicQC::dl_read_gcp()`, and caches it under the directory `EPIGEN_QC_DIR`
-names. It needs `gsutil` on `PATH` and consortium read access.
+`MotrpacHumanPreSuspensionData`, which lists
+`gs://motrpac-data-hub/analysis/human-precovid-sed-adu/c2.0`, downloads what is missing through
+`MotrpacBicQC::dl_read_gcp()`, and caches it under the directory `EPIGEN_QC_DIR` names. It needs
+`gsutil` on `PATH` and consortium read access, and stops with a message when the listing fails.
+This is the installed Data 2.0.3 build (commit 2306c55, 2026-09-24); a 2.0.3 build from before
+2026-09-24 reads the staging prefix under the same version number.
 
 `EPIGEN_QC_DIR` is one variable for all three panels and SF1A–SF1F deliberately. They read the same
 matrices out of the same collection, and two names for one cache is two caches on the first machine
@@ -196,7 +200,7 @@ put a pathway or feature on them.
 |---|---|---|---|
 | `pathways` | `FIG2Bii`, `FIG2F`, `ED2E` | FIG2Bii, FIG2F, ED2E | `curated_pathways_v2.xlsx`, sheets `2B`, `2F_v3`, `ED2e` |
 | `pathways` | `ED4B`, `ED5B` | ED4B and ST3d, ED5B and FIG4D | `curated_pathways.xlsx`, sheets `5`, `3` |
-| `pathways` | `ED4C`, `cmeans` | ED4C; FIG4D, FIG4F, ED5C, ED5D, ED5E | a literal in ED4C; `CMEANS_PATHWAY` in `config/cmeans.env` |
+| `pathways` | `ED4C`, `cmeans` | ED4C; FIG4D, FIG4F, ED5C, ED5D, ED5E | a literal in ED4C; `CURRENT_PATHWAY` in precovid-analyses `c-means_main_figure.Rmd` |
 | `pathways` | `FIG6D`, `ED8E` | FIG6D, ED8E | `TFEB_ChIP_targets_DA_3.5_4_hr_ORA_oct2025_highlighted.xlsx`, sheet `Heatmap terms`; the autophagy category of `TFEB_ORA_category_heatmaps_v2.R` |
 | `features` | one key per panel | the sixteen single-feature plots | literals in `single_feature_plots.R` |
 | `gene_lists` | `ED8C` | ED8C | `PP2a_subunits` in `Figure_S7_script.R` |
@@ -273,36 +277,35 @@ matrix supplies which peaks and which libraries are kept.
 
 ## The epigenomics differential-analysis tables
 
-Five files, ~7.7 GB, read by every panel that draws a cross-tissue overlap. They are **not** an
-unauthenticated HTTPS download, whatever an older note may have said:
-`load_differential_analysis(epigen = TRUE)` lists
+Five files, ~7.7 GB, read by every panel that draws a cross-tissue overlap. From Analysis 2.0.7,
+`load_differential_analysis(epigen = TRUE)` downloads them over HTTPS from the public c2.0
+CloudFront release:
 
 ```
-gs://pre-cawg/staging_20260806
+https://d1yw74buhe0ts0.cloudfront.net/data/analysis/human_presuspension_sed_adu/c2.0/epigenomics/da/
 ```
 
-with `gsutil ls -R`, filters to `*_da_*.txt`, and pulls each match through
-`MotrpacBicQC::dl_read_gcp()`. It needs `gsutil` on `PATH` and consortium read access. The bucket
-is the package constant `.STAGING_BUCKET`, which mirrors `STAGING_BUCKET` in precovid-repro's
-`config/pipeline.env`; a released prefix can be passed as `bucket=` instead.
+No `gsutil` and no credentials. Nothing is cached: every call downloads the files it asks for
+again, and `repo_local_dir` is ignored. A failed download is an error, not a silent drop of the
+epigen omes. SF1G asks for the muscle ATAC file alone; every other reader asks for all five.
 
-| Tissue | Assay | Version |
+| Tissue | Assay | Method | Version |
+|---|---|---|---|
+| muscle, PBMC | `epigen-atac-seq` | `dream-acute` | v2.1 |
+| muscle, EDTA, adipose | `epigen-methylcap-seq` | `malax-glmm-acute` | v1.2 |
+
+**Provenance.** The five files were checked on 2026-09-24 and are byte-identical (MD5/ETag) to the
+`gs://pre-cawg/staging_20260806` objects the assembled figures were drawn from, so the move changes
+no panel. The ETags below are from a HEAD request on 2026-09-24; they are S3 multipart ETags, not
+MD5s of the file.
+
+| File | Bytes | ETag |
 |---|---|---|
-| muscle, PBMC | `epigen-atac-seq` | v2.1 |
-| muscle, EDTA, adipose | `epigen-methylcap-seq` | v1.2 |
-
-**The cache does not make this offline-capable.** Files land under `EPIGEN_QC_DIR/data/tmp/` and a
-second build reuses them, but the cache is consulted *per file, after the bucket listing names it*.
-With an expired credential the listing returns nothing, the loader reports "No epigenetic
-ome/tissue combination was found" and **returns the five package-shipped omes as though nothing
-were missing** — a panel then builds cleanly from five omes instead of seven. Measured: the
-`Muscle_only` ORA background halves, 30,168 genes to 15,237.
-
-`cross_tissue_da()` in `lib/da_overlap_helpers.R` therefore checks that both epigen assays
-came back and stops if they did not. Refresh with `gcloud auth login`.
-
-Only the versions above are in the bucket. A cache holding a superseded copy — a `v2.0` ATAC table,
-say — is dead weight rather than a hazard, because the bucket listing is what selects.
+| `human-precovid-sed-adu_t05-pbmc_epigen-atac-seq_da_dream-acute_v2.1.txt` | 2,393,827,800 | `35ec8b27f4c4024bbf6c35ef63a9bc2a-286` |
+| `human-precovid-sed-adu_t06-muscle_epigen-atac-seq_da_dream-acute_v2.1.txt` | 2,463,315,476 | `b40a4911abb7b6c24c9d90c00b08ee20-294` |
+| `human-precovid-sed-adu_t03-edta_epigen-methylcap-seq_da_malax-glmm-acute_v1.2.txt` | 817,280,255 | `68499022d5eba55f2e3cc6e77eac7071-98` |
+| `human-precovid-sed-adu_t06-muscle_epigen-methylcap-seq_da_malax-glmm-acute_v1.2.txt` | 1,263,150,456 | `427080f36bd6cef07f31063438c71753-151` |
+| `human-precovid-sed-adu_t11-adipose_epigen-methylcap-seq_da_malax-glmm-acute_v1.2.txt` | 767,453,550 | `f5046317c9e58a3ef21d7d069917705a-92` |
 
 
 ## ED2E — the PTMsigDB over-representation result
@@ -319,7 +322,8 @@ by construction:
 `HUMAN_FEATURE_TO_GENE` is keyed on `(assay, feature_id)` with no tissue column, so its `prot-ph`
 rows are the **union** of the two tissues — 18,548 muscle plus 21,022 adipose over 7,865 shared,
 exactly 31,705. Localization confidence is a per-tissue measurement and **859 of those shared sites
-disagree** (782 muscle-only, 77 adipose-only); with one row per site that table collapses every
+disagree** (782 muscle-only, 77 adipose-only). Since Analysis 2.0.7 `HUMAN_FEATURE_TO_GENE`
+carries no `confident_site` column at all; before that, with one row per site, it collapsed every
 disagreement to `FALSE`. `flanking_sequence` does not diverge — all 7,865 agree — because it is a
 property of the protein, not the assay.
 

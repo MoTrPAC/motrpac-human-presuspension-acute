@@ -61,6 +61,7 @@ qc_data <- local({
     if (is.null(cache)) {
       cache <<- MotrpacHumanPreSuspensionData::load_qc(
         epigen = TRUE,
+        gsutil = Sys.getenv("GSUTIL", unset = "gsutil"),
         repo_local_dir = epigen_qc_dir()
       )
     }

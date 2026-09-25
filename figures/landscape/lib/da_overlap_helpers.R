@@ -38,8 +38,8 @@ OME_DISPLAY_NAMES <- c(
   "epigen-methylcap-seq" = "Methylation"
 )
 
-# Every metabolomics platform is one display row. The DA tables carry a dozen
-# metab-* assay ids and the panels never separate them.
+# Every metabolomics platform is one display row. DA metabolomics rows read
+# assay = "metab", with the platform in a separate column.
 ome_display_name <- function(assay) {
   assay <- as.character(assay)
   out <- unname(OME_DISPLAY_NAMES[assay])
@@ -79,8 +79,8 @@ OME_LEVELS <- c(
 #' data_packages field does that attach.
 #'
 #' @param epigen Include the ATAC and methylCap tables. TRUE for every panel
-#'   that draws a cross-tissue overlap; the tables are ~7.7 GB and are fetched
-#'   into epigen_qc_dir().
+#'   that draws a cross-tissue overlap; the tables are ~7.7 GB, downloaded
+#'   from the public c2.0 CloudFront release on every call.
 #' @returns A data.frame, one row per tissue x assay x feature x contrast.
 cross_tissue_da <- function(epigen = TRUE) {
   if (!"package:MotrpacHumanPreSuspensionAnalysis" %in% search()) {
@@ -97,29 +97,18 @@ cross_tissue_da <- function(epigen = TRUE) {
     epigen = epigen,
     combine_with_featgene = TRUE,
     single_matrix = TRUE,
-    repo_local_dir = epigen_qc_dir(),
     verbose = FALSE
   )
 
-  # epigen = TRUE is a request, not a guarantee. load_DA_from_bucket() lists the
-  # staging bucket with `gsutil ls -R` and, if that listing fails — an expired
-  # credential is the common case — returns an empty list after a message and
-  # nothing else. load_differential_analysis() then hands back the five
-  # package-shipped omes as though nothing had happened, and a panel drawn from
-  # it is missing ATAC and methylCap with no error anywhere. The local cache
-  # does not save you: it is consulted per file, after the listing names it.
-  #
-  # Measured: with the listing failing, Muscle_only's ORA background halves from
-  # 30,168 genes to 15,237.
+  # Both epigen assays must come back; stop rather than draw from five omes.
   if (epigen) {
     got <- unique(as.character(da$assay))
     missing_epigen <- setdiff(c("epigen-atac-seq", "epigen-methylcap-seq"), got)
     if (length(missing_epigen) > 0) {
       stop("epigen = TRUE but the differential analysis came back without ",
            paste(missing_epigen, collapse = " and "),
-           ".\n  The staging-bucket listing failed silently. Refresh the ",
-           "credential with `gcloud auth login` and rebuild; the cached files ",
-           "under EPIGEN_QC_DIR cannot be used without it.",
+           ".\n  The tables come from the public c2.0 CloudFront release; ",
+           "check it is reachable and rebuild.",
            call. = FALSE)
     }
   }

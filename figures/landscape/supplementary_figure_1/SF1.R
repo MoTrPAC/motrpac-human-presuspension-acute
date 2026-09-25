@@ -46,10 +46,11 @@ source(file.path(here, "..", "lib", "panel_export.R"))
 # Read by all seven panels of this figure and by nothing else, so they live here
 # rather than under helpers/.
 #
-# The qc-norm matrix, sample sheet and DA table come through the data packages'
-# loaders from the epigenomics staging prefix. The raw counts are the one file
-# those loaders do not cover; they are resolved by listing the bucket, never by
-# composing a versioned name.
+# The qc-norm matrix and sample sheet come through load_qc() from the c2.0
+# data-hub release; the DA table through load_differential_analysis() from the
+# public c2.0 CloudFront release, downloaded on every run. The raw counts are
+# the one file those loaders do not cover; they are resolved by listing the
+# bucket, never by composing a versioned name.
 #
 # Everything here is namespace-qualified. epigen_qc_dir() is lib/panel_export.R's.
 
@@ -129,19 +130,20 @@ atac_raw_counts_path <- function() {
 
 # ---- building the shared objects -------------------------------------------
 
-#' The muscle ATAC qc-norm matrix and sample sheet, from the staging prefix.
+#' The muscle ATAC qc-norm matrix and sample sheet, from the c2.0 data-hub release.
 atac_qc_objects <- function() {
   qc <- MotrpacHumanPreSuspensionData::load_qc(
     selected_tissues = ATAC_TISSUE,
     selected_omes = ATAC_OME,
     epigen = TRUE,
+    gsutil = Sys.getenv("GSUTIL", unset = "gsutil"),
     repo_local_dir = epigen_qc_dir(),
     verbose = FALSE
   )
   objects <- qc[[ATAC_TISSUE]][[ATAC_OME]]
   if (is.null(objects) || is.null(objects$qc_norm) || is.null(objects$sample_metadata)) {
     stop("load_qc(epigen = TRUE) returned no ", ATAC_TISSUE, " ", ATAC_OME,
-         " objects — check gsutil access to the staging prefix", call. = FALSE)
+         " objects — check gsutil access to the c2.0 data-hub bucket", call. = FALSE)
   }
   objects
 }
@@ -153,13 +155,13 @@ atac_differential_analysis <- function() {
     selected_omes = ATAC_OME,
     selected_tissues = ATAC_TISSUE,
     epigen = TRUE,
-    repo_local_dir = epigen_qc_dir(),
     verbose = FALSE
   )
   table <- da[[ATAC_TISSUE]][[ATAC_OME]]
   if (is.null(table)) {
     stop("load_differential_analysis(epigen = TRUE) returned no ", ATAC_TISSUE, " ",
-         ATAC_OME, " table — check gsutil access to the staging prefix", call. = FALSE)
+         ATAC_OME, " table — check the public c2.0 CloudFront release is reachable",
+         call. = FALSE)
   }
   as.data.frame(table)
 }

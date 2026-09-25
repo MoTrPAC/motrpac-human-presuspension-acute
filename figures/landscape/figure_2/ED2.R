@@ -10,10 +10,10 @@
 #          ED2F  overlap between omes within each tissue
 # Tables:  ST2f   phospho ORA (PTMsigDB)                    (written by ED2E)
 #
-# Needs consortium data access. ED2A, ED2C, ED2E and ED2F share one
-# load_differential_analysis(epigen = TRUE) pass; the ATAC and methylCap DA
-# tables are not in the data package and are downloaded into EPIGEN_QC_DIR on
-# first use, then reused.
+# Needs consortium data access: ED2E reads load_qc(). ED2A, ED2C, ED2E and ED2F
+# share one load_differential_analysis(epigen = TRUE) pass, which downloads the
+# ATAC and methylCap DA tables from the public c2.0 CloudFront release on every
+# run; nothing is cached.
 #
 #   Rscript figures/landscape/ED2.R          every panel
 #   Rscript figures/landscape/ED2.R ED2D     one panel
@@ -60,24 +60,17 @@ acute_da <- local({
       epigen = TRUE,
       combine_with_featgene = TRUE,
       single_matrix = TRUE,
-      repo_local_dir = epigen_qc_dir(),
       verbose = FALSE
     )
 
-    # epigen = TRUE is a request, not a guarantee. load_DA_from_bucket() lists
-    # the staging bucket with `gsutil ls -R` and, if that listing fails — an
-    # expired credential is the common case — returns an empty list after a
-    # message and nothing else, and the five package-shipped omes come back as
-    # though nothing had happened. The same check cross_tissue_da() makes,
-    # stated here because this is where the load is.
+    # Both epigen assays must come back; stop rather than draw from five omes.
     missing_epigen <- setdiff(c("epigen-atac-seq", "epigen-methylcap-seq"),
                               unique(as.character(cache$assay)))
     if (length(missing_epigen) > 0) {
       stop("epigen = TRUE but the differential analysis came back without ",
            paste(missing_epigen, collapse = " and "),
-           ".\n  The staging-bucket listing failed silently. Refresh the ",
-           "credential with `gcloud auth login` and rebuild; the cached files ",
-           "under EPIGEN_QC_DIR cannot be used without it.", call. = FALSE)
+           ".\n  The tables come from the public c2.0 CloudFront release; ",
+           "check it is reachable and rebuild.", call. = FALSE)
     }
     cache
   }
@@ -486,17 +479,9 @@ ed2d <- function() {
 # shows up in the build log rather than being discovered later.
 #
 # Site confidence in that check is read PER TISSUE, from
-# *_PROT_PH_QC$feature_metadata rather than from HUMAN_FEATURE_TO_GENE. The two
-# disagree by construction and the per-tissue table is the right one:
-#
-#   HUMAN_FEATURE_TO_GENE is keyed on (assay, feature_id) with no tissue column,
-#   so its prot-ph rows are the UNION of the two tissues — 18,548 muscle plus
-#   21,022 adipose over 7,865 shared, exactly 31,705. Localization confidence is
-#   a per-tissue measurement, and 859 of those shared sites disagree between
-#   muscle and adipose (782 muscle-only, 77 adipose-only). Having one row per
-#   site, that table collapses every disagreement to FALSE, which undercounts
-#   muscle's confident sites by up to 782. flanking_sequence does NOT diverge —
-#   all 7,865 agree — because it is a property of the protein, not the assay.
+# *_PROT_PH_QC$feature_metadata. HUMAN_FEATURE_TO_GENE has no confident_site
+# column. Localization confidence is a per-tissue measurement: 859 of the 7,865
+# sites shared by muscle and adipose disagree (782 muscle-only, 77 adipose-only).
 #
 # Per tissue, the check lands within 14 of the CSV on muscle's input (3,850 vs
 # 3,836) but 572 over on its background, and 9 of the 48 drawn cells still cross
@@ -691,7 +676,7 @@ ed2e <- function() {
       padj_column = "adj_p_value",
       padj_legend_title = "adj p \n(background)",
       padj_fill = "grey80",
-      colors = c("white", "#543483"),
+      colors = unname(MotrpacHumanPreSuspensionAnalysis::ORA_COLORS),
       heatmap_args = list(
         name = "-log10(p)",
         na_col = "grey90",

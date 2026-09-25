@@ -14,10 +14,10 @@
 # Tables:  ST2c    number of DA features                     (written by FIG2A)
 #          ST2e    cross-tissue ORA                          (written by FIG2B)
 #
-# Needs consortium data access. Six of the seven panels read one
-# load_differential_analysis(epigen = TRUE) pass; the ATAC and methylCap DA
-# tables are not in the data package and are downloaded into EPIGEN_QC_DIR on
-# first use, about 7.7 GB, then reused.
+# Needs no consortium data access. Six of the seven panels read one
+# load_differential_analysis(epigen = TRUE) pass, which downloads the ATAC and
+# methylCap DA tables (about 7.7 GB) from the public c2.0 CloudFront release on
+# every run; nothing is cached.
 #
 #   Rscript figures/landscape/FIG2.R          every panel
 #   Rscript figures/landscape/FIG2.R FIG2D    one panel
@@ -61,10 +61,8 @@ TISSUE_SETS <- c("Muscle", "Blood", "Adipose")
 # should not be read to build FIG2D, which is the one panel that does not need
 # it.
 #
-# The epigenomics DA tables are not shipped in the package; they are downloaded
-# into EPIGEN_QC_DIR, which the package requires as its cache. The bucket is the
-# package default, the staging prefix the current precovid-repro cycle writes:
-# ATAC DA is v2.0 there, against v1.2 on the published collection.
+# The epigenomics DA tables come from the public c2.0 CloudFront release (ATAC
+# v2.1, methylCap v1.2), downloaded on every call.
 differential_analysis <- local({
   cache <- NULL
   function() {
@@ -857,7 +855,7 @@ fig2f <- function() {
       padj_column = "adj_p_value",
       padj_legend_title = "adj p \n(background)",
       padj_fill = "grey70",
-      colors = c("white", "#543483"),
+      colors = unname(MotrpacHumanPreSuspensionAnalysis::ORA_COLORS),
       heatmap_args = list(
         name = "-log10(p)",
         na_col = "grey90",

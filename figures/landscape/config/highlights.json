@@ -168,7 +168,7 @@
     "cmeans": {
       "panels": ["FIG4D", "FIG4F", "ED5C", "ED5D", "ED5E"],
       "match_on": "set",
-      "provenance": "CMEANS_PATHWAY and CMEANS_PATHWAY_LABEL in figure_4/cmeans.env",
+      "provenance": "CURRENT_PATHWAY in c-means_main_figure.Rmd (precovid-analyses figures/landscape/figure_3); label as in the ED5B selection",
       "sets": [{"set": "WP_VEGFA_VEGFR2_SIGNALING", "label": "VEGFA/VEGFR2 Signaling"}]
     },
     "FIG6D": {

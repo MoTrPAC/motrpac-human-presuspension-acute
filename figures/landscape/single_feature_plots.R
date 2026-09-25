@@ -16,7 +16,7 @@
 #                 Rscript figures/landscape/single_feature_plots.R ED2B FIG7C
 #
 # ED3B and ED3C are drawn by sex_differences_single_feature() from
-# helpers/ED3.R; every other entry uses plot_single_feature().
+# extended_data_3/ED3_helpers.R; every other entry uses plot_single_feature().
 
 # Sourced by a figure script as well as run directly, so the root is taken from
 # landscape_root() when panel_export.R is already loaded and from this file's
@@ -85,9 +85,6 @@ SINGLE_FEATURE_PLOTS <- list(
     figure = "Extended Data 2B",
     title = "Example single-feature trajectories per hit type",
     build = function() {
-      # The phosphosite's ome is named explicitly: "all" omes routes the request
-      # through a metabolomics-platform filter that discards every
-      # non-metabolite row.
       assemble_feature_panel(
         list(
           highlighted_feature_plot("ED2B", "ppargc1a", color_time_labels = FALSE,
@@ -126,7 +123,7 @@ SINGLE_FEATURE_PLOTS <- list(
 
   # ---- Extended Data 3 -----------------------------------------------------
   #
-  # sex_sensitivity_helpers.R is sourced per entry, not at the top of the file:
+  # ED3_helpers.R is sourced per entry, not at the top of the file:
   # nothing else in the catalog needs it.
 
   ED3B = list(
@@ -403,28 +400,6 @@ single_feature_panel_names <- function() {
 }
 
 # ---- Running the whole catalog ---------------------------------------------
-
-#' The catalog entry for one name, with a message naming the alternatives when
-#' there is no such entry.
-single_feature_entry <- function(name) {
-  if (!name %in% names(SINGLE_FEATURE_PLOTS)) {
-    stop(
-      "unknown single-feature plot '", name, "'. Known plots: ",
-      paste(names(SINGLE_FEATURE_PLOTS), collapse = ", "),
-      call. = FALSE
-    )
-  }
-  SINGLE_FEATURE_PLOTS[[name]]
-}
-
-#' The plot one catalog entry draws. Figure scripts call this.
-single_feature_plot <- function(name) single_feature_entry(name)$build()
-
-#' The catalog names that carry a panel id, in catalog order.
-single_feature_panel_names <- function() {
-  Filter(function(name) !is.na(SINGLE_FEATURE_PLOTS[[name]]$panel),
-         names(SINGLE_FEATURE_PLOTS))
-}
 
 if (sys.nframe() == 0) {
   # Attached, not merely loaded: plot_single_feature() calls

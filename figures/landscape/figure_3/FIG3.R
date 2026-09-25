@@ -334,7 +334,7 @@ fig3b <- function() {
       statistic_column = "neg_log10_p",
       contrast_column = "contrast",
       padj_column = "adj_p_value",
-      colors = c("white", "#543483"),
+      colors = unname(MotrpacHumanPreSuspensionAnalysis::ORA_COLORS),
       heatmap_args = list(
         column_title = "Muscle \n Transcriptomics",
         row_order = ordered_sets,

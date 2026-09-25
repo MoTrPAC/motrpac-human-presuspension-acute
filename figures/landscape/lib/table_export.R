@@ -395,6 +395,11 @@ explain_failure <- function(e) {
              "     Check MotrpacHumanPreSuspensionData and ...Analysis are installed",
              "     at the versions config/required_packages.tsv pins, and attached."))
   }
+  if (hit("cannot open (the connection to|URL) 'https?://|Timeout of [0-9]+ seconds")) {
+    return(c("why: an HTTPS download failed (the public epigenomics DA release on",
+             "     CloudFront). No credentials are involved; check the network and",
+             "     that the URL above resolves."))
+  }
   if (hit("gsutil|CommandException|AccessDenied|ServiceException|401|403|credential|not authenticated")) {
     return(c("why: a consortium bucket read failed.",
              "     Needs gsutil on PATH, an authenticated account, and consortium",

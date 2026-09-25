@@ -13,9 +13,9 @@
 #   ST2g  sex-specific DA estimate correlation   ED3.R (ED3A)
 #   ST2h  sex-specific differences enrichment    ED3.R (ED3A)
 #
-# ST2d needs consortium data access. load_differential_analysis(epigen = TRUE)
-# downloads the epigenomics DA tables into EPIGEN_QC_DIR on first use, then
-# reuses the cache. ST2a reads a stored object and needs neither.
+# ST2d needs no consortium data access. load_differential_analysis(epigen = TRUE)
+# downloads the epigenomics DA tables from the public c2.0 CloudFront release on
+# every run; nothing is cached. ST2a reads a stored object.
 #
 #   Rscript figures/landscape/tables/ST2.R          every sub-table here
 #   Rscript figures/landscape/tables/ST2.R ST2a     one of them
@@ -27,8 +27,6 @@ suppressPackageStartupMessages({
 
 here <- dirname(sub("^--file=", "",
                     grep("^--file=", commandArgs(FALSE), value = TRUE)[1]))
-# panel_export.R for epigen_qc_dir(); table_export.R after it.
-source(file.path(here, "..", "lib", "panel_export.R"))
 source(file.path(here, "..", "lib", "table_export.R"))
 
 # ---- shared ----------------------------------------------------------------
@@ -76,7 +74,6 @@ all_da <- local({
         selected_omes = "all",
         selected_tissues = "all",
         epigen = TRUE,
-        repo_local_dir = epigen_qc_dir(),
         single_matrix = TRUE
       )
     }

@@ -1,9 +1,16 @@
 # Packages the figure scripts, the fits and the shared helpers under lib/
 # import. Install these before a first run.
 #
-# Maintained by hand. No script in this repo reads this file; it is the list the
-# README and the `why:` hint on a missing-package failure point at. Change it
-# when a script starts or stops loading a package.
+# Maintained by hand. One package per line, then a comment naming where it
+# comes from (CRAN, Bioconductor or GitHub) and the one-line R call that
+# installs it on its own, for anyone installing packages one at a time rather
+# than through setup/install_packages.R. Everything after # is ignored by the
+# scripts that read this file. Change it when a script starts or stops loading
+# a package.
+#
+# Bioconductor packages need BiocManager (install.packages("BiocManager")) at
+# the release that pairs with your R: 3.20 on R 4.4, 3.22 on R 4.5. GitHub
+# packages need remotes (install.packages("remotes")).
 #
 # Versions are not recorded here. config/required_packages.tsv pins the five
 # whose version changes a panel, and outputs/panels/export_manifest.tsv records
@@ -23,42 +30,54 @@
 #       from. No script here names it.
 #
 # Two entries are not on CRAN or Bioconductor and install from GitHub:
-# MotrpacBicQC (MoTrPAC/MotrpacBicQC@v2.0.0) and PLIER (wgmao/PLIER).
+# MotrpacBicQC (MoTrPAC/MotrpacBicQC) and PLIER (wgmao/PLIER).
+#
+# Four are Bioconductor annotation packages rather than software: GO.db and
+# AnnotationDbi, which figure_3/ST3.R attaches for ST3g and ST3h, and
+# org.Hs.eg.db and TxDb.Hsapiens.UCSC.hg19.knownGene, which annotatr reads
+# when figure_6/FIG6_ED8_helpers.R builds the hg19_basicgenes annotation.
+# TMSig is on Bioconductor from release 3.20.
+#
+# setup/install_packages.R installs this list; setup/preflight.sh checks it.
 
-annotatr
-BiocParallel
-circlize
-ComplexHeatmap
-ComplexUpset
-data.table
-dplyr
-edgeR
-forcats
-geomtextpath
-ggh4x
-ggnewscale
-ggplot2
-ggpubr
-ggrastr
-ggrepel
-gplots
-gridExtra
-jsonlite
-latex2exp
-limma
-lme4
-MotrpacBicQC
-openxlsx
-patchwork
-pheatmap
-PLIER
-ragg
-RColorBrewer
-readxl
-scales
-stringr
-tibble
-tidyr
-TMSig
-variancePartition
-WGCNA
+annotatr                           # Bioconductor  BiocManager::install("annotatr")
+AnnotationDbi                      # Bioconductor  BiocManager::install("AnnotationDbi")
+BiocParallel                       # Bioconductor  BiocManager::install("BiocParallel")
+circlize                           # CRAN          install.packages("circlize")
+ComplexHeatmap                     # Bioconductor  BiocManager::install("ComplexHeatmap")
+ComplexUpset                       # CRAN          install.packages("ComplexUpset")
+data.table                         # CRAN          install.packages("data.table")
+dplyr                              # CRAN          install.packages("dplyr")
+edgeR                              # Bioconductor  BiocManager::install("edgeR")
+forcats                            # CRAN          install.packages("forcats")
+geomtextpath                       # CRAN          install.packages("geomtextpath")
+ggh4x                              # CRAN          install.packages("ggh4x")
+ggnewscale                         # CRAN          install.packages("ggnewscale")
+ggplot2                            # CRAN          install.packages("ggplot2")
+ggpubr                             # CRAN          install.packages("ggpubr")
+ggrastr                            # CRAN          install.packages("ggrastr")
+ggrepel                            # CRAN          install.packages("ggrepel")
+GO.db                              # Bioconductor  BiocManager::install("GO.db")
+gplots                             # CRAN          install.packages("gplots")
+gridExtra                          # CRAN          install.packages("gridExtra")
+jsonlite                           # CRAN          install.packages("jsonlite")
+latex2exp                          # CRAN          install.packages("latex2exp")
+limma                              # Bioconductor  BiocManager::install("limma")
+lme4                               # CRAN          install.packages("lme4")
+MotrpacBicQC                       # GitHub        remotes::install_github("MoTrPAC/MotrpacBicQC")
+openxlsx                           # CRAN          install.packages("openxlsx")
+org.Hs.eg.db                       # Bioconductor  BiocManager::install("org.Hs.eg.db")
+patchwork                          # CRAN          install.packages("patchwork")
+pheatmap                           # CRAN          install.packages("pheatmap")
+PLIER                              # GitHub        remotes::install_github("wgmao/PLIER")
+ragg                               # CRAN          install.packages("ragg")
+RColorBrewer                       # CRAN          install.packages("RColorBrewer")
+readxl                             # CRAN          install.packages("readxl")
+scales                             # CRAN          install.packages("scales")
+stringr                            # CRAN          install.packages("stringr")
+tibble                             # CRAN          install.packages("tibble")
+tidyr                              # CRAN          install.packages("tidyr")
+TMSig                              # Bioconductor  BiocManager::install("TMSig")
+TxDb.Hsapiens.UCSC.hg19.knownGene  # Bioconductor  BiocManager::install("TxDb.Hsapiens.UCSC.hg19.knownGene")
+variancePartition                  # Bioconductor  BiocManager::install("variancePartition")
+WGCNA                              # CRAN          install.packages("WGCNA")

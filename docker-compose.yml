@@ -1,0 +1,57 @@
+# Run figures/landscape/ inside the image built from its own package manifest.
+#
+#   docker compose build landscape
+#   docker compose run --rm landscape bash figures/landscape/setup/preflight.sh
+#   docker compose run --rm landscape Rscript figures/landscape/figure_2/FIG2.R
+#   docker compose run --rm landscape                       # a shell
+#
+# Scope: this repository and its R environment. The image holds R 4.4.1,
+# Bioconductor 3.20, every package config/packages.tsv names and the
+# public Analysis package at its current release. The access-gated Data package
+# is not in the image: mount a checkout (below) and the entrypoint installs it
+# into the acute-local-lib volume, or bake it in at build time with a GitHub
+# token (see figures/landscape/docs/INSTALL.md).
+
+services:
+  landscape:
+    build:
+      context: figures/landscape
+      dockerfile: docker/Dockerfile
+      args:
+        R_VERSION: "4.4.1"
+        BIOC_VERSION: "3.20"
+        CRAN_SNAPSHOT: "2026-10-01"
+    image: motrpac-human-presuspension-acute:4.4.1
+    working_dir: /github/motrpac-human-presuspension-acute
+
+    environment:
+      GITHUB_ROOT: /github
+      R_LIBS_USER: /local-lib
+      TZ: "${TZ:-America/Chicago}"
+      # Cores the two mixed-model fits hand to variancePartition. The fits'
+      # .env files default to 1; raise it per run if the VM has them.
+      VARIANCEPARTITION_PARALLEL_CORES: "${VARIANCEPARTITION_PARALLEL_CORES:-1}"
+
+    volumes:
+      # This repository, read-write: outputs/, staging/ (the epigen QC cache)
+      # and the fits are written under figures/landscape/ and persist on the
+      # host between runs.
+      - .:/github/motrpac-human-presuspension-acute
+
+      # Consortium bucket access. `gcloud auth login` on the host; the container
+      # reuses those credentials.
+      - ${HOME}/.config/gcloud:/root/.config/gcloud
+
+      # The only writable R library: the Data package installed from the mount
+      # below. A named volume, so the ~0.5 GB install survives between runs.
+      - acute-local-lib:/local-lib
+
+      # The gated Data package, as a checkout beside this repository. Uncomment
+      # for a run that needs it; the entrypoint installs it and reinstalls only
+      # when its version or commit changes.
+      # - ../MotrpacHumanPreSuspensionData:/github/MotrpacHumanPreSuspensionData
+
+    command: ["bash"]
+
+volumes:
+  acute-local-lib:

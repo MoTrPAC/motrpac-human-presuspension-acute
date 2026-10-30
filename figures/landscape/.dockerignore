@@ -1,0 +1,11 @@
+# The image build reads three files from this directory: the package manifest,
+# the installer, and the entrypoint. Everything else is working data
+# (assembled/ is tens of MB of PDFs, staging/ can be 6 GB of downloaded
+# matrices) and has no business in the build context.
+#
+# Whitelist style: ignore everything, then un-ignore what the Dockerfile COPYs.
+*
+
+!config/packages.tsv
+!setup/install_packages.R
+!docker/entrypoint.sh

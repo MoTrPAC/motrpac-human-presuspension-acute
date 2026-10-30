@@ -37,7 +37,7 @@ source(file.path(landscape_root(), "lib", "supp_table_helpers.R"))
 #
 # What the table reports is decided entirely by which version of the Analysis
 # package is installed: the clustering is in the object, not computed here. The
-# pin in config/required_packages.tsv is what fixes it, and the export manifest
+# pin in config/packages.tsv is what fixes it, and the export manifest
 # records the version every run was built from.
 
 st4a <- function() {

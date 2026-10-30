@@ -249,7 +249,7 @@ You need all five of these. [`docs/INSTALL.md`](docs/INSTALL.md) walks through i
 |---|---|
 | **R 4.4.1** | the version every panel in `assembled/` was drawn under |
 | **The two data packages** | `MotrpacHumanPreSuspensionData` 2.0.3 and `MotrpacHumanPreSuspensionAnalysis` 2.0.8, installed from source. `Data` needs an approved consortium data-access request; `Analysis` is public. Data 2.0.3 requires Analysis >= 2.0.8 |
-| **The packages in `config/panel_packages.txt`** | 41 packages: 39 from CRAN and Bioconductor (four of them annotation packages), plus `MotrpacBicQC` and `PLIER` (`wgmao/PLIER`) from GitHub. `config/required_packages.tsv` pins the five whose version changes the numbers: the two data packages, `MotrpacBicQC`, and `ggpubr >= 1.0.0` with the `rstatix` it requires |
+| **The packages in `config/packages.tsv`** | 44 rows: 40 from CRAN and Bioconductor (four of them annotation packages), `MotrpacBicQC` and `PLIER` (`wgmao/PLIER`) from GitHub, and the two data packages. Its `required_version` column pins the five whose version changes the numbers: the two data packages, `MotrpacBicQC`, and `ggpubr >= 1.0.0` with the `rstatix` it requires |
 | **`MotrpacBicQC` >= 2.0.0** | from GitHub (`MoTrPAC/MotrpacBicQC`). Both data packages require it |
 | **`gsutil` on `PATH`**, authenticated | for the epigenomics QC matrices (FIG1C, ED1B, ED1D, SF1, cached under `staging/`), the SF1C-SF1F raw ATAC counts, the ED1A ancestry PCs and the sex and cell-type DA fits. The epigenomics DA tables are a public HTTPS download and need no `gsutil` |
 
@@ -266,8 +266,8 @@ bash    figures/landscape/setup/preflight.sh --no-network
 
 The preflight follows the Stage 0 script of `motrpac-human-presuspension-repro`: one line per
 check, a report at `outputs/preflight_report.tsv`, and a non-zero exit only when something
-required is missing. It checks the tools on `PATH`, every package in `panel_packages.txt`,
-every pin in `required_packages.tsv`, that the data packages attach and carry the API the
+required is missing. It checks the tools on `PATH`, every package and pin in
+`config/packages.tsv`, that the data packages attach and carry the API the
 panels call, that the manifests parse and name scripts that exist, that the vendored inputs
 are in the checkout, which fits have run, consortium bucket access, the public epigenomics DA
 download, and disk and memory. `FAIL` blocks a run; `WARN` names the panels that will not
@@ -357,7 +357,7 @@ recognisable ones, an indented `why:` follows it saying what to do:
 ```
 [FAIL] FIG4A    there is no package called 'ComplexHeatmap'
         why: the package 'ComplexHeatmap' is not installed.
-             config/panel_packages.txt lists every package the figures need.
+             config/packages.tsv lists every package the figures need.
 ```
 
 It recognises a missing package, a function not in scope, a data-package object not on the

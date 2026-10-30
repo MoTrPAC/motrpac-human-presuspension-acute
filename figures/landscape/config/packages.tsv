@@ -1,0 +1,72 @@
+# Every R package the figure scripts, the four fits and lib/ load, with the
+# version a panel needs where one is pinned. setup/install_packages.R installs
+# this list and setup/preflight.sh checks it. Maintained by hand: change it when
+# a script starts or stops loading a package.
+#
+# required_version   empty: any release.
+#                    ">= x": a floor. Below it the preflight FAILs and the
+#                    installer moves the package to the current release, because
+#                    the version decides numbers (ggpubr < 1.0.0 adjusts p across
+#                    a different set of rows, and FIG4G and ED6E move).
+#                    "== x": the version every panel in assembled/ was drawn
+#                    under. A different one is a WARN; the installer leaves it
+#                    alone, and outputs/panels/export_manifest.tsv records what
+#                    each PDF was drawn from.
+# install            the one-line R call that installs the package on its own.
+#                    CRAN and Bioconductor packages need BiocManager at the
+#                    release that pairs with your R (3.20 on R 4.4); GitHub
+#                    packages need remotes. The call installs the current
+#                    release, not the pinned version.
+#
+# Not listed: base, grDevices, grid, stats, utils, methods, ... (versioned with
+# R itself), and MotrpacHumanPreSuspension, which no script here names.
+#
+# Four rows are Bioconductor annotation packages rather than software: GO.db and
+# AnnotationDbi (figure_3/ST3.R, for ST3g and ST3h), and org.Hs.eg.db and
+# TxDb.Hsapiens.UCSC.hg19.knownGene (annotatr, in figure_6/FIG6_ED8_helpers.R).
+# rstatix is loaded by no script: ggpubr >= 1.0.0 requires it.
+package	required_version	install
+AnnotationDbi		BiocManager::install("AnnotationDbi")
+annotatr		BiocManager::install("annotatr")
+BiocParallel		BiocManager::install("BiocParallel")
+circlize		install.packages("circlize")
+ComplexHeatmap		BiocManager::install("ComplexHeatmap")
+ComplexUpset		install.packages("ComplexUpset")
+data.table		install.packages("data.table")
+dplyr		install.packages("dplyr")
+edgeR		BiocManager::install("edgeR")
+forcats		install.packages("forcats")
+geomtextpath		install.packages("geomtextpath")
+ggh4x		install.packages("ggh4x")
+ggnewscale		install.packages("ggnewscale")
+ggplot2		install.packages("ggplot2")
+ggpubr	>= 1.0.0	install.packages("ggpubr")
+ggrastr		install.packages("ggrastr")
+ggrepel		install.packages("ggrepel")
+GO.db		BiocManager::install("GO.db")
+gplots		install.packages("gplots")
+gridExtra		install.packages("gridExtra")
+jsonlite		install.packages("jsonlite")
+latex2exp		install.packages("latex2exp")
+limma		BiocManager::install("limma")
+lme4		install.packages("lme4")
+MotrpacBicQC	>= 2.0.0	remotes::install_github("MoTrPAC/MotrpacBicQC")
+MotrpacHumanPreSuspensionAnalysis	== 2.0.8	remotes::install_github("MoTrPAC/MotrpacHumanPreSuspensionAnalysis")
+MotrpacHumanPreSuspensionData	== 2.0.3	remotes::install_github("MoTrPAC/MotrpacHumanPreSuspensionData")  (private: set GITHUB_PAT, or remotes::install_local("<path to the checkout>"))
+openxlsx		install.packages("openxlsx")
+org.Hs.eg.db		BiocManager::install("org.Hs.eg.db")
+patchwork		install.packages("patchwork")
+pheatmap		install.packages("pheatmap")
+PLIER		remotes::install_github("wgmao/PLIER")
+ragg		install.packages("ragg")
+RColorBrewer		install.packages("RColorBrewer")
+readxl		install.packages("readxl")
+rstatix	>= 1.0.0	install.packages("rstatix")
+scales		install.packages("scales")
+stringr		install.packages("stringr")
+tibble		install.packages("tibble")
+tidyr		install.packages("tidyr")
+TMSig		BiocManager::install("TMSig")
+TxDb.Hsapiens.UCSC.hg19.knownGene		BiocManager::install("TxDb.Hsapiens.UCSC.hg19.knownGene")
+variancePartition		BiocManager::install("variancePartition")
+WGCNA		install.packages("WGCNA")

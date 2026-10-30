@@ -1,4 +1,4 @@
-# Run figures/landscape/ inside the image built from its own package manifests.
+# Run figures/landscape/ inside the image built from its own package manifest.
 #
 #   docker compose build landscape
 #   docker compose run --rm landscape bash figures/landscape/setup/preflight.sh
@@ -6,7 +6,7 @@
 #   docker compose run --rm landscape                       # a shell
 #
 # Scope: this repository and its R environment. The image holds R 4.4.1,
-# Bioconductor 3.20, every package config/panel_packages.txt names and the
+# Bioconductor 3.20, every package config/packages.tsv names and the
 # public Analysis package at its current release. The access-gated Data package
 # is not in the image: mount a checkout (below) and the entrypoint installs it
 # into the acute-local-lib volume, or bake it in at build time with a GitHub

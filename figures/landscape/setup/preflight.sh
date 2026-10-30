@@ -142,44 +142,43 @@ else
   record_check WARN "tool:curl" "not on PATH; only this script's HTTPS probe uses it (R downloads the epigenomics DA itself)"
 fi
 
-# ---- 2. The packages in config/panel_packages.txt ---------------------------
-section "2. R packages (config/panel_packages.txt)"
+# ---- 2. The packages in config/packages.tsv ---------------------------------
+# Every row but the two data packages, which section 3 reports with the
+# message their absence deserves.
+section "2. R packages (config/packages.tsv)"
 
-PANEL_PKGS_TXT="${LANDSCAPE_ROOT}/config/panel_packages.txt"
-if [[ ! -f "${PANEL_PKGS_TXT}" ]]; then
-  record_check FAIL "panel_packages" "config/panel_packages.txt not found"
+PACKAGES_TSV="${LANDSCAPE_ROOT}/config/packages.tsv"
+if [[ ! -f "${PACKAGES_TSV}" ]]; then
+  record_check FAIL "packages" "config/packages.tsv not found"
 elif (( HAVE_R )); then
   # A while loop, not mapfile: macOS ships bash 3.2, which has no mapfile.
   PANEL_PKGS=()
   while IFS= read -r pkg; do
     [[ -n "${pkg}" ]] && PANEL_PKGS+=("${pkg}")
-  done < <(sed -e 's/#.*$//' -e 's/[[:space:]]//g' "${PANEL_PKGS_TXT}")
+  done < <(awk -F'\t' '/^#/ || $1 == "package" || $1 ~ /^MotrpacHumanPreSuspension/ {next} {print $1}' "${PACKAGES_TSV}")
   missing_pkgs="$(r_lines '
     pkgs <- commandArgs(trailingOnly = TRUE)
     miss <- pkgs[!vapply(pkgs, requireNamespace, logical(1), quietly = TRUE)]
     cat("@@", paste(miss, collapse = " "), "\n", sep = "")
   ' "${PANEL_PKGS[@]}")"
   if [[ -z "${missing_pkgs// /}" ]]; then
-    record_check PASS "panel_packages" "all ${#PANEL_PKGS[@]} packages installed"
+    record_check PASS "packages" "all ${#PANEL_PKGS[@]} packages installed"
   else
-    record_check FAIL "panel_packages" "missing: ${missing_pkgs# } — run: Rscript figures/landscape/setup/install_packages.R"
+    record_check FAIL "packages" "missing: ${missing_pkgs# } — run: Rscript figures/landscape/setup/install_packages.R"
   fi
 fi
 
-# ---- 3. The pins in config/required_packages.tsv ----------------------------
-# The two data packages, MotrpacBicQC, ggpubr and rstatix. A blocking row that
-# is off is a FAIL because its version decides numbers, not appearance (ggpubr
-# 0.6.3 and 1.0.0 draw different FIG4G and ED6E bubbles). A non-blocking row
-# that is off is a WARN: the panel builds, and export_manifest.tsv records what
-# it was drawn from. The Data package is gated, so its absence is a WARN that
-# names what it costs rather than a FAIL.
-section "3. Pinned versions (config/required_packages.tsv)"
+# ---- 3. The pinned rows of config/packages.tsv ------------------------------
+# The rows with a required_version: the two data packages, MotrpacBicQC, ggpubr
+# and rstatix. A ">=" floor that is not met is a FAIL because that version
+# decides numbers, not appearance (ggpubr 0.6.3 and 1.0.0 draw different FIG4G
+# and ED6E bubbles). An "==" row that is off is a WARN: the panel builds, and
+# export_manifest.tsv records what it was drawn from. The Data package is gated,
+# so its absence is a WARN that names what it costs rather than a FAIL.
+section "3. Pinned versions (config/packages.tsv)"
 
-REQUIRED_TSV="${LANDSCAPE_ROOT}/config/required_packages.tsv"
 DATA_PRESENT=0; ANALYSIS_PRESENT=0
-if [[ ! -f "${REQUIRED_TSV}" ]]; then
-  record_check FAIL "required_packages" "config/required_packages.tsv not found"
-elif (( HAVE_R )); then
+if [[ -f "${PACKAGES_TSV}" ]] && (( HAVE_R )); then
   while IFS=$'\t' read -r pkg status installed want op blocking; do
     [[ -z "${pkg}" ]] && continue
     case "${pkg}:${status}" in
@@ -206,17 +205,20 @@ elif (( HAVE_R )); then
   done < <(r_lines '
     tsv <- commandArgs(trailingOnly = TRUE)[1]
     rows <- read.csv(tsv, sep = "\t", quote = "", comment.char = "#", stringsAsFactors = FALSE, check.names = FALSE)
+    req <- trimws(as.character(rows$required_version))
+    rows <- rows[nzchar(req), , drop = FALSE]; req <- req[nzchar(req)]
     for (i in seq_len(nrow(rows))) {
-      p <- rows$package[i]; want <- rows$version[i]; op <- rows$op[i]
+      p <- rows$package[i]; op <- substr(req[i], 1, 2); want <- trimws(substring(req[i], 3))
       got <- tryCatch(as.character(utils::packageVersion(p)), error = function(e) NA_character_)
       status <- if (is.na(got)) "MISSING" else {
         cmp <- utils::compareVersion(got, want)
         ok <- if (op == "==") cmp == 0 else if (op == ">=") cmp >= 0 else NA
         if (isTRUE(ok)) "OK" else "MISMATCH"
       }
-      cat("@@", paste(p, status, ifelse(is.na(got), "-", got), want, op, rows$blocking[i], sep = "\t"), "\n", sep = "")
+      blocking <- if (op == ">=") "yes" else "no"
+      cat("@@", paste(p, status, ifelse(is.na(got), "-", got), want, op, blocking, sep = "\t"), "\n", sep = "")
     }
-  ' "${REQUIRED_TSV}")
+  ' "${PACKAGES_TSV}")
 fi
 
 # ---- 4. The packages load and are the build the panels expect ---------------

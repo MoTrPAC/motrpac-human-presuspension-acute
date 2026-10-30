@@ -1,9 +1,9 @@
 #!/usr/bin/env Rscript
 # figures/landscape/setup/install_packages.R — install what config/ says a run needs.
 #
-# Reads config/panel_packages.txt (every package the figure scripts, fits and
-# lib/ load) and config/required_packages.tsv (the five pins that decide
-# numbers), installs what is missing, and reports what is still off. It is the
+# Reads config/packages.tsv (every package the figure scripts, fits and lib/
+# load, with the version a panel needs where one is pinned), installs what is
+# missing, and reports what is still off. It is the
 # executable form of docs/INSTALL.md, and the Dockerfile runs it too, so a native
 # install and the image are built by the same code.
 #
@@ -28,15 +28,15 @@
 # Packages install at their current release: CRAN and Bioconductor packages from
 # the repositories, the GitHub packages from the default branch of each
 # repository. Already-installed packages are left alone, whatever their
-# version, except the pins: a blocking row of required_packages.tsv that is off
-# (ggpubr < 1.0.0) is moved to a version that satisfies it. Nothing else is
-# upgraded, because the versions a panel was drawn from are recorded per PDF in
+# version, except one below a ">=" floor in packages.tsv (ggpubr < 1.0.0),
+# which is moved to the current release. Nothing else is upgraded, because the
+# versions a panel was drawn from are recorded per PDF in
 # outputs/panels/export_manifest.tsv and an unasked-for upgrade is the one way
 # to make that record wrong without noticing.
 #
-# Exit status: non-zero when a package in panel_packages.txt, the Analysis
-# package, or a blocking pin is still off at the end. A missing Data package is
-# a note unless it was asked for.
+# Exit status: non-zero when a package in packages.tsv is still missing, or
+# still below its ">=" floor, at the end. A missing Data package is a note
+# unless it was asked for.
 
 options(warn = 1)
 
@@ -66,8 +66,6 @@ DATA_REPO <- "MoTrPAC/MotrpacHumanPreSuspensionData"
 BICQC_REPO <- "MoTrPAC/MotrpacBicQC"
 PLIER_REPO <- "wgmao/PLIER"
 
-GITHUB_PKGS <- c(MotrpacBicQC = BICQC_REPO, PLIER = PLIER_REPO)
-
 # ---- Locate config/ ----------------------------------------------------------
 
 script_dir <- function() {
@@ -77,11 +75,8 @@ script_dir <- function() {
 }
 root <- opt("root", if (!is.null(script_dir())) file.path(script_dir(), "..") else getwd())
 root <- normalizePath(root, mustWork = TRUE)
-panel_txt <- file.path(root, "config", "panel_packages.txt")
-required_tsv <- file.path(root, "config", "required_packages.tsv")
-for (f in c(panel_txt, required_tsv)) {
-  if (!file.exists(f)) stop("not found: ", f, "\n  pass --root=<path to figures/landscape>")
-}
+packages_tsv <- file.path(root, "config", "packages.tsv")
+if (!file.exists(packages_tsv)) stop("not found: ", packages_tsv, "\n  pass --root=<path to figures/landscape>")
 
 say <- function(...) cat("[install] ", paste0(...), "\n", sep = "")
 
@@ -119,14 +114,22 @@ options(Ncpus = max(1L, parallel::detectCores() - 1L))
 # aborts both on a slow link.
 options(timeout = max(3600, getOption("timeout")))
 
-# ---- What the manifests say --------------------------------------------------
-
-panel_pkgs <- readLines(panel_txt, warn = FALSE)
-panel_pkgs <- trimws(sub("#.*$", "", panel_pkgs))
-panel_pkgs <- panel_pkgs[nzchar(panel_pkgs)]
+# ---- What the manifest says --------------------------------------------------
 
 # quote = "": the install column holds R calls with double quotes in them.
-pins <- read.csv(required_tsv, sep = "\t", quote = "", comment.char = "#", stringsAsFactors = FALSE, check.names = FALSE)
+manifest <- read.csv(packages_tsv, sep = "\t", quote = "", comment.char = "#", stringsAsFactors = FALSE, check.names = FALSE)
+manifest$required_version <- trimws(as.character(manifest$required_version))
+# required_version is empty (any release), ">= x" (a floor: below it the package
+# is moved to the current release) or "== x" (the version the panels were drawn
+# under: reported, never changed).
+manifest$op <- ifelse(startsWith(manifest$required_version, ">="), ">=",
+                      ifelse(startsWith(manifest$required_version, "=="), "==", NA_character_))
+manifest$want <- trimws(sub("^(>=|==)", "", manifest$required_version))
+manifest$github <- grepl("install_github", manifest$install, fixed = TRUE)
+
+github_pkgs <- manifest$package[manifest$github]
+cran_bioc_pkgs <- manifest$package[!manifest$github]
+pins <- manifest[!is.na(manifest$op), , drop = FALSE]
 
 pin_ok <- function(p, want, op) {
   got <- version_of(p)
@@ -141,10 +144,10 @@ pin_ok <- function(p, want, op) {
 # is what keeps limma, edgeR, TMSig and their S4 neighbours on the same ABI.
 
 if (stage %in% c("cran-bioc", "all")) {
-  cran_bioc <- setdiff(panel_pkgs, names(GITHUB_PKGS))
+  cran_bioc <- cran_bioc_pkgs
   missing <- cran_bioc[!vapply(cran_bioc, installed, logical(1))]
   if (!length(missing)) {
-    say("every CRAN/Bioconductor package in panel_packages.txt is installed (", length(cran_bioc), ")")
+    say("every CRAN/Bioconductor package in packages.tsv is installed (", length(cran_bioc), ")")
   } else {
     say(length(missing), " to install from CRAN/Bioconductor ", bioc, ": ", paste(missing, collapse = " "))
     if (!dry_run) {
@@ -189,7 +192,7 @@ if (stage %in% c("github", "all")) {
   # MotrpacBicQC: both data packages require >= 2.0.0, so a build below that is
   # replaced by the current one.
   bicqc <- pins[pins$package == "MotrpacBicQC", , drop = FALSE]
-  if (nrow(bicqc) && !pin_ok("MotrpacBicQC", bicqc$version, bicqc$op)) {
+  if (nrow(bicqc) && !pin_ok("MotrpacBicQC", bicqc$want, bicqc$op)) {
     install_gh(BICQC_REPO)
   } else if (!installed("MotrpacBicQC")) {
     install_gh(BICQC_REPO)
@@ -225,36 +228,36 @@ if (stage %in% c("github", "all")) {
 
 if (dry_run) { say("dry run; nothing installed"); quit(status = 0) }
 
-# ---- Pins: move a blocking row that is off, then report everything ----------
+# ---- Pins: move a CRAN package below its floor, then report every pin --------
 
 if (stage == "all") {
   for (i in seq_len(nrow(pins))) {
     p <- pins$package[i]
-    if (pins$blocking[i] != "yes" || pins$source[i] != "CRAN") next
-    if (!installed(p) || pin_ok(p, pins$version[i], pins$op[i])) next
-    say(p, " ", version_of(p), " is off its blocking pin (", pins$op[i], " ", pins$version[i], "); installing the current CRAN release")
+    if (pins$op[i] != ">=" || pins$github[i]) next
+    if (!installed(p) || pin_ok(p, pins$want[i], pins$op[i])) next
+    say(p, " ", version_of(p), " is below its floor (", pins$op[i], " ", pins$want[i], "); installing the current CRAN release")
     utils::install.packages(p)
   }
 }
 
 cat("\n")
-say("required_packages.tsv:")
+say("pinned versions in packages.tsv:")
 problems <- character(0)
 for (i in seq_len(nrow(pins))) {
   p <- pins$package[i]; got <- version_of(p)
-  status <- if (is.na(got)) "MISSING" else if (pin_ok(p, pins$version[i], pins$op[i])) "ok" else "OFF"
-  cat(sprintf("  %-36s %-8s installed %-8s pinned %s %s%s\n", p, status, ifelse(is.na(got), "-", got),
-              pins$op[i], pins$version[i], if (pins$blocking[i] == "yes") "  (blocking)" else ""))
+  status <- if (is.na(got)) "MISSING" else if (pin_ok(p, pins$want[i], pins$op[i])) "ok" else "OFF"
+  cat(sprintf("  %-36s %-8s installed %-8s required %s %s%s\n", p, status, ifelse(is.na(got), "-", got),
+              pins$op[i], pins$want[i], if (pins$op[i] == ">=") "  (blocking)" else ""))
   if (status == "MISSING" && p == "MotrpacHumanPreSuspensionData" && !with_data && is.null(data_source)) next
-  if (status == "MISSING" && stage == "cran-bioc" && p != "ggpubr" && p != "rstatix") next
-  if (status == "MISSING" || (status == "OFF" && pins$blocking[i] == "yes")) problems <- c(problems, p)
+  if (status == "MISSING" && stage == "cran-bioc" && pins$github[i]) next
+  if (status == "MISSING" || (status == "OFF" && pins$op[i] == ">=")) problems <- c(problems, p)
 }
 
-check_set <- if (stage == "cran-bioc") setdiff(panel_pkgs, names(GITHUB_PKGS)) else panel_pkgs
-if (stage == "github") check_set <- names(GITHUB_PKGS)
+check_set <- switch(stage, "cran-bioc" = cran_bioc_pkgs, github = github_pkgs, manifest$package)
+if (!with_data && is.null(data_source)) check_set <- setdiff(check_set, "MotrpacHumanPreSuspensionData")
 still_missing <- check_set[!vapply(check_set, installed, logical(1))]
 if (length(still_missing)) {
-  say("still missing from panel_packages.txt: ", paste(still_missing, collapse = " "))
+  say("still missing from packages.tsv: ", paste(still_missing, collapse = " "))
   problems <- c(problems, still_missing)
 }
 

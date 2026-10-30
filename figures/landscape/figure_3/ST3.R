@@ -53,8 +53,8 @@ source(file.path(here, "FIG3_ED4_helpers.R"))
 # other collections fill ONTOLOGY with their database name and leave ID empty;
 # MSigDB set names are the only identifier they have.
 #
-# GO.db is attached here rather than by a figure script. No panel needs it, and
-# config/panel_packages.txt covers the panel arm only.
+# GO.db is attached here rather than by a figure script. No panel needs it;
+# config/packages.tsv lists it for this script.
 
 GO_DATABASES <- c(GOBP = "BP", GOCC = "CC", GOMF = "MF")
 

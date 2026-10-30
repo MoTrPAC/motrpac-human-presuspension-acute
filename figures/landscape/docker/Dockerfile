@@ -1,8 +1,8 @@
 # figures/landscape — the R environment the figure scripts run in, as an image.
 #
-# Built from the same two manifests a native install reads
-# (config/panel_packages.txt, config/required_packages.tsv) by the same script
-# (setup/install_packages.R), so the image and docs/INSTALL.md cannot disagree about
+# Built from the same manifest a native install reads (config/packages.tsv)
+# by the same script (setup/install_packages.R), so the image and
+# docs/INSTALL.md cannot disagree about
 # what is installed. R 4.4.1, Bioconductor 3.20, a CRAN snapshot, the Google
 # Cloud SDK, and every package the panels load, including
 # MotrpacHumanPreSuspensionAnalysis at its current release.
@@ -88,11 +88,11 @@ RUN . /etc/os-release \
        >> "${R_HOME}/etc/Rprofile.site" \
     && echo "CRAN snapshot: ${REPO}"
 
-# ---- R packages, from the manifests ------------------------------------------
+# ---- R packages, from the manifest -------------------------------------------
 # Two layers so a change to the GitHub pins does not rebuild the ~40-package
 # CRAN/Bioconductor layer beneath it. The cache mount keeps downloaded tarballs
 # across retries.
-COPY config/panel_packages.txt config/required_packages.tsv /opt/landscape/config/
+COPY config/packages.tsv /opt/landscape/config/packages.tsv
 COPY setup/install_packages.R /opt/landscape/setup/install_packages.R
 
 RUN --mount=type=cache,target=/tmp/Rdownloads,sharing=locked \

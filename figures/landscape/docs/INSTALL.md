@@ -3,18 +3,21 @@
 What `figures/landscape/` needs before its first run, how to install it, how to check
 the result, and the Docker alternative. Paths here are relative to `figures/landscape/`, as
 in `external_dependencies.md` beside this file; the commands are given from the repository
-root. The package list lives in two files under `config/` and everything here reads them
-rather than restating them:
+root. The package list lives in one file, `config/packages.tsv`, and everything here reads it
+rather than restating it. One row per package the figure scripts, the four fits and `lib/`
+load, 44 in all: 40 from CRAN and Bioconductor, `MotrpacBicQC` and `PLIER` from GitHub, and
+the two data packages. Three columns:
 
-| File | Holds |
+| Column | Holds |
 |---|---|
-| `config/panel_packages.txt` | every package the figure scripts, the four fits and `lib/` load: 39 from CRAN and Bioconductor, plus `MotrpacBicQC` and `PLIER` from GitHub. Each line names the package's source and the one-line R call that installs it on its own |
-| `config/required_packages.tsv` | the five pins whose version changes a number, not just an appearance: the two data packages, `MotrpacBicQC`, `ggpubr >= 1.0.0` and its `rstatix`. Each row names its source (CRAN, Bioconductor or GitHub) and the one-line R call that installs it on its own |
+| `package` | the package name |
+| `required_version` | empty for most rows. `>= x` is a floor the installer enforces and the preflight fails on; `== x` is the version every panel in `assembled/` was drawn under, which the preflight reports and nothing changes. Set on the five whose version changes a number, not just an appearance: the two data packages, `MotrpacBicQC`, `ggpubr >= 1.0.0` and its `rstatix` |
+| `install` | the one-line R call that installs the package on its own, at its current release |
 
 Three commands, run from the repository root:
 
 ```bash
-Rscript figures/landscape/setup/install_packages.R     # install what the two files name
+Rscript figures/landscape/setup/install_packages.R     # install what the file names
 bash    figures/landscape/setup/preflight.sh           # check the machine, panel by panel
 Rscript figures/landscape/figure_2/FIG2.R              # build something
 ```
@@ -25,7 +28,7 @@ Rscript figures/landscape/figure_2/FIG2.R              # build something
 |---|---|---|
 | **R 4.4.1** | the version every panel in `assembled/` was drawn under. R >= 4.4 is a hard floor (the Analysis package requires it); a later 4.x builds every panel but a number may differ in its last digit | everyone |
 | **Bioconductor 3.20** | the release that pairs with R 4.4 (3.19 also does; 4.5 pairs with 3.22, 4.6 with 3.23). Mixing releases is where `limma`, `edgeR` and `TMSig` stop loading together | everyone |
-| **System libraries** | macOS: Xcode command-line tools and **XQuartz**. Linux: the development headers listed in §2 | everyone |
+| **System libraries** | macOS: Xcode command-line tools and **XQuartz**. Linux: the development headers listed in §2. Windows: none | everyone |
 | **`MotrpacHumanPreSuspensionAnalysis` 2.0.8** | public, from GitHub. The aggregate results every panel reads, and the palettes and labels | everyone |
 | **`MotrpacBicQC` >= 2.0.0** | public, from GitHub. Both data packages require it | everyone |
 | **`MotrpacHumanPreSuspensionData` 2.0.3** | access-gated: a formal MoTrPAC consortium data-access request, then read access to a private GitHub repository. Of the 94 panels, 76 build without it; 17 panels, the four fits and their tables need it | the fits, FIG1C, ED1B, ED1D, SF1, and the single-feature and sex-stratified panels |
@@ -56,10 +59,6 @@ unable to load shared object '.../library/tcltk/libs/tcltk.so':
 
 and FIG4A, FIG4B and ED5A, which write their heatmaps through `cairo_pdf()`, fail to draw.
 
-If `gsutil` is on your shell's `PATH` but a script cannot find it, set `GSUTIL` to the full
-path (`config/landscape.env` reads it); RStudio launched from the Dock does not inherit the
-shell's `PATH`, which is one reason the scripts are run with `Rscript` from a terminal.
-
 ### Linux (Ubuntu 22.04 names)
 
 ```bash
@@ -74,6 +73,19 @@ sudo apt-get install -y \
 This is the list `docker/Dockerfile` installs (there as the runtime `libtcl8.6`/`libtk8.6`,
 since the rocker image's R is already built against them), which is the one place it has been
 exercised end to end. Other distributions: the same libraries under their own names.
+
+### Windows
+
+Windows has no additional required installs.
+
+### `PATH`, on every platform
+
+`Rscript` and `gsutil` have to resolve from the terminal you run the scripts in. If `gsutil`
+is on your shell's `PATH` but a script cannot find it, set `GSUTIL` to the full path
+(`config/landscape.env` reads it). RStudio launched from the Dock does not inherit the
+shell's `PATH`, which is one reason the scripts are run with `Rscript` from a terminal. On
+Windows the R installer does not add `C:\Program Files\R\R-4.4.1\bin` to `PATH`, and the
+Google Cloud SDK ships `gsutil.cmd`, so `GSUTIL` needs the full path with that extension.
 
 ### Google Cloud SDK
 
@@ -95,17 +107,18 @@ Rscript figures/landscape/setup/install_packages.R
 ```
 
 From a clean R this installs, in order: `BiocManager` and the Bioconductor release that pairs
-with your R; every missing CRAN and Bioconductor package in `config/panel_packages.txt` in one
+with your R; every missing CRAN and Bioconductor package in `config/packages.tsv` in one
 resolver pass; and `MotrpacBicQC`, `PLIER` and `MotrpacHumanPreSuspensionAnalysis` from the
-current release on GitHub. It then prints every row of `config/required_packages.tsv` with the
-installed version beside the version the panels were drawn under, and exits non-zero if
-anything a panel loads is still missing.
+current release on GitHub. It then prints every pinned row of the file with the installed
+version beside the required one, and exits non-zero if anything a panel loads is still
+missing.
 
 What it does not do: upgrade anything already installed. The versions each PDF was drawn from
 are recorded per panel in `outputs/panels/export_manifest.tsv`, and an unasked-for upgrade is
-the one way to make that record wrong without noticing. The single exception is `ggpubr`:
-below 1.0.0 it adjusts p-values across a different set of rows, FIG4G and ED6E move, and so
-it is the one blocking pin the installer corrects.
+the one way to make that record wrong without noticing. The single exception is a package
+below a `>=` floor in the file, in practice `ggpubr`: below 1.0.0 it adjusts p-values across
+a different set of rows, FIG4G and ED6E move, and so the installer moves it to the current
+release.
 
 `--dry-run` prints the plan and installs nothing. `--bioc=3.19` keeps an existing 3.19
 library on R 4.4 rather than moving it to 3.20 (the installer already does this when 3.19 is
@@ -134,9 +147,8 @@ The installer is a convenience over these calls. In R 4.4:
 ```r
 install.packages("BiocManager")
 BiocManager::install(version = "3.20")
-pkgs <- readLines("figures/landscape/config/panel_packages.txt")
-pkgs <- trimws(sub("#.*$", "", pkgs)); pkgs <- setdiff(pkgs[nzchar(pkgs)], c("MotrpacBicQC", "PLIER"))
-BiocManager::install(pkgs, update = FALSE, ask = FALSE)
+pkgs <- read.csv("figures/landscape/config/packages.tsv", sep = "\t", quote = "", comment.char = "#", check.names = FALSE)
+BiocManager::install(pkgs$package[!grepl("install_github", pkgs$install)], update = FALSE, ask = FALSE)
 install.packages("remotes")
 remotes::install_github("MoTrPAC/MotrpacBicQC", upgrade = "never")
 remotes::install_github("wgmao/PLIER", upgrade = "never")
@@ -146,7 +158,7 @@ remotes::install_github("MoTrPAC/MotrpacHumanPreSuspensionData", upgrade = "neve
 ```
 
 `pak::pak("MoTrPAC/MotrpacHumanPreSuspensionAnalysis")` also works, as each package's own
-README says. Either way the package lands at its current release; `config/required_packages.tsv`
+README says. Either way the package lands at its current release; `config/packages.tsv`
 records the version each panel was drawn under, and `preflight.sh` reports the difference.
 
 ## 4. Check the machine: `setup/preflight.sh`
@@ -164,8 +176,8 @@ sections:
 | | Checks | FAILs when |
 |---|---|---|
 | 1 | `Rscript`, R version, `gsutil`, `gcloud`, `curl` on `PATH` | no R, or R < 4.4 |
-| 2 | every package in `config/panel_packages.txt` is installed | any is missing |
-| 3 | every row of `config/required_packages.tsv` against its pin | the Analysis package is missing, or a **blocking** pin is off |
+| 2 | every package in `config/packages.tsv` is installed | any is missing |
+| 3 | every pinned row of `config/packages.tsv` against its `required_version` | the Analysis package is missing, or a package is below a `>=` floor |
 | 4 | the data packages attach; the installed builds carry the API the panels call (`plot_enrich_heatmap(return_drawing=)`, `load_qc(epigen=)`); `MotrpacBicQC` loads; Tcl/Tk and cairo capabilities; Bioconductor release pairs with R | a package that is installed does not attach, or the Analysis build predates 2.0.8 |
 | 5 | the three `config/*.json` parse, the seven `.env` files exist, every script the manifests name is on disk | any is missing |
 | 6 | the twelve tracked inputs under `*/sources/` and the 22 HOMER files; whether the two gated inputs are present | a tracked input is missing (an incomplete checkout) |
@@ -189,7 +201,7 @@ panels will: `EPIGEN_QC_DIR`, `PLIER_DIR`, `QUANT_BUCKET`, `GSUTIL` and the fit 
 
 ## 5. Docker
 
-The same environment as an image, built from the same two manifests by the same installer,
+The same environment as an image, built from the same manifest by the same installer,
 so the container and §3 cannot disagree. R 4.4.1 on `rocker/r-ver`, Bioconductor 3.20, a
 dated CRAN snapshot, the Google Cloud SDK, every panel package, and the Analysis package at
 its current release. `docker-compose.yml` at the repository root is the entry point:

@@ -64,6 +64,28 @@ To protect participant privacy and comply with data-use governance policies, ind
 
 The figure folders rely heavily on the `MotrpacHumanPreSuspensionAnalysis` and `MotrpacHumanPreSuspensionData` packages. Some data from external datasets are stored in the relevant figure folder, but most data are loaded through `MotrpacHumanPreSuspensionData`.
 
+## Installation
+
+The environment the `landscape` scripts run in is documented in
+[`figures/landscape/docs/INSTALL.md`](figures/landscape/docs/INSTALL.md): R 4.4.1, Bioconductor 3.20,
+the packages named in `figures/landscape/config/`, the two MoTrPAC data packages, and `gsutil`
+for the consortium-gated reads. Three commands from the repository root:
+
+```bash
+Rscript figures/landscape/setup/install_packages.R   # install what config/ names
+bash    figures/landscape/setup/preflight.sh         # check the machine; writes outputs/preflight_report.tsv
+docker compose build landscape                       # or build the same environment as an image
+```
+
+The preflight is a series of PASS/WARN/FAIL checks in the style of the
+`motrpac-human-presuspension-repro` Stage 0 script: tools, packages, pins, config, vendored
+inputs, fits, bucket access, downloads, and machine resources. `docker-compose.yml` runs the
+scripts inside the image with the repository mounted.
+
+The other manuscripts' folders are run script by script. The installer and the preflight read
+only the `landscape` manifests; the other folders load a few packages beyond that list
+(`conflicted`, `UpSetR`, `tidyverse`) and are not checked.
+
 ## Running the figure scripts
 
 Instructions for running each manuscript's figure code:

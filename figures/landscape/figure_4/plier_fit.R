@@ -377,7 +377,7 @@ fit_arm <- function(arm) {
   # A fit on disk with no response grid beside it: rebuild the grid off the fit
   # rather than refitting. The grid is the cheap half and it moves on its own —
   # it is Wilcoxon tests through ggpubr, and compare_means() changed how it
-  # adjusts p at ggpubr 1.0.0 (config/required_packages.tsv). Deleting the
+  # adjusts p at ggpubr 1.0.0 (config/packages.tsv). Deleting the
   # response .rds is how to redo it after such a change; the RNA arm is two
   # hours and none of it is the grid.
   if (!FORCE && all(file.exists(paths[c("plier", "input")]))) {

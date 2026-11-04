@@ -384,16 +384,16 @@ explain_failure <- function(e) {
   if (hit("there is no package called")) {
     pkg <- sub(".*there is no package called [‘'\"]?([^’'\"]+).*", "\\1", msg)
     return(c(sprintf("why: the package '%s' is not installed.", pkg),
-             "     config/panel_packages.txt lists every package the figures need."))
+             "     config/packages.tsv lists every package the figures need."))
   }
   if (hit("could not find function")) {
     return(c("why: a function is not in scope, so a package is missing or a helper",
-             "     was not sourced. config/panel_packages.txt lists the packages."))
+             "     was not sourced. config/packages.tsv lists the packages."))
   }
   if (hit("object '[A-Z][A-Z0-9_]+' not found")) {
     return(c("why: a data-package object is not on the search path.",
              "     Check MotrpacHumanPreSuspensionData and ...Analysis are installed",
-             "     at the versions config/required_packages.tsv pins, and attached."))
+             "     at the versions config/packages.tsv pins, and attached."))
   }
   if (hit("cannot open (the connection to|URL) 'https?://|Timeout of [0-9]+ seconds")) {
     return(c("why: an HTTPS download failed (the public epigenomics DA release on",

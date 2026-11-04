@@ -241,18 +241,54 @@ from `MotrpacHumanPreSuspensionAnalysis` rather than from a figure script.
 
 ### Before the first run
 
-You need all five of these. Nothing here checks them for you.
+You need all five of these. [`docs/INSTALL.md`](docs/INSTALL.md) walks through installing them,
+`setup/install_packages.R` installs the R packages from the two manifests under `config/`, and
+`setup/preflight.sh` checks every row of this table, and more, before a run.
 
 | | |
 |---|---|
 | **R 4.4.1** | the version every panel in `assembled/` was drawn under |
 | **The two data packages** | `MotrpacHumanPreSuspensionData` 2.0.3 and `MotrpacHumanPreSuspensionAnalysis` 2.0.8, installed from source. `Data` needs an approved consortium data-access request; `Analysis` is public. Data 2.0.3 requires Analysis >= 2.0.8 |
-| **The packages in `config/panel_packages.txt`** | 37 packages: 35 from CRAN and Bioconductor, plus `MotrpacBicQC` and `PLIER` (`wgmao/PLIER`) from GitHub. `config/required_packages.tsv` pins the five whose version changes the numbers: the two data packages, `MotrpacBicQC`, and `ggpubr >= 1.0.0` with the `rstatix` it requires |
-| **`MotrpacBicQC` >= 2.0.0** | from the `v2.0.0` tag. Both data packages declare it in `Remotes` (`MoTrPAC/MotrpacBicQC@v2.0.0`) |
+| **The packages in `config/packages.tsv`** | 44 rows: 40 from CRAN and Bioconductor (four of them annotation packages), `MotrpacBicQC` and `PLIER` (`wgmao/PLIER`) from GitHub, and the two data packages. Its `required_version` column pins the five whose version changes the numbers: the two data packages, `MotrpacBicQC`, and `ggpubr >= 1.0.0` with the `rstatix` it requires |
+| **`MotrpacBicQC` >= 2.0.0** | from GitHub (`MoTrPAC/MotrpacBicQC`). Both data packages require it |
 | **`gsutil` on `PATH`**, authenticated | for the epigenomics QC matrices (FIG1C, ED1B, ED1D, SF1, cached under `staging/`), the SF1C-SF1F raw ATAC counts, the ED1A ancestry PCs and the sex and cell-type DA fits. The epigenomics DA tables are a public HTTPS download and need no `gsutil` |
 
 Scripts must be run with **`Rscript`**, not sourced from an R console or RStudio. Each one locates
 this directory from its own file path, which a console session does not have.
+
+### Check the machine
+
+```bash
+Rscript figures/landscape/setup/install_packages.R     # install what config/ names
+bash    figures/landscape/setup/preflight.sh           # then check
+bash    figures/landscape/setup/preflight.sh --no-network
+```
+
+The preflight follows the Stage 0 script of `motrpac-human-presuspension-repro`: one line per
+check, a report at `outputs/preflight_report.tsv`, and a non-zero exit only when something
+required is missing. It checks the tools on `PATH`, every package and pin in
+`config/packages.tsv`, that the data packages attach and carry the API the
+panels call, that the manifests parse and name scripts that exist, that the vendored inputs
+are in the checkout, which fits have run, consortium bucket access, the public epigenomics DA
+download, and disk and memory. `FAIL` blocks a run; `WARN` names the panels that will not
+build or whose numbers may differ; `INFO` is a state the scripts handle themselves (a fit not
+yet run, a gated input absent). On a public machine with every package installed, expect no
+`FAIL`, a `WARN` for the Data package and the buckets, and 76 buildable panels.
+
+### Docker
+
+The same environment as an image, built from the same manifests by the same installer.
+`docker-compose.yml` at the repository root:
+
+```bash
+docker compose build landscape
+docker compose run --rm landscape bash figures/landscape/setup/preflight.sh
+docker compose run --rm landscape Rscript figures/landscape/figure_2/FIG2.R
+```
+
+The repository is mounted read-write, so outputs and the epigen cache persist on the host. The
+gated Data package is not in the image; mount a checkout or bake it in with a token, as
+[`docs/INSTALL.md`](docs/INSTALL.md) §5 describes.
 
 ### Build everything
 
@@ -321,7 +357,7 @@ recognisable ones, an indented `why:` follows it saying what to do:
 ```
 [FAIL] FIG4A    there is no package called 'ComplexHeatmap'
         why: the package 'ComplexHeatmap' is not installed.
-             config/panel_packages.txt lists every package the figures need.
+             config/packages.tsv lists every package the figures need.
 ```
 
 It recognises a missing package, a function not in scope, a data-package object not on the
@@ -395,10 +431,13 @@ figures/landscape/
 ├── run_all.R                               build every figure and table
 ├── single_feature_plots.R                  the sixteen single-feature panels, defined once
 ├── assembled/                              the figures and tables as submitted (see `assembled/README.md`)
-├── docs/                                   external_dependencies.md: every input the data packages do not carry
+├── docs/                                   INSTALL.md: installing the environment, natively or in Docker;
+│                                           external_dependencies.md: every input the data packages do not carry
 ├── lib/                                    panel and table export, highlights, shared helpers
 ├── config/                                 panel_map.json, table_map.json, highlights.json,
 │                                           landscape.env, package manifests
+├── setup/                                  install_packages.R (installs from config/), preflight.sh (checks)
+├── docker/                                 Dockerfile and entrypoint; docker-compose.yml is at the repository root
 └── outputs/panels/, outputs/tables/        what a run writes
 ```
 
